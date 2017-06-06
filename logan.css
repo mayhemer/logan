@@ -1,0 +1,128 @@
+html {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #eeeeea;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  /*font-size: 12px;*/
+  margin: 0;
+  padding: 0;
+}
+
+.indent {
+  margin-left: 1em; /* maybe padding? */
+}
+
+div,h2 {
+  margin: 0;
+  padding: 0;
+}
+.topbar > h2 {
+  font-size-adjust: 0.3;
+  display: inline;
+}
+
+div.section {
+  display: none;
+  margin: 16%;
+  padding: 2em;
+  align-self: center;
+  border: solid 1px gray;
+}
+
+div.results {
+  font-family: Courier New, Courier, monospace;
+  margin: 0;
+  padding: 0;
+  background-color: white;
+  white-space: nowrap;
+  border: none;
+}
+
+div.result_summary {
+  cursor: pointer;
+  padding: 0 0 0 1em
+}
+div.result_summary:hover {
+  background-color: #ffe;
+}
+div.result_summary:has(expansion) {
+  background-color: #ffe;
+}
+
+div.result_summary.added {
+  color: #555;
+}
+div.result_summary.added > div {
+  color: black;
+}
+
+div.expansion {
+  padding: 1em;
+  background-color: #ffe;
+  cursor: default;
+  border-left: solid 1px black;
+}
+.expansion div.prop {
+  font-weight: bolder;
+}
+.expansion div.label {
+  color: #444;
+  padding: 0.25em 0 0;
+}
+.expansion div.obj {
+  padding-left: 2em;
+  cursor: pointer;
+  font-weight: bolder;
+}
+
+div.topbar {
+  display: none;
+  margin: 0;
+  padding: 0.25em;
+  border-bottom: solid 1px gray;
+}
+
+input.button.big {
+  background-color: #008CBA;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: block;
+  font-size: 16px;
+  margin: 1em auto 0 auto;
+  cursor: pointer;
+}
+.topbar > input.button.big {
+  margin: .5em;
+  position: relative;
+  float: right;
+  top: -61px;
+  right: 1em;
+}
+
+label:not(.tail) {
+  display: inline-block;
+  min-width: 10em;
+  text-align: right;
+}
+.topbar > label {
+  font-size-adjust: 0.5;
+}
+
+input[type=text],
+select {
+  border: solid 1px gray;
+  margin: 0.25em;
+}
+
+input[type=text]{
+  width: 15em;
+}
+select:not(.narrow) {
+  width: 12em;
+}
