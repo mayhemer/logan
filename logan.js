@@ -1,5 +1,32 @@
 var logan = null;
 
+Array.prototype.binaryFirstLessThenOrEqual = function(target, comparator)
+{
+  let t = this.length - 1;
+
+  if (t == 0) {
+    return undefined;
+  }
+  if (comparator(this[t], target) <= 0) {
+    return this[t];
+  }
+  if (comparator(this[0], target) > 0) {
+    return null;
+  }
+
+  let f = 0;
+  do {
+    var c = (t + f) >> 1;
+    if (comparator(this[c], target) <= 0) {
+      f = c;
+    } else {
+      t = c;
+    }
+  } while ((t - f) > 1);
+
+  return this[f];
+};
+
 (function() {
 
 function ensure(array, itemName, def = {})
@@ -44,94 +71,127 @@ function convertPrintfToRegexp(printf)
   return new RegExp('^' + printf + '$');
 }
 
-const FILE_SLICE = 10 * 1024 * 1024;
+const FILE_SLICE = 512 * 1024;
 const LINE_MAIN_REGEXP = /^(\d+-\d+-\d+ \d+:\d+:\d+.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/;
+const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+
+function Obj(ptr, logan)
+{
+  this.id = logan.objects.length;
+  this.props = { pointer: ptr, className: null };
+  this.captures = [];
+  this.references = 0;
+  this.logan = logan;
+  this.file = logan._proc.file;
+
+  // This is used for placing the summary of the object (to generate
+  // the unique ordered position, see UI.position.)
+  // Otherwise there would be no other way than to use the first capture
+  // that would lead to complicated duplications.
+  this.placement = {
+    time: this.logan._proc.timestamp,
+    id: ++this.logan._proc.captureid,
+  };
+
+  logan.objects.push(this);
+}
+
+Obj.prototype.create = function(className)
+{
+  ensure(this.logan.searchProps, className, { pointer: true, state: true });
+
+  if (this.props.className) {
+    throw "recreating object (TODO)";
+  }
+  this.props.className = className;
+  this.props.state = "created";
+  return this.capture();
+};
+
+Obj.prototype.destroy = function()
+{
+  delete this.logan._proc.objs[this.props.pointer];
+  this.props.state = "released";
+  return this.capture();
+};
+
+function Capture(_proc, what)
+{
+  this.time = _proc.timestamp,
+  this.line = _proc.linenumber,
+  this.id = ++_proc.captureid,
+  this.what = what;
+}
+
+Obj.prototype.capture = function(what)
+{
+  what = what || this.logan._proc.line;
+  if (typeof what === "object" && "linkBy" in what) {
+    ++this.references;
+  }
+  let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(this.logan._proc, what);
+  this.captures.push(capture);
+  return this;
+};
+
+Obj.prototype.prop = function(name, value, merge = false)
+{
+  ensure(this.logan.searchProps, this.props.className)[name] = true;
+
+  if (value === undefined) {
+    delete this.props[name];
+  } else if (typeof value === "function") {
+    this.props[name] = value(this.props[name] || 0);
+  } else if (merge && this.props[name]) {
+    this.props[name] += value;
+  } else {
+    this.props[name] = value;
+  }
+  return this;
+};
+
+Obj.prototype.state = function(state)
+{
+  return this.prop("state", state);
+};
+
+Obj.prototype.links = function(that)
+{
+  that = logan._proc.obj(that);
+  let capture = new Capture(this.logan._proc, { linkFrom: this, linkTo: that });
+  this.capture(capture);
+  that.capture(capture);
+  return this;
+};
+
+Obj.prototype.guid = function(guid)
+{
+  this.guid = guid;
+  ensure(logan._proc.global, "guids")[guid] = this;
+};
+
 
 // export
 logan = {
+  // processing state sub-object, passed to rule consumers
+  // initialized in consumeFile(s)
   _proc: {
-    create: function(self, className)
+    obj: function(ptr)
     {
-      if (self in this.objs) {
-        console.warn("Object already exists at " + logan.filename + ":" + logan.linenumber);
+      if (typeof obj === "object") {
+        return obj;
       }
-
-      var obj = {
-        props: {
-          className: className,
-          pointer: self,
-          state: "init",
-        },
-        id: logan.objects.length, // unique per all processed log files
-        linksTo: [], // lists obj.id
-        linkedBy: [], // lists obj.id
-        createFile: logan.filename,
-        createOffset: logan.fileoffset,
-        createTime: this.timestamp
-      };
-      logan.objects.push(obj);
-      this.objs[self] = obj;
-
-      // deliberately ommiting the className prop, since that is the first level default only
-      ensure(logan.searchProps, className, { pointer: true, state: true });
-
+      var obj = this.objs[ptr];
+      if (!obj) {
+        this.objs[ptr] = (obj = new Obj(ptr, logan));
+      }
       return obj;
     },
 
-    destroy: function(self)
+    global_obj: function(guid)
     {
-      var obj = (typeof self === "object") ? self : this.objs[self];
-      if (!obj) {
-        console.warn("Object doesn't exist at " + logan.filename + ":" + logan.linenumber);
-        return;
-      }
-
-      obj.props.state = "released";      
-      obj.destroyFile = logan.filename;
-      obj.destroyOffset = logan.fileoffset;
-      obj.destroyTime = this.timestamp;
-      delete this.objs[obj.props.pointer];
-    },
-
-    link: function(master, slave)
-    {
-      var src = (typeof master === "object") ? master : this.objs[master];
-      var trg = (typeof slave === "object") ? slave : this.objs[slave];
-      if (!src) {
-        console.warn("Source object doesn't exist at " + logan.filename + ":" + logan.linenumber);
-        return;
-      }
-      if (!trg) {
-        console.warn("Target object doesn't exist at " + logan.filename + ":" + logan.linenumber);
-        return;
-      }
-
-      src.linksTo.push([trg.id, logan.filename, logan.fileoffset]);
-      trg.linkedBy.push([src.id, logan.filename, logan.fileoffset]);
-    },
-
-    prop: function(self, name, value, merge = false)
-    {
-      var obj = (typeof self === "object") ? self : this.objs[self];
-      if (!obj) {
-        console.warn("Object doesn't exist at " + logan.filename + ":" + logan.linenumber);
-        return;
-      }
-
-      // Update the list of searchable object properties
-      ensure(logan.searchProps, obj.props.className)[name] = true;
-
-      if (merge && obj.props[name]) {
-        obj.props[name] += value;
-      } else {
-        obj.props[name] = value;
-      }
-    },
-
-    state: function(self, state)
-    {
-      prop(self, "state", state);
-    },
+      return this.logan._proc.global.guids[guid] || new Obj(null, this.logan);
+    }
   },
 
   _rules: {
@@ -176,6 +236,7 @@ logan = {
     this.objects = [];
     this.searchProps = {};
     this._proc.global = {};
+    this._proc.captureid = 0;
 
     this.filesToProcess = Array.from(files);
 
@@ -194,20 +255,20 @@ logan = {
       // a new file to process
       file = this.filesToProcess.shift();
       this.eollength = 1;
-      this.linenumber = 0;
       this.filename = file.name;
       this.fileoffset = 0;
 
       this._proc.threads = {};
       this._proc.objs = {};
       this._proc.file = file;
+      this._proc.linenumber = 0;
       this._proc.child = isChildFile(file);
     }
 
     var blob = file.slice(offset, offset + FILE_SLICE);
     if (blob.size == 0) {
       if (previousLine) {
-        this.consumeLine(file, previousLine);
+        this.consumeLine(UI, file, previousLine);
       }
       this.processEOF(UI);
       this._proc.file = null;
@@ -227,11 +288,11 @@ logan = {
 
         // This simple code assumes that a single line can't be longer than FILE_SLICE
         previousLine += lines.shift();
-        this.consumeLine(file, previousLine);
+        this.consumeLine(UI, file, previousLine);
 
         previousLine = lines.pop();
         for (let line of lines) {
-          this.consumeLine(file, line);
+          this.consumeLine(UI, file, line);
         }
 
         this.consumeFile(UI, file, offset + FILE_SLICE, previousLine);
@@ -247,11 +308,12 @@ logan = {
     this.reader.readAsBinaryString(blob);
   },
 
-  consumeLine: function(file, line)
+  consumeLine: function(UI, file, line)
   {
+    ++this._proc.linenumber;
     this._proc.lineBinaryOffset = this.fileoffset;
     this.fileoffset += line.length + this.eollength;
-    ++this.linenumber;
+    UI.loadProgress(this.fileoffset, file.size);
 
     var main = line.match(LINE_MAIN_REGEXP);
     if (!main) {
@@ -270,14 +332,17 @@ logan = {
 
   processLine: function(ruleSet, file, line)
   {
+    this._proc.line = line;
     for (let rule of ruleSet) { // optmize this!!!
       try {
         if (rule.cond && !rule.cond(this._proc)) {
           continue;
         }
       } catch (e) {
-        // any exception from the condition checker is ignored
-        continue;
+        alert("\"" + e.message + "\" while processing rule condition at " + e.fileName + ":" + e.lineNumber +
+              "\n\nprocessed text: " + line + " at " + file.name + ":" + this._proc.linenumber +
+              "\n\nFile loading stopped");
+        throw e;
       }
 
       if (!rule.regexp) {
@@ -304,6 +369,7 @@ logan = {
 
   processEOS: function(UI)
   {
+    UI.loadProgress(0);
     UI.fillClassNames(this.searchProps);
     UI.fillSearchBy();
   },
@@ -348,7 +414,7 @@ logan = {
       if (!matchFunc(prop)) {
         continue;
       }
-      UI.addResult(obj);
+      UI.addObject(obj, "result");
     }
   },
 }; // logan impl
@@ -356,7 +422,17 @@ logan = {
 var UI =
 {
   expandedElement: null,
-  results: {},
+  display: {},
+  dynamicStyle: {},
+
+  loadProgress: function(prog, max = 1)
+  {
+    if (prog) {
+      $("#load_progress").show().css("width", (prog * 100.0 / max) + "%");
+    } else {
+      $("#load_progress").hide();
+    }
+  },
 
   setInitialView: function()
   {
@@ -372,7 +448,6 @@ var UI =
       $("#search_className").empty();
       $("#search_By").empty();
       $("#results_section").empty();
-      this.results = {};
     }
   },
 
@@ -382,7 +457,9 @@ var UI =
     $("#results_section").show();
     if (reset) {
       $("#results_section").empty();
-      this.results = {};
+      this.display = {};
+      $("#dynamic_style").empty();
+      this.dynamicStyle = {};
     }
   },
 
@@ -390,7 +467,9 @@ var UI =
   {
     let select = $("#search_className");
     for (let className in classNames) {
-      select.append($("<option>").attr("value", className).text(className));
+      if (className !== "null") {
+        select.append($("<option>").attr("value", className).text(className));
+      }
     }
   },
 
@@ -415,12 +494,17 @@ var UI =
   summary: function(obj)
   {
     var props = this.summaryProps(obj);
-    var summary = "";
+    var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
     for (let prop of props) {
       if (summary) summary += " \u2502 ";
       summary += obj.props[prop] || "-";
     }
     return summary;
+  },
+
+  quick: function(obj)
+  {
+    return (obj.props.className || "(" + obj.id + ")") + " @" + obj.props.pointer;
   },
 
   closeExpansion: function(newElement = null)
@@ -431,80 +515,138 @@ var UI =
     this.expandedElement = newElement;
   },
 
-  addResult: function(obj, under = null)
+  // this method is mostly meaningless, but leaving in case
+  // I invent something smart here...
+  // the plan to inteleave child processes is to process them
+  // in parallel processing always the oldest line from all
+  // open files on their respective cursors (yeah, fun..)
+  position: function(capture)
   {
-    if (obj.id in this.results) {
-      // already in the results!  we can alert :)
+    if (!capture) {
+      return 0;
+    }
+    return capture.id;
+  },
+
+  place: function(position, element)
+  {
+    if (this.display[position]) {
+      // When a link revealer is turned on, it is readded (the object has the same capture)
+      // Removing it would leave an element that is unchecked.
+      this.display[position].__refs++;
+      return this.display[position];
+    }
+
+    let keys = Object.keys(this.display);
+    keys.sort((a, b) => parseInt(a) - parseInt(b));
+    let following = keys.find((a) => parseInt(a) > parseInt(position));
+
+    if (following === undefined) { // can be last
+      $("#results_section").append(element);
+    } else { // has to be placed before
+      element.insertBefore(this.display[following]);
+    }
+
+    element.__refs = 1;
+    return (this.display[position] = element);
+  },
+
+  addRevealer: function(obj, builder, capture = null, includeSummary = false)
+  {
+    let element = $("<div>")
+      .addClass("log_line")
+      .addClass(() => includeSummary ? "" : "summary")
+      .append($("<input type='checkbox'>")
+        .on("change", function(event)
+        {
+          if (event.target.checked) {
+            if (includeSummary) {
+              this.addSummary(obj);
+            }
+            element.addClass("checked");
+            for (let capture of obj.captures) {
+              this.addCapture(obj, capture);
+            }
+          } else {
+            if (includeSummary) {
+              this.removeLine(this.position(obj.placement));
+            }
+            element.removeClass("checked");
+            for (let capture of obj.captures) {
+              this.removeLine(this.position(capture));
+            }
+          }
+        }.bind(this))
+      )
+      .click(function(event) {
+        // higlight
+      });
+
+    builder(element);
+    this.place(this.position(capture || obj.placement), element);
+    return element;
+  },
+
+  addSummary: function(obj)
+  {
+    let element = $("<div>")
+      .addClass("log_line expanded summary")
+      .addClass(() => (obj.references > 1) ? "shared" : "")
+      .append($("<span>")
+        .text(this.summary(obj)));
+
+    this.place(this.position(obj.placement), element);
+    return element;
+  },
+
+  addObject: function(obj)
+  {
+    this.addRevealer(obj, (element) =>
+    {
+      element
+        .addClass(() => (obj.references > 1) ? "shared" : "")
+        .append($("<span>")
+          .text(this.summary(obj)));
+    });
+  },
+
+  addCapture: function(obj, capture)
+  {
+    if (!capture.what) {
       return;
     }
 
-    this.results[obj.id] = true;
-
-    var summary = this.summary(obj);
-    var element = $("<div>")
-      .addClass("result_summary")
-      .text(summary)
-      .click(function(event)
-      {
-        var expansion = $("<div>").addClass("expansion");
-        this.closeExpansion(expansion);
-
-        var props = this.summaryProps(obj);
-        for (let prop in obj.props) {
-          if (!props.includes(prop)) {
-            var propLines = obj.props[prop].trim().split(/\n/);
-            for (propLine of propLines) {
-              expansion.append($("<div>").addClass("prop").text(
-                prop + ": " + propLine
-              ));
-            }
-          }
-        }
-
-        if (obj.linksTo.length) {
-          expansion.append($("<div>").addClass("label").text("Linking to"));
-        }
-        for (let linkto of obj.linksTo) {
-          var trg = logan.objects[linkto[0]];
-          expansion.append($("<div>").addClass("obj")
-            .text(UI.summary(trg))
-            .click(function(event)
-            {
-              this.closeExpansion();
-              this.addResult(trg, element).click();
-              event.stopPropagation();
-            }.bind(this))
-          );
-        }
-
-        if (obj.linkedBy.length) {
-          expansion.append($("<div>").addClass("label").text("Linked by"));
-        }
-        for (let linkby of obj.linkedBy) {
-          var trg = logan.objects[linkby[0]];
-          expansion.append($("<div>").addClass("obj")
-            .text(UI.summary(trg))
-            .click(function(event)
-            {
-              this.closeExpansion();
-              this.addResult(trg, element).click();
-              event.stopPropagation();
-            }.bind(this))
-          );
-        }
-
-        element.append(expansion);
-        event.stopPropagation();
-      }.bind(this));
-
-    if (!under) {
-      element.addClass("searched");
-      $("#results_section").append(element);
-    } else {
-      element.addClass("added");
-      $("<div>").addClass("indent").append(element).insertAfter(under);
+    if (typeof capture.what == "object") {
+      let linkFrom = capture.what.linkFrom;
+      let linkTo = capture.what.linkTo;
+      if (linkTo && linkFrom) {
+        this.addRevealer(obj === linkTo ? linkFrom : linkTo, (element) =>
+        {
+          element
+            .addClass("expanded")
+            .append($("<span>")
+              .text(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
+        }, capture, true);
+      }
+      return;
     }
-    return element;
+
+    let time = capture.time.toISOString().replace(/[TZ]/g, " ").trim();
+    let line = time + " \u2502 " + capture.what;
+    let element = $("<div>")
+      .addClass("log_line expanded")
+      .addClass(() => (obj.references > 1) ? "shared" : "")
+      .append($("<pre>").text(line));
+
+    this.place(this.position(capture), element);
+  },
+
+  removeLine: function(position)
+  {
+    if (this.display[position] && --this.display[position].__refs === 0) {
+      this.display[position].remove();
+      delete this.display[position];
+    }
   },
 }; // UI
 
@@ -523,6 +665,9 @@ $(() => {
 
   $("#search_button").click((event) =>
   {
+    if (logan.reader) {
+      return;
+    }
     UI.setResultsView(true);
     logan.search(UI,
       $("#search_className").val(),

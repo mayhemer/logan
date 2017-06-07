@@ -6,13 +6,26 @@ html {
 body {
   background-color: #eeeeea;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
-  /*font-size: 12px;*/
+}
+pre {
+  font-family: Courier New, Courier, monospace;
+}
+body, pre {
   margin: 0;
   padding: 0;
 }
 
 .indent {
   margin-left: 1em; /* maybe padding? */
+}
+
+div.load_progress {
+  background-color: greenyellow;
+  display: block;
+  width: 0;
+  height: 1em;
+  display: none;
+  margin-top: 4px;
 }
 
 div,h2 {
@@ -41,41 +54,41 @@ div.results {
   border: none;
 }
 
-div.result_summary {
+div.log_line {
   cursor: pointer;
   padding: 0 0 0 1em
 }
-div.result_summary:hover {
+div.log_line:hover {
   background-color: #ffe;
 }
-div.result_summary:has(expansion) {
-  background-color: #ffe;
+div.log_line.result {
 }
-
-div.result_summary.added {
-  color: #555;
-}
-div.result_summary.added > div {
-  color: black;
-}
-
-div.expansion {
-  padding: 1em;
-  background-color: #ffe;
-  cursor: default;
-  border-left: solid 1px black;
-}
-.expansion div.prop {
+div.log_line.expanded {
   font-weight: bolder;
 }
-.expansion div.label {
-  color: #444;
-  padding: 0.25em 0 0;
+div.log_line.checked {
+  font-weight: bold;
 }
-.expansion div.obj {
-  padding-left: 2em;
-  cursor: pointer;
-  font-weight: bolder;
+div.log_line.expanded.shared {
+  color: red;
+}
+div.log_line.expanded.summary,
+div.log_line.checked.summary {
+  background-color: greenyellow;
+}
+div.log_line.link_to:before {
+  content: '\21B3';
+}
+div.log_line.link_by:before {
+  content: '\2196';
+}
+
+div.log_line input[type="checkbox"] {
+  position: absolute;
+}
+div.log_line span,
+div.log_line pre {
+  margin-left: 2em;
 }
 
 div.topbar {
