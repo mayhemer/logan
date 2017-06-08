@@ -2,5 +2,4 @@
 {
   "editor.trimAutoWhitespace": true,
   "javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
-  "javascript.format.placeOpenBraceOnNewLineForFunctions": true,  
 }

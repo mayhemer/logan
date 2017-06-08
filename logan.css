@@ -20,7 +20,7 @@ body, pre {
 }
 
 div.load_progress {
-  background-color: greenyellow;
+  background-color: lime;
   display: block;
   width: 0;
   height: 1em;
@@ -28,11 +28,13 @@ div.load_progress {
   margin-top: 4px;
 }
 
-div,h2 {
+div {
   margin: 0;
   padding: 0;
 }
 .topbar > h2 {
+  margin: 0;
+  padding: 0;
   font-size-adjust: 0.3;
   display: inline;
 }
@@ -58,13 +60,12 @@ div.log_line {
   cursor: pointer;
   padding: 0 0 0 1em
 }
-div.log_line:hover {
-  background-color: #ffe;
+div.log_line.focused {
+  outline: solid 1px;
 }
-div.log_line.result {
-}
-div.log_line.expanded {
-  font-weight: bolder;
+div.log_line.expanded.revealer {
+  font-style: italic;
+  color: blue;
 }
 div.log_line.checked {
   font-weight: bold;
@@ -74,13 +75,15 @@ div.log_line.expanded.shared {
 }
 div.log_line.expanded.summary,
 div.log_line.checked.summary {
-  background-color: greenyellow;
+  font-weight: bolder;
+  color: black;
 }
-div.log_line.link_to:before {
-  content: '\21B3';
-}
-div.log_line.link_by:before {
-  content: '\2196';
+div.log_line.past_capture_limit:before {
+  content: '\258E';
+  color: red;
+  position: absolute;
+  left: 0;
+  font-style: normal;
 }
 
 div.log_line input[type="checkbox"] {
@@ -123,7 +126,7 @@ label:not(.tail) {
   min-width: 10em;
   text-align: right;
 }
-.topbar > label {
+.topbar label {
   font-size-adjust: 0.5;
 }
 

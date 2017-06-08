@@ -27,6 +27,7 @@
   <select id="search_By"></select>
 
   <select id="search_Matching" class="narrow">
+    <option value="any">any value</option>
     <option value="exact">exact match</option>
     <option value="contains">contains</option>
     <option value="!contains">not contains</option>
@@ -37,6 +38,14 @@
   <input id="search_PropValue" type="text" />
 
   <br/>
+
+  <span id="subsec_UpToLine">
+    <label for="search_UpToCapture">at line #</label>
+    <input id="search_UpToCapture" type="text" readonly="readonly"/>
+    <input id="uptoline_pick" class="small button" type="button" value="pick" />
+    <input id="uptoline_reset" class="small button" type="button" value="reset" />
+    <br/>
+  </span>
 
   <input id="search_button" class="big button" type="button" value="Search"/>
 </div>
