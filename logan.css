@@ -101,6 +101,11 @@ div.topbar {
   border-bottom: solid 1px gray;
 }
 
+div.button_container {
+  margin: 1em auto 0 auto;
+  display: block;
+  text-align: center;
+}
 input.button.big {
   background-color: #008CBA;
   border: none;
@@ -108,12 +113,15 @@ input.button.big {
   padding: 15px 32px;
   text-align: center;
   text-decoration: none;
-  display: block;
+  display: inline-block;
   font-size: 16px;
-  margin: 1em auto 0 auto;
   cursor: pointer;
 }
-.topbar > input.button.big {
+input.button.big.narrow {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.topbar > div.button_container {
   margin: .5em;
   position: relative;
   float: right;

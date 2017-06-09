@@ -32,6 +32,7 @@ Array.prototype.last = function() {
   const printfToRegexpMap = {
     "%p": "([A-Fa-f0-9]+)",
     "%d": "([\\d]+)",
+    "%u": "([\\d]+)",
     "%s": "([^\\s,]*)",
     "%x": "((?:0x)?[A-Fa-f0-9]+)",
   };
@@ -57,7 +58,7 @@ Array.prototype.last = function() {
   }
 
   const FILE_SLICE = 512 * 1024;
-  const LINE_MAIN_REGEXP = /^(\d+-\d+-\d+ \d+:\d+:\d+.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/;
+  const LINE_MAIN_REGEXP = /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/;
   const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
 
   function Obj(ptr, logan) {
@@ -135,6 +136,25 @@ Array.prototype.last = function() {
     return this;
   };
 
+  Obj.prototype.follow = function(cond) {
+    let capture = {
+      obj: this,
+    };
+
+    if (typeof cond === "number") {
+      capture.count = cond;
+      capture.follow = (obj, line, proc) => {
+        obj.capture(line);
+        return --capture.count;
+      };
+    } else {
+      capture.follow = cond;
+    }
+
+    this.logan._proc.thread._auto_follow = capture;
+    return this;
+  }
+
   Obj.prototype.prop = function(name, value, merge = false) {
     ensure(this.logan.searchProps, this.props.className)[name] = true;
 
@@ -169,14 +189,20 @@ Array.prototype.last = function() {
   };
 
   Obj.prototype.links = function(that) {
-    that = logan._proc.obj(that);
+    that = this.logan._proc.obj(that);
     let capture = new Capture(this, { linkFrom: this, linkTo: that });
     this.capture(capture);
     that.capture(capture).maybeShared(capture);
     return this;
   };
 
-  Obj.prototype.expose = function(that) {
+  Obj.prototype.mention = function(that) {
+    if (parseInt(that, 16) === 0) {
+      return this;
+    }
+    if (!(typeof that === "object") && !this.logan._proc.objs[that]) {
+      return this.capture({ untracked: that });
+    }
     that = logan._proc.obj(that);
     this.capture({ expose: that });
     return this;
@@ -184,7 +210,7 @@ Array.prototype.last = function() {
 
   Obj.prototype.guid = function(guid) {
     this.guid = guid;
-    ensure(logan._proc.global, "guids")[guid] = this;
+    ensure(this.logan._proc.global, "guids")[guid] = this;
   };
 
 
@@ -224,6 +250,10 @@ Array.prototype.last = function() {
 
     plainIf: function(condition, consumer) {
       this._rules.unmatch.push({ cond: condition, consumer: consumer });
+    },
+
+    parse: function(line, regexp, consumer) {
+      this.processRule(line, convertPrintfToRegexp(regexp), consumer);
     },
 
 
@@ -324,20 +354,37 @@ Array.prototype.last = function() {
 
       var main = line.match(LINE_MAIN_REGEXP);
       if (!main) {
-        this.processLine(this._rules.unmatch, file, line);
+        this.processLine([this._rules.unmatch], file, line);
         return;
       }
 
-      var [all, timestamp, thread, level, module, text] = main;
-      this._proc.timestamp = new Date(timestamp);
-      this._proc.thread = ensure(this._proc.threads, thread, { name: thread });
+      var [all, date, time, thread, level, module, text] = main;
+      this._proc.timestamp = new Date(date + "T" + time + "Z");
+      this._proc.thread = ensure(this._proc.threads, file + "|" + thread, { name: thread });
 
-      if (!this.processLine(this._rules.match, file, text)) {
-        this.processLine(this._rules.unmatch, file, text);
-      }
+      this.processLine([this._rules.match, this._rules.unmatch], file, text);
     },
 
-    processLine: function(ruleSet, file, line) {
+    processLine: function(rules, file, line) {
+      this._proc.thread._auto_follow = null;
+      for (let ruleSet of rules) {
+        if (this.processLineByRules(ruleSet, file, line)) {
+          this._proc.thread._auto_capture = this._proc.thread._auto_follow;
+          return true;
+        }
+      }
+
+      let autoCapture = this._proc.thread._auto_capture;
+      if (!autoCapture) {
+        return false;
+      }
+      if (!autoCapture.follow(autoCapture.obj, line, this._proc)) {
+        this._proc.thread._auto_capture = null;
+      }
+      return true;
+    },
+
+    processLineByRules: function(ruleSet, file, line) {
       this._proc.line = line;
       for (let rule of ruleSet) { // optmize this!!!
         try {
@@ -352,21 +399,31 @@ Array.prototype.last = function() {
         }
 
         if (!rule.regexp) {
+          if (!rule.cond) {
+            throw "INTERNAL ERROR: No regexp and no cond on a rule";
+          }
+
           rule.consumer.call(this._proc, line);
           return true;
         }
 
-        var match = line.match(rule.regexp)
-        if (!match) {
+        if (!this.processRule(line, rule.regexp, rule.consumer)) {
           continue;
         }
-
-        this._proc.match = match;
-        rule.consumer.apply(this._proc, match.slice(1));
         return true;
       }
 
       return false;
+    },
+
+    processRule: function(line, regexp, consumer) {
+      let match = line.match(regexp);
+      if (!match) {
+        return false;
+      }
+
+      consumer.apply(this._proc, match.slice(1));
+      return true;
     },
 
     processEOF: function(UI) {
@@ -446,6 +503,8 @@ Array.prototype.last = function() {
       }
     },
   }; // logan impl
+
+
 
   var UI =
     {
@@ -682,6 +741,16 @@ Array.prototype.last = function() {
             }, capture, true);
           }
 
+          let untracked = capture.what.untracked;
+          if (untracked) {
+            let element = $("<div>")
+              .addClass("log_line expanded revealer obj-" + obj.id)
+              .append($("<pre>").text("<untracked> @" + untracked))
+              .click(this.objHighlighter(obj));
+
+            return this.place(capture, element);
+          }
+
           // An empty or unknown capture is just ignored.
           return;
         }
@@ -770,17 +839,19 @@ Array.prototype.last = function() {
       UI.fillSearchBy(props);
     });
 
-    $("#search_button").click((event) => {
+    let search = function(reset, event) {
       if (logan.reader) {
         return;
       }
-      UI.setResultsView(true);
+      UI.setResultsView(reset);
       logan.search(UI,
         $("#search_className").val(),
         $("#search_By").val(),
         $("#search_PropValue").val(),
         $("#search_Matching").val());
-    });
+    }
+    $("#search_button").click(search.bind(this, true));
+    $("#search_button_add").click(search.bind(this, false));
 
     let linePicker = function(event) {
       // Maybe called manually to reset
