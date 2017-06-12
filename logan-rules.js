@@ -247,7 +247,7 @@ logan.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d
 logan.rule("nsHttpConnectionMgr::TryDispatchTransaction without conn " +
            "[trans=%p halfOpen=%p conn=%p ci=%p ci=%s caps=%x tunnelprovider=%p " +
            "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
-  this.thread.httptransaction = this.obj(trans).capture("attempt to dispatch").mention(ci_key);
+  this.thread.httptransaction = this.obj(trans).capture("Attempt to dispatch on " + ci_key).mention(ci_key);
   this.thread.conn_info = this.obj(ci_key).capture().follow((ci, line) => {
     if (line.match(/^\s\s/)) {
       ci.capture();

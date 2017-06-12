@@ -30,7 +30,7 @@ Array.prototype.last = function() {
   }
 
   const printfToRegexpMap = {
-    "%p": "([A-Fa-f0-9]+)",
+    "%p": "((?:0x)?[A-Fa-f0-9]+)",
     "%d": "([\\d]+)",
     "%u": "([\\d]+)",
     "%s": "([^\\s,]*)",
@@ -197,7 +197,7 @@ Array.prototype.last = function() {
   };
 
   Obj.prototype.mention = function(that) {
-    if (parseInt(that, 16) === 0) {
+    if (typeof that === "string" && that.match(/^0+$/)) {
       return this;
     }
     if (!(typeof that === "object") && !this.logan._proc.objs[that]) {
@@ -664,6 +664,8 @@ Array.prototype.last = function() {
           .addClass(() => includeSummary ? "" : "summary")
           .append($("<input type='checkbox'>")
             .on("change", function(event) {
+              let fromTop = element.offset().top - $(window).scrollTop();
+
               this.onExpansion(obj, element, event.target.checked);
               if (event.target.checked) {
                 this.objHighlighter(obj, top, true)();
@@ -683,6 +685,8 @@ Array.prototype.last = function() {
                   this.removeLine(this.position(capture));
                 }
               }
+
+              setTimeout(function() { $(window).scrollTop(element.offset().top - fromTop); }, 0);
             }.bind(this))
           );
 
