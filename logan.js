@@ -11,7 +11,7 @@ Array.prototype.last = function() {
 
   function ensure(array, itemName, def = {}) {
     if (!(itemName in array)) {
-      array[itemName] = def;
+      array[itemName] = (typeof def === "function") ? def() : def;
     }
 
     return array[itemName];
@@ -60,6 +60,13 @@ Array.prototype.last = function() {
   const FILE_SLICE = 512 * 1024;
   const LINE_MAIN_REGEXP = /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/;
   const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+
+  var HIGHLIGHTSET = ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
+  function nextHighlightColor() {
+    let result = HIGHLIGHTSET[0];
+    HIGHLIGHTSET.push(HIGHLIGHTSET.shift());
+    return result;
+  }
 
   function Obj(ptr, logan) {
     this.id = logan.objects.length;
@@ -512,6 +519,7 @@ Array.prototype.last = function() {
       display: {},
       dynamicStyle: {},
       activeRevealeres: 0,
+      objColors: {},
 
       loadProgress: function(prog, max = 1) {
         if (prog) {
@@ -548,6 +556,7 @@ Array.prototype.last = function() {
           this.dynamicStyle = {};
           this.activeRevealeres = 0;
           this.inFocus = null;
+          this.objColors = {};
         }
       },
 
@@ -571,16 +580,20 @@ Array.prototype.last = function() {
         }
       },
 
-      objHighlighter: function(obj, source = null, set = false) {
+      objHighlighter: function(obj, source = null, set) {
         source = source || obj;
 
-        let style = "div.log_line.obj-" + obj.id + " { background-color: #" + colorHash(
-          source.id * 0x12345 + parseInt(source.props.pointer, 16) * 0xf0f0f0
-        ) + "}";
+        let color = ensure(this.objColors, source.id, function() {
+          return nextHighlightColor();
+        }.bind(this));
+
+        let style = "div.log_line.obj-" + obj.id + " { background-color: " + color + "}";
 
         return function(event) {
-          if (set) {
+          if (set === true) {
             this.changeDynamicStyle("obj-" + obj.id, style);
+          } else if (set === false) {
+            this.changeDynamicStyle("obj-" + obj.id);
           } else {
             this.toggleDynamicStyle("obj-" + obj.id, style);
           }
@@ -667,8 +680,8 @@ Array.prototype.last = function() {
               let fromTop = element.offset().top - $(window).scrollTop();
 
               this.onExpansion(obj, element, event.target.checked);
+              this.objHighlighter(obj, top, event.target.checked)();
               if (event.target.checked) {
-                this.objHighlighter(obj, top, true)();
                 if (includeSummary && obj.props.className) {
                   this.addSummary(obj);
                 }
@@ -686,7 +699,7 @@ Array.prototype.last = function() {
                 }
               }
 
-              setTimeout(function() { $(window).scrollTop(element.offset().top - fromTop); }, 0);
+              $(window).scrollTop(element.offset().top - fromTop);
             }.bind(this))
           );
 
