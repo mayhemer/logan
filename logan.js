@@ -35,6 +35,7 @@ Array.prototype.last = function() {
     "%u": "([\\d]+)",
     "%s": "([^\\s,]*)",
     "%x": "((?:0x)?[A-Fa-f0-9]+)",
+    "%*$": "(.*$)",
   };
 
   function convertPrintfToRegexp(printf) {
@@ -67,6 +68,8 @@ Array.prototype.last = function() {
     HIGHLIGHTSET.push(HIGHLIGHTSET.shift());
     return result;
   }
+
+  var SEARCH_INDEXER = 0;
 
   function Obj(ptr, logan) {
     this.id = logan.objects.length;
@@ -286,7 +289,7 @@ Array.prototype.last = function() {
       this._proc.captureid = 0;
 
       this.filesToProcess = Array.from(files);
-      this.searchAt = 0;
+      this.seekId = 0;
 
       this.consumeFile(UI);
     },
@@ -445,7 +448,7 @@ Array.prototype.last = function() {
     search: function(UI, className, propName, matchValue, match) {
       var matchFunc;
       switch (match) {
-        case "exact": {
+        case "==": {
           matchFunc = function(prop) { return matchValue === prop; }
           break;
         }
@@ -459,44 +462,40 @@ Array.prototype.last = function() {
           matchFunc = function(prop) { return !prop.match(ncontains); }
           break;
         }
-        case "regexp": {
+        case "rx": {
           let regexp = new RegExp(matchValue, "g");
           matchFunc = function(prop) { return prop.match(regexp); }
           break;
         }
-        case "!regexp": {
+        case "!rx": {
           let nregexp = new RegExp(matchValue, "g");
           matchFunc = function(prop) { return !prop.match(nregexp); }
           break;
         }
-        case "any":
+        case "*":
           matchFunc = () => true;
           break;
         default:
           throw "Unexpected match operator";
       }
 
-      UI.captureLimitApplied = this.searchAt;
-
       for (let obj of this.objects) {
         if (className != obj.props.className) {
           continue;
         }
-        if (this.searchAt && obj.captures[0].id > this.searchAt) {
+        if (this.seekId && obj.captures[0].id > this.seekId) {
           continue;
         }
-        if (this.searchAt && obj.captures.last().id >= this.searchAt) {
+        if (this.seekId && obj.captures.last().id >= this.seekId) {
           // The object lives around the cutting point, find the prop value
           var prop = "";
           let capture = obj.captures.find(capture => {
-            if (capture.id > this.searchAt) {
+            if (capture.id > this.seekId) {
               return true;
             }
-            if (typeof capture.what === "object") {
-              if (capture.what.prop) console.log(capture.what.prop + "=" + capture.what.value);
-              if (capture.what.prop == propName) {
-                prop = capture.what.value;
-              }
+            if (typeof capture.what === "object" &&
+                capture.what.prop == propName) {
+              prop = capture.what.value;
             }
             return false;
           }, this);
@@ -515,6 +514,7 @@ Array.prototype.last = function() {
 
   var UI =
     {
+      searches: [],
       expandedElement: null,
       display: {},
       dynamicStyle: {},
@@ -531,33 +531,56 @@ Array.prototype.last = function() {
 
       setInitialView: function() {
         $("#file_load_section").removeClass().addClass("section").show();
+        $("#active_searches").hide();
         $("#search_section").hide();
+        $("#seek").hide();
       },
 
       setSearchView: function(reset) {
         $("#file_load_section").removeClass().addClass("topbar").show();
+        $("#active_searches").hide();
         $("#search_section").show();
+        $("#seek").hide();
         if (reset) {
           $("#search_className").empty();
           $("#search_By").empty();
           $("#results_section").empty();
-          $("#uptoline_reset").click();
+          this.seekTo(0);
         }
       },
 
-      setResultsView: function(reset) {
+      setResultsView: function() {
         $("#search_section").removeClass().addClass("topbar").show();
+        $("#active_searches").show();
         $("#results_section").show();
+        $("#seek").show();
         $("#search_By").change();
-        if (reset) {
-          $("#results_section").empty();
-          this.display = {};
-          $("#dynamic_style").empty();
-          this.dynamicStyle = {};
-          this.activeRevealeres = 0;
-          this.inFocus = null;
-          this.objColors = {};
+      },
+
+      clearResultsView: function() {
+        $("#results_section").empty();
+        this.display = {};
+        $("#active_searches").empty();
+        $("#search_reset_button").hide();
+        this.searches = [];
+        $("#dynamic_style").empty();
+        this.dynamicStyle = {};
+
+        this.activeRevealeres = 0;
+        this.inFocus = null;
+        this.objColors = {};
+      },
+
+      seekTo: function(seekId) {
+        if (seekId) {
+          $("#seek_to_tail").show();
+        } else {
+          $("#seek_to_tail").hide();
+          $("#seek_to").val("tail");
         }
+
+        logan.seekId = seekId;
+        this.redoSearches();
       },
 
       fillClassNames: function(classNames) {
@@ -577,6 +600,53 @@ Array.prototype.last = function() {
         select.empty();
         for (let prop in props) {
           select.append($("<option>").attr("value", prop).text(prop));
+        }
+      },
+
+      addSearch: function(search) {
+        search.id = ++SEARCH_INDEXER;
+        this.searches.push(search);
+
+        let descr = search.className;
+        if (search.matching !== "*") {
+          descr += "." + search.propName + "\xa0" + search.matching + "\xa0" + search.value;
+        }
+        let element = $("<div>")
+          .addClass("search")
+          .attr("id", "search-" + search.id)
+          .text(descr)
+          .append($("<input>")
+            .attr("type", "button")
+            .val("\uD83D\uDDD9") // X
+            .addClass("button icon")
+            .click(function() { this.removeSearch(search); }.bind(this))
+          );
+        $("#active_searches").append(element);
+
+        logan.search(
+          this,
+          search.className,
+          search.propName,
+          search.value,
+          search.matching
+        );
+
+        $("#search_reset_button").show();
+        return search;
+      },
+
+      removeSearch: function(search) {
+        // This clears the UI and performs all remaining search again
+        let index = this.searches.findIndex((item) => item.id == search.id);
+        this.searches.splice(index, 1);
+        this.redoSearches();
+      },
+
+      redoSearches: function() {
+        let searches = this.searches.slice();
+        this.clearResultsView(false); // todo - no expand history clear
+        for (search of searches) {
+          this.addSearch(search);
         }
       },
 
@@ -606,13 +676,39 @@ Array.prototype.last = function() {
       },
 
       summary: function(obj) {
-        var props = this.summaryProps(obj);
-        var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
-        for (let prop of props) {
-          if (summary) summary += " \u2502 ";
-          summary += obj.props[prop] || "-";
+        let props = this.summaryProps(obj);
+        let generate = (source) => {
+          var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
+          for (let prop of props) {
+            if (summary) summary += " \u2502 ";
+            summary += source.props[prop] || "-";
+          }
+          return summary;
         }
-        return summary;
+
+        if (!logan.seekId || obj.captures.last().id < logan.seekId) {
+          // Object is younger than the seek point, just pick the final props state
+          return generate(obj);
+        }
+
+        // Must collect properties manually
+        // TODO - could be optimized by walking backwards until
+        // all summary propeties are found
+        let objAt = {
+          props: {
+            className: obj.props.className,
+            pointer: obj.props.pointer,
+          }
+        };
+        for (let capture of obj.captures) {
+          if (capture.id > logan.seekId) {
+            break;
+          }
+          if (typeof capture.what === "object" && capture.what.prop) {
+            objAt.props[capture.what.prop] = capture.what.value;
+          }
+        }
+        return generate(objAt);
       },
 
       quick: function(obj) {
@@ -638,7 +734,7 @@ Array.prototype.last = function() {
       },
 
       place: function(capture, element) {
-        if (this.captureLimitApplied && capture.id > this.captureLimitApplied) {
+        if (logan.seekId && capture.id > logan.seekId) {
           element.addClass("past_capture_limit");
         }
 
@@ -654,7 +750,7 @@ Array.prototype.last = function() {
           return this.display[position];
         }
 
-        element.attr("capture", capture.id);
+        element.attr("id", capture.id);
 
         let keys = Object.keys(this.display);
         keys.sort((a, b) => parseInt(a) - parseInt(b));
@@ -752,7 +848,7 @@ Array.prototype.last = function() {
           if (expose) {
             return this.addRevealer(expose, (element) => {
               element
-                .addClass("expanded revealer obj-" + obj.id)
+                .addClass("expanded revealer obj-" + obj.id) // todo - transactions mentioned by ci are not hl
                 .append($("<span>").text("   " + this.quick(expose)))
                 .click(this.objHighlighter(expose))
             }, capture, true);
@@ -836,18 +932,19 @@ Array.prototype.last = function() {
 
 
   $(() => {
+    $("#tools_button").click((event) => {
+      alert("Coming soon :)");
+    });
     $("#files").on("change", (event) => {
       UI.setSearchView(true);
       logan.consumeFiles(UI, event.target.files);
     });
 
     $("#search_By").on("change", (event) => {
-      ($("#results_section").is(":visible"))
-        ? $("#subsec_UpToLine").show() : $("#subsec_UpToLine").hide();
     }).change();
 
     $("#search_Matching").on("change", (event) => {
-      (event.target.value == "any")
+      (event.target.value === "*")
         ? $("#search_PropValue").hide() : $("#search_PropValue").show();
     }).change();
 
@@ -856,58 +953,61 @@ Array.prototype.last = function() {
       UI.fillSearchBy(props);
     });
 
-    let search = function(reset, event) {
+    $("#search_button").click(function(event) {
       if (logan.reader) {
         return;
       }
-      UI.setResultsView(reset);
-      logan.search(UI,
-        $("#search_className").val(),
-        $("#search_By").val(),
-        $("#search_PropValue").val(),
-        $("#search_Matching").val());
-    }
-    $("#search_button").click(search.bind(this, true));
-    $("#search_button_add").click(search.bind(this, false));
+      UI.setResultsView();
+      UI.addSearch({
+        className: $("#search_className").val(),
+        propName: $("#search_By").val(),
+        value: $("#search_PropValue").val(),
+        matching: $("#search_Matching").val(),
+      });
+    }.bind(this));
+    $("#search_reset_button").click(() => { UI.clearResultsView(); });
 
     let linePicker = function(event) {
-      // Maybe called manually to reset
-      if (event) {
-        logan.searchAt = parseInt(this.getAttribute("capture"));
-
-        $("#search_UpToCapture").val(this.textContent);
-        event.stopPropagation();
-      }
-
       $("#results_section > div.log_line").each((i, element) => {
         element.removeEventListener("click", linePicker, true);
       });
 
-      $("#uptoline_pick").attr("disabled", null);
+      $("#seek_to").attr("disabled", null);
       UI.changeDynamicStyle("linepick");
+
+      if (!event) {
+        // Called manually to reset
+        return;
+      }
+
+      $("#seek_to").val(this.textContent.match(/(\d+:\d+:\d+\.\d+)/)[1] || this.textContent);
+      UI.seekTo(parseInt(this.getAttribute("id")));
+
+      event.stopPropagation();
     }
-    $("#uptoline_pick").click((event) => {
+    $("#seek_to").click((event) => {
       $("#results_section > div.log_line").each((i, element) => {
         element.addEventListener("click", linePicker, true);
       });
-      $("#uptoline_pick").attr("disabled", "disabled");
+      $("#seek_to").attr("disabled", "disabled");
       UI.changeDynamicStyle("linepick", "div.log_line:hover { cursor: alias !important; background-color: black !important; color: white !important }");
     });
-    $("#uptoline_reset").click((event) => {
-      logan.searchAt = 0;
-      $("#search_UpToCapture").val("");
-      linePicker();
+    $("#seek_to_tail").click((event) => {
+      UI.seekTo(0);
     });
 
-    $(window).on("keypress", (event) => {
+    let escapeHandler = (event) => {
       if (event.keyCode == 27) {
         UI.closeExpansion();
+        linePicker();
       }
-      linePicker();
-    });
+    };
+    $(document).keydown(escapeHandler);
+    $("#seek_to").keydown(escapeHandler);
 
     var files = $("#files").get()[0].files;
     if (files.length) {
+      UI.clearResultsView();
       UI.setSearchView(true);
       logan.consumeFiles(UI, files);
     } else {
