@@ -262,8 +262,10 @@ Array.prototype.last = function() {
       this._rules.unmatch.push({ cond: condition, consumer: consumer });
     },
 
-    parse: function(line, regexp, consumer) {
-      this.processRule(line, convertPrintfToRegexp(regexp), consumer);
+    parse: function(line, regexp, consumer, failedConsumer) {
+      if (!this.processRule(line, convertPrintfToRegexp(regexp), consumer) && failedConsumer) {
+        failedConsumer(line);
+      }
     },
 
 

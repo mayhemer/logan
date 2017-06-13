@@ -236,10 +236,11 @@ logan.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d
     if (line.match("done listing")) {
       return false;
     }
-    obj.capture(line);
-    logan.parse(line, "  %p", function(trans) {
+    logan.parse(line, "  %p", (trans) => {
       let _trans = logan._proc.obj(trans);
       obj.mention(trans);
+    }, (line) => {
+      obj.capture(line);
     });
     return true;
   });
