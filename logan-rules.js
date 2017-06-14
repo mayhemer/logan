@@ -1,4 +1,21 @@
 /******************************************************************************
+ * RequestContext
+ ******************************************************************************/
+
+logan.rule("RequestContext::RequestContext this=%p id=%x", function(ptr, id) {
+  this.obj(ptr).create("RequestContext").prop("id", id);
+});
+logan.rule("RequestContext::RequestContext this=%p blockers=%u", function(ptr) {
+  this.obj(ptr).destroy();
+});
+logan.rule("RequestContext::AddBlockingTransaction this=%p blockers=%u", function(ptr) {
+  this.obj(ptr).capture();
+});
+logan.rule("RequestContext::RemoveBlockingTransaction this=%p blockers=%u", function(ptr) {
+  this.obj(ptr).capture();
+});
+
+/******************************************************************************
  * HttpChannelParent
  ******************************************************************************/
 
@@ -16,7 +33,7 @@ logan.rule("Destroying HttpChannelParent [this=%p]", function(ptr) {
 logan.rule("Creating nsHttpChannel [this=%p]", function(ptr) {
   this.thread.httpchannel = this.obj(ptr).create("nsHttpChannel");
   if (this.thread.httpchannelparent) {
-    this.thread.httpchannelparent.links(this.thread.httpchannel);
+    this.thread.httpchannelparent.link(this.thread.httpchannel);
     this.thread.httpchannelparent = null;
   }
 });
@@ -30,7 +47,7 @@ logan.rule("nsHttpChannel::Init [this=%p]", function(ptr) {
 logan.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
   proc => proc.thread.httpchannel_init,
   function(oldch, newch) {
-    this.obj(oldch).capture().links(this.thread.httpchannel_init.alias(newch));
+    this.obj(oldch).capture().link(this.thread.httpchannel_init.alias(newch));
     this.thread.httpchannel_init = null;
   });
 logan.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
@@ -46,13 +63,13 @@ logan.rule("nsHttpChannel::OpenCacheEntry [this=%p]", function(ptr) {
   this.obj(ptr).capture();
 });
 logan.rule("nsHttpChannel::OnCacheEntryCheck enter [channel=%p entry=%p]", function(ch, entry) {
-  this.obj(ch).capture().mention(entry);
+  this.obj(ch).capture().mention(entry).follow((obj) => obj.capture());
 });
 logan.rule("nsHTTPChannel::OnCacheEntryCheck exit [this=%p doValidation=%d result=%d]", function(ch, val, result) {
   this.obj(ch).capture();
 });
 logan.rule("nsHttpChannel::OnCacheEntryAvailable [this=%p entry=%p new=%d appcache=%p status=%x mAppCache=%p mAppCacheForWrite=%p]", function(ch, entry, isnew) {
-  this.obj(ch).capture().links(entry);
+  this.obj(ch).capture().link(entry);
 });
 logan.rule("nsHttpChannel::TriggerNetwork [this=%p]", function(ptr) {
   this.obj(ptr).capture();
@@ -61,20 +78,23 @@ logan.rule("nsHttpChannel::SetupTransaction [this=%p]", function(ptr) {
   this.obj(ptr).capture();
 });
 logan.rule("nsHttpChannel %p created nsHttpTransaction %p", function(ch, tr) {
-  this.obj(ch).capture().links(tr);
+  this.obj(ch).capture().link(tr);
   this.obj(tr).prop("url", this.obj(ch).props["url"]);
 });
 logan.rule("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]", function(cl, ch) {
-  this.obj(ch).capture().links(cl);
+  this.obj(ch).capture().link(cl);
+});
+logan.rule("nsHttpChannel::ReadFromCache [this=%p] Using cached copy of: %s", function(ptr) {
+  this.obj(ptr).capture().prop("from-cache", true);
 });
 logan.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-  this.obj(ch).capture();
+  this.obj(ch).capture().state("started");
 });
 logan.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
-  this.obj(ch).capture();
+  this.obj(ch).capture().state("data");
 });
 logan.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-  this.obj(ch).capture().prop("status", status);
+  this.obj(ch).capture().prop("status", status).state("finished");
 });
 logan.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ptr) {
   this.obj(ptr).capture().prop("suspendcount", c => ++c);
@@ -122,7 +142,7 @@ logan.ruleIf("AtActiveConnectionLimit result: %s", proc => proc.thread.httptrans
 logan.rule("  adding transaction to pending queue [trans=%p pending-count=%d]", function(trans, pc) {
   trans = this.obj(trans).state("pending").capture();
   if (this.thread.conn_info) {
-    this.thread.conn_info.links(trans);
+    this.thread.conn_info.link(trans);
   }
 });
 logan.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
@@ -136,7 +156,7 @@ logan.ruleIf("http response [", proc => proc.thread.httptransaction, function() 
   this.thread.httptransaction = null;
 });
 logan.rule("nsHttpTransaction %p SetRequestContext %p", function(trans, rc) {
-  this.obj(rc).links(trans);
+  this.obj(rc).link(trans);
 });
 logan.rule("   blocked by request context: [rc=%p trans=%p blockers=%d]", function(rc, trans) {
   this.obj(trans).capture().mention(rc).state("blocked");
@@ -170,7 +190,7 @@ logan.rule("Creating nsHttpConnection @%p", function(ptr) {
 });
 logan.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%d]", function(conn, trans, caps) {
   this.obj(conn).capture();
-  this.obj(trans).state("active").links(conn);
+  this.obj(trans).state("active").link(conn);
 });
 logan.rule("nsHttpConnection::OnSocketWritable %p ReadSegments returned [rv=%d read=%d sock-cond=%x again=%d]", function(conn, rv, read, cond, again) {
   if (parseInt(read) > 0)
@@ -204,7 +224,7 @@ logan.rule("nsHalfOpenSocket::OnOutputStreamReady [this=%p ent=%s %s]", function
   this.thread.halfopen = this.obj(ptr).capture();
 });
 logan.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn) {
-  this.thread.halfopen.links(conn).capture();
+  this.thread.halfopen.link(conn).capture();
   this.thread.halfopen = null;
 });
 logan.rule("Destroying nsHalfOpenSocket [this=%p]", function(ptr) {
@@ -264,18 +284,23 @@ logan.rule("nsHttpConnectionMgr::TryDispatchTransaction without conn " +
 logan.summaryProps("nsConnectionEntry", "key");
 
 /******************************************************************************
- * RequestContext
+ * CacheEntry
  ******************************************************************************/
 
-logan.rule("RequestContext::RequestContext this=%p id=%x", function(ptr, id) {
-  this.obj(ptr).create("RequestContext").prop("id", id);
+logan.rule("CacheEntry::CacheEntry [this=%p]", function(ptr) {
+  this.thread.httpcacheentry = this.obj(ptr).create("CacheEntry");
 });
-logan.rule("RequestContext::RequestContext this=%p blockers=%u", function(ptr) {
-  this.obj(ptr).destroy("RequestContext");
+logan.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key) {
+  this.thread.httpcacheentry.capture().prop("key", key);
+  this.thread.httpcacheentry = null;
 });
-logan.rule("RequestContext::AddBlockingTransaction this=%p blockers=%u", function(ptr) {
-  this.obj(ptr).capture();
+logan.rule("CacheEntry::AsyncOpen [this=%p, state=%s, flags=%x, callback=%p]", function(entry, state, falgs, cb) {
+  entry = this.obj(entry).capture();
 });
-logan.rule("RequestContext::RemoveBlockingTransaction this=%p blockers=%u", function(ptr) {
-  this.obj(ptr).capture();
+logan.rule("New CacheEntryHandle %p for entry %p", function(handle, entry) {
+  this.obj(entry).capture().alias(handle);
 });
+logan.rule("CacheEntry::~CacheEntry [this=%p]", function(ptr) {
+  this.obj(ptr).destroy();
+});
+logan.summaryProps("CacheEntry", "key");

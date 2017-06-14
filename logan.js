@@ -7,6 +7,22 @@ Array.prototype.last = function() {
   return this[this.length - 1];
 };
 
+Array.prototype.remove = function(element, finder) {
+  let index = this.findIndex(finder);
+  if (index > -1) {
+    this.splice(index, 1);
+  }
+};
+
+Array.prototype.after = function(element, finder) {
+  let index = this.findIndex(finder);
+  if (index > -1) {
+    this.splice(index, 0, element);
+  } else {
+    this.push(element);
+  }
+};
+
 (function() {
 
   function ensure(array, itemName, def = {}) {
@@ -35,7 +51,7 @@ Array.prototype.last = function() {
     "%u": "([\\d]+)",
     "%s": "([^\\s,]*)",
     "%x": "((?:0x)?[A-Fa-f0-9]+)",
-    "%*$": "(.*$)",
+    "%\\\\\\*\\\\\\$": "(.*$)",
   };
 
   function convertPrintfToRegexp(printf) {
@@ -90,7 +106,7 @@ Array.prototype.last = function() {
     };
 
     this._references = {};
-    this.maybeShared = function(capture) {
+    this._maybeShared = function(capture) {
       if (this.shared) {
         return;
       }
@@ -198,11 +214,11 @@ Array.prototype.last = function() {
     return this.prop("state", state, merge);
   };
 
-  Obj.prototype.links = function(that) {
+  Obj.prototype.link = function(that) {
     that = this.logan._proc.obj(that);
     let capture = new Capture(this, { linkFrom: this, linkTo: that });
     this.capture(capture);
-    that.capture(capture).maybeShared(capture);
+    that.capture(capture)._maybeShared(capture);
     return this;
   };
 
@@ -210,10 +226,7 @@ Array.prototype.last = function() {
     if (typeof that === "string" && that.match(/^0+$/)) {
       return this;
     }
-    if (!(typeof that === "object") && !this.logan._proc.objs[that]) {
-      return this.capture({ untracked: that });
-    }
-    that = logan._proc.obj(that);
+    that = this.logan._proc.obj(that);
     this.capture({ expose: that });
     return this;
   };
@@ -517,6 +530,7 @@ Array.prototype.last = function() {
   var UI =
     {
       searches: [],
+      expand_tree: [],
       expandedElement: null,
       display: {},
       dynamicStyle: {},
@@ -536,6 +550,7 @@ Array.prototype.last = function() {
         $("#active_searches").hide();
         $("#search_section").hide();
         $("#seek").hide();
+        $("#expand_tree").hide();
       },
 
       setSearchView: function(reset) {
@@ -543,6 +558,7 @@ Array.prototype.last = function() {
         $("#active_searches").hide();
         $("#search_section").show();
         $("#seek").hide();
+        $("#expand_tree").hide();
         if (reset) {
           $("#search_className").empty();
           $("#search_By").empty();
@@ -556,6 +572,7 @@ Array.prototype.last = function() {
         $("#active_searches").show();
         $("#results_section").show();
         $("#seek").show();
+        $("#expand_tree").show();
         $("#search_By").change();
       },
 
@@ -563,8 +580,9 @@ Array.prototype.last = function() {
         $("#results_section").empty();
         this.display = {};
         $("#active_searches").empty();
-        $("#search_reset_button").hide();
         this.searches = [];
+        $("#expand_tree").empty();
+        this.expand_tree = [];
         $("#dynamic_style").empty();
         this.dynamicStyle = {};
 
@@ -633,7 +651,6 @@ Array.prototype.last = function() {
           search.matching
         );
 
-        $("#search_reset_button").show();
         return search;
       },
 
@@ -652,13 +669,16 @@ Array.prototype.last = function() {
         }
       },
 
+      objColor: function(obj) {
+        return ensure(this.objColors, obj.id, function() {
+          return nextHighlightColor();
+        });
+      },
+
       objHighlighter: function(obj, source = null, set) {
         source = source || obj;
 
-        let color = ensure(this.objColors, source.id, function() {
-          return nextHighlightColor();
-        }.bind(this));
-
+        let color = this.objColor(source);
         let style = "div.log_line.obj-" + obj.id + " { background-color: " + color + "}";
 
         return function(event) {
@@ -714,7 +734,7 @@ Array.prototype.last = function() {
       },
 
       quick: function(obj) {
-        return (obj.props.className || "(" + obj.id + ")") + " @" + obj.props.pointer;
+        return (obj.props.className || "?:" + obj.id) + " @" + obj.props.pointer;
       },
 
       closeExpansion: function(newElement = null) {
@@ -768,8 +788,7 @@ Array.prototype.last = function() {
         return (this.display[position] = element);
       },
 
-      addRevealer: function(obj, builder, capture = null, includeSummary = false, top = null) {
-        top = top || obj;
+      addRevealer: function(obj, builder, placement = null, includeSummary = false, parent = null) {
         let element = $("<div>")
           .addClass("log_line obj-" + obj.id)
           .addClass(() => includeSummary ? "" : "summary")
@@ -777,15 +796,16 @@ Array.prototype.last = function() {
             .on("change", function(event) {
               let fromTop = element.offset().top - $(window).scrollTop();
 
-              this.onExpansion(obj, element, event.target.checked);
-              this.objHighlighter(obj, top, event.target.checked)();
+              // Must call in this order, since onExpansion wants to get the same color
+              this.objHighlighter(obj, obj, event.target.checked)();
+              this.onExpansion(obj, parent, element, event.target.checked);
               if (event.target.checked) {
                 if (includeSummary && obj.props.className) {
                   this.addSummary(obj);
                 }
                 element.addClass("checked");
                 for (let capture of obj.captures) {
-                  this.addCapture(obj, capture, top);
+                  this.addCapture(obj, capture);
                 }
               } else {
                 if (includeSummary && obj.props.className) {
@@ -802,31 +822,31 @@ Array.prototype.last = function() {
           );
 
         builder(element);
-        return this.place(capture || obj.placement, element);
+        return this.place(placement || obj.placement, element);
       },
 
       addResult: function(obj) {
         return this.addRevealer(obj, (element) => {
           element
-            .addClass(() => (obj.references > 1) ? "shared" : "")
+            .addClass(() => (obj.shared) ? "shared" : "")
             .append($("<span>")
               .text(this.summary(obj)))
-            .click(this.objHighlighter(obj));
+          ;
         });
       },
 
-      addSummary: function(obj, top) {
+      addSummary: function(obj) {
         let element = $("<div>")
           .addClass("log_line expanded summary obj-" + obj.id)
-          .addClass(() => (obj.references > 1) ? "shared" : "")
+          .addClass(() => (obj.shared) ? "shared" : "")
           .append($("<span>")
             .text(this.summary(obj)))
-          .click(this.objHighlighter(obj, top));
+        ;
 
         return this.place(obj.placement, element);
       },
 
-      addCapture: function(obj, capture, top) {
+      addCapture: function(obj, capture) {
         if (!capture.what) {
           return;
         }
@@ -835,35 +855,23 @@ Array.prototype.last = function() {
           let linkFrom = capture.what.linkFrom;
           let linkTo = capture.what.linkTo;
           if (linkTo && linkFrom) {
+            let source = obj === linkTo ? linkTo : linkFrom;
             let target = obj === linkTo ? linkFrom : linkTo;
-            let highlight = top == linkTo ? top : (obj === linkFrom ? top : linkFrom);
             return this.addRevealer(target, (element) => {
               element
                 .addClass("expanded revealer obj-" + obj.id)
                 .append($("<span>")
                   .text(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
-                .click(this.objHighlighter(target, highlight))
-            }, capture, true, highlight);
+            }, capture, true, source);
           }
 
           let expose = capture.what.expose;
           if (expose) {
             return this.addRevealer(expose, (element) => {
               element
-                .addClass("expanded revealer obj-" + obj.id) // todo - transactions mentioned by ci are not hl
+                .addClass("expanded revealer obj-" + obj.id)
                 .append($("<span>").text("   " + this.quick(expose)))
-                .click(this.objHighlighter(expose))
-            }, capture, true);
-          }
-
-          let untracked = capture.what.untracked;
-          if (untracked) {
-            let element = $("<div>")
-              .addClass("log_line expanded revealer obj-" + obj.id)
-              .append($("<pre>").text("<untracked> @" + untracked))
-              .click(this.objHighlighter(obj));
-
-            return this.place(capture, element);
+            }, capture, true, obj);
           }
 
           // An empty or unknown capture is just ignored.
@@ -876,7 +884,7 @@ Array.prototype.last = function() {
           .addClass("log_line expanded obj-" + obj.id)
           .addClass(() => obj.shared ? "shared" : "")
           .append($("<pre>").text(line))
-          .click(this.objHighlighter(obj));
+        ;
 
         return this.place(capture, element);
       },
@@ -888,12 +896,48 @@ Array.prototype.last = function() {
         }
       },
 
-      onExpansion: function(obj, element, revealed) {
+      onExpansion: function(obj, parent, revealer, revealed) {
         if (this.inFocus) {
           this.inFocus.removeClass("focused");
         }
-        this.inFocus = element;
+        this.inFocus = revealer;
         this.inFocus.addClass("focused");
+
+        let parentExpand = parent ? this.expand_tree.find(item => item.obj === parent) : null;
+        let expand = this.expand_tree.find(item => item.obj === obj);
+        if (revealed) {
+          if (expand) {
+            expand.refs++;
+          } else {
+            expand = {
+              obj: obj,
+              revealer: revealer,
+              refs: 1,
+              element: $("<span>")
+                .addClass("branch").addClass(() => parent ? "child" : "parent")
+                .css("background-color", this.objColor(obj))
+                .text(this.quick(obj))
+            };
+            if (parentExpand) {
+              expand.element.insertAfter(parentExpand.element);
+              this.expand_tree.after(expand, item => item.obj === parent);
+            } else {
+              $("#expand_tree").append(expand.element);
+              this.expand_tree.push(expand);
+            }
+          }
+        } else {
+          if (expand) {
+            expand.refs--;
+            if (!expand.refs) {
+              expand.element.remove();
+              this.expand_tree.remove(expand, item => item.obj === expand.obj);
+            }
+          } else {
+            throw "Internal error - expand in the tree not found";
+          }
+        }
+
 
         let before = this.activeRevealeres;
         this.activeRevealeres += revealed ? 1 : -1;
@@ -914,11 +958,7 @@ Array.prototype.last = function() {
           delete this.dynamicStyle[id];
         }
 
-        let content = "";
-        for (id in this.dynamicStyle) {
-          content += this.dynamicStyle[id];
-        }
-
+        let content = Object.values(this.dynamicStyle).join("\n");
         $("#dynamic_style").html(content);
       },
 
@@ -967,7 +1007,6 @@ Array.prototype.last = function() {
         matching: $("#search_Matching").val(),
       });
     }.bind(this));
-    $("#search_reset_button").click(() => { UI.clearResultsView(); });
 
     let linePicker = function(event) {
       $("#results_section > div.log_line").each((i, element) => {
@@ -991,7 +1030,6 @@ Array.prototype.last = function() {
       $("#results_section > div.log_line").each((i, element) => {
         element.addEventListener("click", linePicker, true);
       });
-      $("#seek_to").attr("disabled", "disabled");
       UI.changeDynamicStyle("linepick", "div.log_line:hover { cursor: alias !important; background-color: black !important; color: white !important }");
     });
     $("#seek_to_tail").click((event) => {

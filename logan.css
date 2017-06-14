@@ -63,7 +63,7 @@ div.results {
 }
 
 div.log_line {
-  cursor: pointer;
+  /*cursor: pointer;*/
   padding: 0 0 0 1em
 }
 div.log_line.focused {
@@ -193,8 +193,6 @@ div.search:before {
   font-size-adjust: 0.4;
 }
 div.search {
-  background-color: #008CBA;
-  color: white;
   display: inline-block;
   white-space: nowrap;
   border-right: solid 1px black;
@@ -215,4 +213,20 @@ div#seek {
 input#seek_to_tail {
   display: none;
   color: red;
+}
+
+div#expand_tree {
+  font-size: 12px;
+}
+
+#expand_tree > span.branch {
+  display: inline-block;
+  padding: 0 0.5em;
+  border-bottom: solid 1px;
+}
+#expand_tree > span.branch.child:before {
+  content: '\21A6';
+}
+#expand_tree > span.branch.parent:before {
+  content: '\25FC';
 }
