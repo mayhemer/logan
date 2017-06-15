@@ -198,7 +198,7 @@
       },
 
       summaryProps: function(props) {
-        var custom = logan._ui.summary[props.className] || [];
+        var custom = logan._schema.ui.summary[props.className] || [];
         return ["className", "pointer"].concat(custom);
       },
 

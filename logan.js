@@ -23,15 +23,15 @@ Array.prototype.after = function(element, finder) {
   }
 };
 
-(function() {
-
-  function ensure(array, itemName, def = {}) {
-    if (!(itemName in array)) {
-      array[itemName] = (typeof def === "function") ? def() : def;
-    }
-
-    return array[itemName];
+function ensure(array, itemName, def = {}) {
+  if (!(itemName in array)) {
+    array[itemName] = (typeof def === "function") ? def() : def;
   }
+
+  return array[itemName];
+}
+
+(function() {
 
   function isChildFile(file) {
     return file.name.match(/\.child-\d+(?:\.\d)?$/);
@@ -65,9 +65,48 @@ Array.prototype.after = function(element, finder) {
     return new RegExp('^' + printf + '$');
   }
 
-  const FILE_SLICE = 512 * 1024;
-  const LINE_MAIN_REGEXP = /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/;
+  const FILE_SLICE = 1 * 1024 * 1024;
   const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+
+
+  function Schema(namespace, lineRegexp, linePreparer) {
+    this.namespace = namespace;
+    this.lineRegexp = lineRegexp;
+    this.linePreparer = linePreparer;
+    this.modules = {};
+    this.unmatch = [];
+    this.ui = {
+      summary: {}, // map: className -> prop to display on the summary line
+    };
+  }
+
+  Schema.prototype.module = function(name, builder)
+  {
+    builder(ensure(this.modules, name, new Module(name)));
+  }
+
+  Schema.prototype.plainIf = function(condition, consumer) {
+    this.unmatch.push({ cond: condition, consumer: consumer });
+  };
+
+  Schema.prototype.summaryProps = function(className, arrayOfProps) {
+    this.ui.summary[className] = arrayOfProps;
+  };
+
+
+  function Module(name) {
+    this.name = name;
+    this.rules = [];
+  }
+
+  Module.prototype.rule = function(exp, consumer) {
+    this.rules.push({ regexp: convertPrintfToRegexp(exp), cond: null, consumer: consumer });
+  };
+
+  Module.prototype.ruleIf = function(exp, condition, consumer) {
+    this.rules.push({ regexp: convertPrintfToRegexp(exp), cond: condition, consumer: consumer });
+  };
+
 
   function Obj(ptr, logan) {
     this.id = logan.objects.length;
@@ -179,7 +218,7 @@ Array.prototype.after = function(element, finder) {
     } else {
       this.props[name] = value;
     }
-    return this.capture({ prop: name, value: value });
+    return this.capture({ prop: name, value: this.props[name] });
   };
 
   Obj.prototype.state = function(state, merge = false) {
@@ -240,21 +279,16 @@ Array.prototype.after = function(element, finder) {
       }
     },
 
-    _rules: {
-      match: [],
-      unmatch: [],
+    _schemes: {},
+    _schema: null,
+
+    schema: function(name, lineRegexp, linePreparer, builder) {
+      this._schema = ensure(this._schemes, name, new Schema(name, lineRegexp, linePreparer));
+      builder(this._schema);
     },
 
-    rule: function(exp, consumer) {
-      this._rules.match.push({ regexp: convertPrintfToRegexp(exp), cond: null, consumer: consumer });
-    },
-
-    ruleIf: function(exp, condition, consumer) {
-      this._rules.match.push({ regexp: convertPrintfToRegexp(exp), cond: condition, consumer: consumer });
-    },
-
-    plainIf: function(condition, consumer) {
-      this._rules.unmatch.push({ cond: condition, consumer: consumer });
+    activeSchema: function(name) {
+      this._schema = this._schemes[name];
     },
 
     parse: function(line, regexp, consumer, failedConsumer) {
@@ -264,17 +298,9 @@ Array.prototype.after = function(element, finder) {
     },
 
 
-    _ui: {
-      summary: {}, // map: className -> prop to display on the summary line
-    },
-
-    summaryProps: function(className, arrayOfProps) {
-      this._ui.summary[className] = arrayOfProps;
-    },
-
     // The rest is considered private
 
-    filesToProcess: [],
+    _filesToProcess: [],
 
     consumeFiles: function(UI, files) {
       if (this.reader) {
@@ -285,7 +311,7 @@ Array.prototype.after = function(element, finder) {
       this._proc.global = {};
       this._proc.captureid = 0;
 
-      this.filesToProcess = Array.from(files);
+      this._filesToProcess = Array.from(files);
       this.seekId = 0;
 
       this.consumeFile(UI);
@@ -293,14 +319,14 @@ Array.prototype.after = function(element, finder) {
 
     consumeFile: function(UI, file = null, offset = 0, previousLine = "") {
       if (!file) {
-        if (!this.filesToProcess.length) {
+        if (!this._filesToProcess.length) {
           this.reader = null;
           this.processEOS(UI);
           return;
         }
 
         // a new file to process
-        file = this.filesToProcess.shift();
+        file = this._filesToProcess.shift();
         this.eollength = 1;
         this.filename = file.name;
         this.fileoffset = 0;
@@ -359,17 +385,15 @@ Array.prototype.after = function(element, finder) {
       this.fileoffset += line.length + this.eollength;
       UI.loadProgress(this.fileoffset, file.size);
 
-      var main = line.match(LINE_MAIN_REGEXP);
-      if (!main) {
-        this.processLine([this._rules.unmatch], file, line);
+      let lineMatch = line.match(this._schema.lineRegexp);
+      if (!lineMatch) {
+        this.processLine([this._schema.unmatch], file, line);
         return;
       }
 
-      var [all, date, time, thread, level, module, text] = main;
-      this._proc.timestamp = new Date(date + "T" + time + "Z");
-      this._proc.thread = ensure(this._proc.threads, file + "|" + thread, { name: thread });
-
-      this.processLine([this._rules.match, this._rules.unmatch], file, text);
+      let [module, text] = this._schema.linePreparer(lineMatch, this._proc);
+      module = this._schema.modules[module] || { rules: [] };
+      this.processLine([module.rules, this._schema.unmatch], file, text);
     },
 
     processLine: function(rules, file, line) {
