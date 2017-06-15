@@ -528,6 +528,7 @@
       alert("Coming soon :)");
     });
     $("#files").on("change", (event) => {
+      UI.clearResultsView();
       UI.setSearchView(true);
       logan.consumeFiles(UI, event.target.files);
     });

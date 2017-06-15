@@ -1,8 +1,7 @@
 logan.schema(
   "moz",
   /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/,
-  (lineMatch, proc) => {
-    var [all, date, time, thread, level, module, text] = lineMatch;
+  (proc, all, date, time, thread, level, module, text) => {
     proc.timestamp = new Date(date + "T" + time + "Z");
     proc.thread = ensure(proc.threads, proc.file.name + "|" + thread, { name: thread });
     return [module, text];

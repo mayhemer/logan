@@ -385,13 +385,13 @@ function ensure(array, itemName, def = {}) {
       this.fileoffset += line.length + this.eollength;
       UI.loadProgress(this.fileoffset, file.size);
 
-      let lineMatch = line.match(this._schema.lineRegexp);
-      if (!lineMatch) {
+      let match = line.match(this._schema.lineRegexp);
+      if (!match) {
         this.processLine([this._schema.unmatch], file, line);
         return;
       }
 
-      let [module, text] = this._schema.linePreparer(lineMatch, this._proc);
+      let [module, text] = this._schema.linePreparer.apply(null, [this._proc].concat(match));
       module = this._schema.modules[module] || { rules: [] };
       this.processLine([module.rules, this._schema.unmatch], file, text);
     },
