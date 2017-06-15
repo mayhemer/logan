@@ -929,7 +929,7 @@ Array.prototype.after = function(element, finder) {
               if (this.bc_details) {
                 this.bc_details.remove();
               }
-              this.bc_details = $("<div>")
+              let element = $("<div>")
                 .addClass("breadcrumb_details")
                 .css("background-color", withAlpha(this.objColor(obj), 0.4))
                 .append(
@@ -940,13 +940,14 @@ Array.prototype.after = function(element, finder) {
                   }.bind(this))
                 );
               this.summary(obj, Object.keys, (obj, props) => {
-                this.bc_details.append($("<div>")
+                element.append($("<div>")
                   .text(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
                 for (let prop of props) {
-                  this.bc_details.append($("<div>").text(prop + " = " + obj.props[prop]));
+                  element.append($("<div>").text(prop + " = " + obj.props[prop]));
                 }
               });
-              $("#breadcrumbs").append(this.bc_details);
+
+              $("#breadcrumbs").append(this.bc_details = $("<div>").append(element).append("<br>"));
             }.bind(this)),
         };
 
