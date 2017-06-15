@@ -16,6 +16,22 @@ logan.rule("RequestContext::RemoveBlockingTransaction this=%p blockers=%u", func
 });
 
 /******************************************************************************
+ * HttpChannelChild
+ ******************************************************************************/
+
+logan.rule("Creating HttpChannelChild @%p", function(ptr) {
+  this.thread.httpchannelchild = this.obj(ptr).create("HttpChannelChild");
+});
+logan.ruleIf("uri=%s", state => state.thread.httpchannelchild, function(uri) {
+  this.thread.httpchannelchild.prop("url", uri);
+  this.thread.httpchannelchild = null;
+});
+logan.rule("Destroying HttpChannelChild @%p", function(ptr) {
+  this.obj(ptr).destroy();
+});
+logan.summaryProps("HttpChannelChild", ["state", "url", "status"]);
+
+/******************************************************************************
  * HttpChannelParent
  ******************************************************************************/
 
@@ -291,11 +307,11 @@ logan.rule("CacheEntry::CacheEntry [this=%p]", function(ptr) {
   this.thread.httpcacheentry = this.obj(ptr).create("CacheEntry");
 });
 logan.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key) {
-  this.thread.httpcacheentry.capture().prop("key", key);
+  this.thread.httpcacheentry.prop("key", key);
   this.thread.httpcacheentry = null;
 });
 logan.rule("CacheEntry::AsyncOpen [this=%p, state=%s, flags=%x, callback=%p]", function(entry, state, falgs, cb) {
-  entry = this.obj(entry).capture();
+  this.obj(entry).capture();
 });
 logan.rule("New CacheEntryHandle %p for entry %p", function(handle, entry) {
   this.obj(entry).capture().alias(handle);

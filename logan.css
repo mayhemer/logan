@@ -56,15 +56,22 @@ div#tools {
 div.results {
   font-family: Courier New, Courier, monospace;
   margin: 0;
-  padding: 0;
+  padding: 0.125em 0;
   background-color: white;
   white-space: nowrap;
   border: none;
+  position: relative; /* this is just in case we want to place some position:absolute children over the results (like browser from fusion) */
+  font-size: 12px;
+}
+div.results:empty {
+  padding: 0;
 }
 
 div.log_line {
-  /*cursor: pointer;*/
-  padding: 0 0 0 1em
+  padding: 0 0 0 1em;
+}
+div.log_line:hover:not(.expanded) {
+  font-weight: bold;
 }
 div.log_line.focused {
   outline: solid 1px;
@@ -94,6 +101,7 @@ div.log_line.past_capture_limit:before {
 
 div.log_line input[type="checkbox"] {
   position: absolute;
+  margin: 0;
 }
 div.log_line span,
 div.log_line pre {
@@ -122,6 +130,11 @@ div.button_container {
 
 input.button {
   cursor: pointer;
+}
+input.button.close {
+  position: absolute;
+  top: 0.5em;
+  right: 0;
 }
 input.button.big {
   background-color: #008CBA;
@@ -197,10 +210,11 @@ div.search {
   white-space: nowrap;
   border-right: solid 1px black;
   border-bottom: solid 1px black;
-  padding: 0 0 0 .5em;
+  padding: 0 0 .125em .5em;
 }
 
-div.search > input {
+div.search > input,
+div.breadcrumb_details > input {
   color: red;
 }
 
@@ -213,20 +227,48 @@ div#seek {
 input#seek_to_tail {
   display: none;
   color: red;
+  font-weight: bold;
 }
 
-div#expand_tree {
+div#breadcrumbs {
   font-size: 12px;
+  position: sticky;
+  top: 0px;
+  z-index: 1;
+  background: rgba(255,255,255,0.8);
+  border-top: solid 1px gray;
+  margin-top: -1px;
 }
 
-#expand_tree > span.branch {
+/* :has in unsupported?
+div#breadcrumbs:has(.breadcrumb_details) {
+  padding-bottom: 1em;
+}
+*/
+
+#breadcrumbs > span.branch {
   display: inline-block;
   padding: 0 0.5em;
   border-bottom: solid 1px;
+  border-right: solid 1px;
+  margin: 0.3em;
+  cursor: pointer;
 }
-#expand_tree > span.branch.child:before {
-  content: '\21A6';
+#breadcrumbs > span.branch.child:before {
+  content: '\279c';
 }
-#expand_tree > span.branch.parent:before {
+#breadcrumbs > span.branch.parent:before {
   content: '\25FC';
+}
+
+#breadcrumbs > span.branch.parent:not(:first-child) {
+  clear: left;
+}
+
+div.breadcrumb_details {
+  padding: 1em 2em 1em 1em;
+  margin: 0 auto;
+  border: 1px solid gray;
+  max-width: 61%;
+  position: relative; /* to allow the close button positioning */
 }

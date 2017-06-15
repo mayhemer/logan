@@ -49,7 +49,7 @@ Array.prototype.after = function(element, finder) {
     "%p": "((?:0x)?[A-Fa-f0-9]+)",
     "%d": "([\\d]+)",
     "%u": "([\\d]+)",
-    "%s": "([^\\s,]*)",
+    "%s": "((?:,?[^\\s])*)",
     "%x": "((?:0x)?[A-Fa-f0-9]+)",
     "%\\\\\\*\\\\\\$": "(.*$)",
   };
@@ -65,18 +65,16 @@ Array.prototype.after = function(element, finder) {
     return new RegExp('^' + printf + '$');
   }
 
-  function colorHash(salt, layover = 0xa0a0a0) {
-    salt ^= salt >> 24;
-    salt ^= salt >> 24;
-    salt ^= salt >> 24;
-    salt |= layover;
-    salt &= 0xffffff;
-    return salt.toString(16);
+  function withAlpha(colorString, alpha) {
+    let match = colorString.match(/#?([A-Fa-f0-9]{2})([A-Fa-f0-9]{2})([A-Fa-f0-9]{2})/);
+    return "rgba(" + parseInt(match[1], 16) + "," + parseInt(match[2], 16) + "," + parseInt(match[3], 16) + "," + alpha + ")";
   }
 
   const FILE_SLICE = 512 * 1024;
   const LINE_MAIN_REGEXP = /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/;
   const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+
+  const CLOSE_CROSS = "\uD83D\uDDD9";
 
   var HIGHLIGHTSET = ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
   function nextHighlightColor() {
@@ -128,7 +126,7 @@ Array.prototype.after = function(element, finder) {
       throw "Recreating object! (are you missing destructor rule for this class?)";
     }
     this.props.className = className;
-    this.props.state = "created";
+    this.prop("state", "created");
     return this.capture();
   };
 
@@ -143,7 +141,7 @@ Array.prototype.after = function(element, finder) {
     for (let alias in this.aliases) {
       delete this.logan._proc.objs[alias];
     }
-    this.props.state = "released";
+    this.prop("state", "released");
     delete this["_references"];
     return this.capture();
   };
@@ -530,7 +528,7 @@ Array.prototype.after = function(element, finder) {
   var UI =
     {
       searches: [],
-      expand_tree: [],
+      breadcrumbs: [],
       expandedElement: null,
       display: {},
       dynamicStyle: {},
@@ -550,7 +548,7 @@ Array.prototype.after = function(element, finder) {
         $("#active_searches").hide();
         $("#search_section").hide();
         $("#seek").hide();
-        $("#expand_tree").hide();
+        $("#breadcrumbs").hide();
       },
 
       setSearchView: function(reset) {
@@ -558,12 +556,13 @@ Array.prototype.after = function(element, finder) {
         $("#active_searches").hide();
         $("#search_section").show();
         $("#seek").hide();
-        $("#expand_tree").hide();
+        $("#breadcrumbs").hide();
         if (reset) {
           $("#search_className").empty();
           $("#search_By").empty();
           $("#results_section").empty();
           this.seekTo(0);
+          this.objColors = {};
         }
       },
 
@@ -572,7 +571,7 @@ Array.prototype.after = function(element, finder) {
         $("#active_searches").show();
         $("#results_section").show();
         $("#seek").show();
-        $("#expand_tree").show();
+        $("#breadcrumbs").show();
         $("#search_By").change();
       },
 
@@ -581,14 +580,13 @@ Array.prototype.after = function(element, finder) {
         this.display = {};
         $("#active_searches").empty();
         this.searches = [];
-        $("#expand_tree").empty();
-        this.expand_tree = [];
+        $("#breadcrumbs").empty();
+        this.breadcrumbs = [];
         $("#dynamic_style").empty();
         this.dynamicStyle = {};
 
         this.activeRevealeres = 0;
         this.inFocus = null;
-        this.objColors = {};
       },
 
       seekTo: function(seekId) {
@@ -637,7 +635,7 @@ Array.prototype.after = function(element, finder) {
           .text(descr)
           .append($("<input>")
             .attr("type", "button")
-            .val("\uD83D\uDDD9") // X
+            .val(CLOSE_CROSS) // X
             .addClass("button icon")
             .click(function() { this.removeSearch(search); }.bind(this))
           );
@@ -663,9 +661,17 @@ Array.prototype.after = function(element, finder) {
 
       redoSearches: function() {
         let searches = this.searches.slice();
-        this.clearResultsView(false); // todo - no expand history clear
+        let breadcrumbs = this.breadcrumbs.slice();
+
+        this.clearResultsView();
         for (search of searches) {
           this.addSearch(search);
+        }
+        for (let expand of breadcrumbs) {
+          let capture = this.display[expand.capture.id];
+          if (capture) {
+            capture.children("input[type=checkbox]").click();
+          }
         }
       },
 
@@ -692,25 +698,24 @@ Array.prototype.after = function(element, finder) {
         }.bind(this);
       },
 
-      summaryProps: function(obj) {
-        var custom = logan._ui.summary[obj.props.className] || [];
+      summaryProps: function(props) {
+        var custom = logan._ui.summary[props.className] || [];
         return ["className", "pointer"].concat(custom);
       },
 
-      summary: function(obj) {
-        let props = this.summaryProps(obj);
-        let generate = (source) => {
-          var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
-          for (let prop of props) {
-            if (summary) summary += " \u2502 ";
-            summary += source.props[prop] || "-";
-          }
-          return summary;
+      summary: function(obj, propKeys = this.summaryProps, generate = (source, props) => {
+        var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
+        for (let prop of props) {
+          if (summary) summary += " \u2502 ";
+          summary += source.props[prop] || "-";
         }
+        return summary;
+      }) {
+        let props = propKeys(obj.props);
 
         if (!logan.seekId || obj.captures.last().id < logan.seekId) {
           // Object is younger than the seek point, just pick the final props state
-          return generate(obj);
+          return generate(obj, props);
         }
 
         // Must collect properties manually
@@ -720,7 +725,8 @@ Array.prototype.after = function(element, finder) {
           props: {
             className: obj.props.className,
             pointer: obj.props.pointer,
-          }
+          },
+          placement: obj.placement,
         };
         for (let capture of obj.captures) {
           if (capture.id > logan.seekId) {
@@ -730,7 +736,7 @@ Array.prototype.after = function(element, finder) {
             objAt.props[capture.what.prop] = capture.what.value;
           }
         }
-        return generate(objAt);
+        return generate(objAt, props);
       },
 
       quick: function(obj) {
@@ -789,6 +795,8 @@ Array.prototype.after = function(element, finder) {
       },
 
       addRevealer: function(obj, builder, placement = null, includeSummary = false, parent = null) {
+        placement = placement || obj.placement;
+        
         let element = $("<div>")
           .addClass("log_line obj-" + obj.id)
           .addClass(() => includeSummary ? "" : "summary")
@@ -798,7 +806,7 @@ Array.prototype.after = function(element, finder) {
 
               // Must call in this order, since onExpansion wants to get the same color
               this.objHighlighter(obj, obj, event.target.checked)();
-              this.onExpansion(obj, parent, element, event.target.checked);
+              this.onExpansion(obj, parent, element, placement, event.target.checked);
               if (event.target.checked) {
                 if (includeSummary && obj.props.className) {
                   this.addSummary(obj);
@@ -822,7 +830,7 @@ Array.prototype.after = function(element, finder) {
           );
 
         builder(element);
-        return this.place(placement || obj.placement, element);
+        return this.place(placement, element);
       },
 
       addResult: function(obj) {
@@ -896,48 +904,90 @@ Array.prototype.after = function(element, finder) {
         }
       },
 
-      onExpansion: function(obj, parent, revealer, revealed) {
+      // @param capture: the capture that revealed the object so that we can
+      //                 reconstruct expansions on re-search.
+      addBreadcrumb: function(expand, obj, parent, capture) {
+        if (expand) {
+          expand.refs++;
+          return;
+        }
+
+        if (this.bc_details) {
+          // Because we append to
+          this.bc_details.remove();
+        }
+
+        expand = {
+          obj: obj,
+          refs: 1,
+          capture: capture,
+          element: $("<span>")
+            .addClass("branch").addClass(() => parent ? "child" : "parent")
+            .css("background-color", this.objColor(obj))
+            .text(this.quick(obj))
+            .click(function(event) {
+              if (this.bc_details) {
+                this.bc_details.remove();
+              }
+              this.bc_details = $("<div>")
+                .addClass("breadcrumb_details")
+                .css("background-color", withAlpha(this.objColor(obj), 0.4))
+                .append(
+                  $("<input>").attr("type", "button").addClass("button icon close").val(CLOSE_CROSS).click(function() {
+                    if (this.bc_details) {
+                      this.bc_details.remove();
+                    }
+                  }.bind(this))
+                );
+              this.summary(obj, Object.keys, (obj, props) => {
+                this.bc_details.append($("<div>")
+                  .text(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
+                for (let prop of props) {
+                  this.bc_details.append($("<div>").text(prop + " = " + obj.props[prop]));
+                }
+              });
+              $("#breadcrumbs").append(this.bc_details);
+            }.bind(this)),
+        };
+
+        let parentExpand = parent ? this.breadcrumbs.find(item => item.obj === parent) : null;
+        if (parentExpand) {
+          expand.element.insertAfter(parentExpand.element);
+          this.breadcrumbs.after(expand, item => item.obj === parent);
+        } else {
+          $("#breadcrumbs").append(expand.element);
+          this.breadcrumbs.push(expand);
+        }
+      },
+
+      removeBreadcrumb: function(expand, obj) {
+        if (this.bc_details) {
+          this.bc_details.remove();
+        }
+        if (!expand) {
+          throw "Internal error - expand in the tree not found";
+        }
+
+        expand.refs--;
+        if (!expand.refs) {
+          expand.element.remove();
+          this.breadcrumbs.remove(expand, item => item.obj === expand.obj);
+        }
+      },
+
+      onExpansion: function(obj, parent, revealer, capture, revealed) {
         if (this.inFocus) {
           this.inFocus.removeClass("focused");
         }
         this.inFocus = revealer;
         this.inFocus.addClass("focused");
 
-        let parentExpand = parent ? this.expand_tree.find(item => item.obj === parent) : null;
-        let expand = this.expand_tree.find(item => item.obj === obj);
+        let expand = this.breadcrumbs.find(item => item.obj === obj);
         if (revealed) {
-          if (expand) {
-            expand.refs++;
-          } else {
-            expand = {
-              obj: obj,
-              revealer: revealer,
-              refs: 1,
-              element: $("<span>")
-                .addClass("branch").addClass(() => parent ? "child" : "parent")
-                .css("background-color", this.objColor(obj))
-                .text(this.quick(obj))
-            };
-            if (parentExpand) {
-              expand.element.insertAfter(parentExpand.element);
-              this.expand_tree.after(expand, item => item.obj === parent);
-            } else {
-              $("#expand_tree").append(expand.element);
-              this.expand_tree.push(expand);
-            }
-          }
+          this.addBreadcrumb(expand, obj, parent, capture);
         } else {
-          if (expand) {
-            expand.refs--;
-            if (!expand.refs) {
-              expand.element.remove();
-              this.expand_tree.remove(expand, item => item.obj === expand.obj);
-            }
-          } else {
-            throw "Internal error - expand in the tree not found";
-          }
+          this.removeBreadcrumb(expand, obj);
         }
-
 
         let before = this.activeRevealeres;
         this.activeRevealeres += revealed ? 1 : -1;
