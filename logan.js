@@ -1,4 +1,4 @@
-const LOG = true ? (output) => { console.log(output) } : () => { };
+const LOG = false ? (output) => { console.log(output) } : () => { };
 
 var logan = null;
 

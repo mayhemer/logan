@@ -527,7 +527,7 @@
     logan.init();
     
     $("#tools_button").click((event) => {
-      alert("Coming soon :)");
+      alert("That's a nice settings icon, isn't? :D");
     });
     $("#files").on("change", (event) => {
       UI.clearResultsView();
