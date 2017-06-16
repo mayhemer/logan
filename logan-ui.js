@@ -386,7 +386,7 @@
         }
 
         let time = capture.time.toISOString().replace(/[TZ]/g, " ").trim();
-        let line = time + " \u2502 " + capture.what;
+        let line = time + " \u2502 " + capture.thread + " \u2502 " + capture.what;
         let element = $("<div>")
           .addClass("log_line expanded obj-" + obj.id)
           .addClass(() => obj.shared ? "shared" : "")
@@ -471,7 +471,7 @@
         expand.refs--;
         if (!expand.refs) {
           expand.element.remove();
-          this.breadcrumbs.remove(expand, item => item.obj === expand.obj);
+          this.breadcrumbs.remove(item => item.obj === expand.obj);
         }
       },
 
@@ -524,6 +524,8 @@
 
 
   $(() => {
+    logan.init();
+    
     $("#tools_button").click((event) => {
       alert("Coming soon :)");
     });

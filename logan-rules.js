@@ -1,13 +1,13 @@
-logan.schema(
-  "moz",
+logan.schema("moz",
   /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/,
   (proc, all, date, time, thread, level, module, text) => {
     proc.timestamp = new Date(date + "T" + time + "Z");
     proc.thread = ensure(proc.threads, proc.file.name + "|" + thread, { name: thread });
     return [module, text];
   }, 
-  (moz) => {
-    moz.module("RequestContext", (module) => {
+
+  (schema) => {
+    schema.module("RequestContext", (module) => {
       /******************************************************************************
        * RequestContext
        ******************************************************************************/
@@ -18,30 +18,23 @@ logan.schema(
       module.rule("RequestContext::RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
       });
-      module.rule("RequestContext::AddBlockingTransaction this=%p blockers=%u", function(ptr) {
-        this.obj(ptr).capture();
-      });
-      module.rule("RequestContext::RemoveBlockingTransaction this=%p blockers=%u", function(ptr) {
-        this.obj(ptr).capture();
-      });
     }); // RequestContext
 
-    moz.module("nsHttp", (module) => {
+    schema.module("nsHttp", (module) => {
       /******************************************************************************
        * HttpChannelChild
        ******************************************************************************/
 
       module.rule("Creating HttpChannelChild @%p", function(ptr) {
-        this.thread.httpchannelchild = this.obj(ptr).create("HttpChannelChild");
-      });
-      module.ruleIf("uri=%s", state => state.thread.httpchannelchild, function(uri) {
-        this.thread.httpchannelchild.prop("url", uri);
-        this.thread.httpchannelchild = null;
+        this.obj(ptr).create("HttpChannelChild");
       });
       module.rule("Destroying HttpChannelChild @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      moz.summaryProps("HttpChannelChild", ["state", "url", "status"]);
+      module.rule("HttpChannelChild::AsyncOpen [this=%p uri=%s]", function(ptr, uri) {
+        this.obj(ptr).prop("url", uri);
+      });
+      schema.summaryProps("HttpChannelChild", ["state", "url", "status"]);
 
       /******************************************************************************
        * HttpChannelParent
@@ -65,14 +58,14 @@ logan.schema(
           this.thread.httpchannelparent = null;
         }
       });
-      module.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url) {
+      schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url) {
         this.thread.httpchannel.prop("url", url);
         this.thread.httpchannel = null;
       });
       module.rule("nsHttpChannel::Init [this=%p]", function(ptr) {
         this.thread.httpchannel_init = this.obj(ptr).capture();
       });
-      module.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
+      schema.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
         proc => proc.thread.httpchannel_init,
         function(oldch, newch) {
           this.obj(oldch).capture().link(this.thread.httpchannel_init.alias(newch));
@@ -81,30 +74,20 @@ logan.schema(
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
         this.obj(ptr).state("open").capture();
       });
-      module.rule("nsHttpChannel::OnProxyAvailable [this=%p pi=%p status=%x mStatus=%x]", function(ptr) {
-        this.obj(ptr).capture();
-      });
+      module.rule("nsHttpChannel::OnProxyAvailable [this=%p pi=%p status=%x mStatus=%x]");
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
       });
-      module.rule("nsHttpChannel::OpenCacheEntry [this=%p]", function(ptr) {
-        this.obj(ptr).capture();
-      });
+      module.rule("nsHttpChannel::OpenCacheEntry [this=%p]");
       module.rule("nsHttpChannel::OnCacheEntryCheck enter [channel=%p entry=%p]", function(ch, entry) {
         this.obj(ch).capture().mention(entry).follow((obj) => obj.capture());
       });
-      module.rule("nsHTTPChannel::OnCacheEntryCheck exit [this=%p doValidation=%d result=%d]", function(ch, val, result) {
-        this.obj(ch).capture();
-      });
+      module.rule("nsHTTPChannel::OnCacheEntryCheck exit [this=%p doValidation=%d result=%d]");
       module.rule("nsHttpChannel::OnCacheEntryAvailable [this=%p entry=%p new=%d appcache=%p status=%x mAppCache=%p mAppCacheForWrite=%p]", function(ch, entry, isnew) {
         this.obj(ch).capture().link(entry);
       });
-      module.rule("nsHttpChannel::TriggerNetwork [this=%p]", function(ptr) {
-        this.obj(ptr).capture();
-      });
-      module.rule("nsHttpChannel::SetupTransaction [this=%p]", function(ptr) {
-        this.obj(ptr).capture();
-      });
+      module.rule("nsHttpChannel::TriggerNetwork [this=%p]");
+      module.rule("nsHttpChannel::SetupTransaction [this=%p]");
       module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(ch, tr) {
         this.obj(ch).capture().link(tr);
         this.obj(tr).prop("url", this.obj(ch).props["url"]);
@@ -136,7 +119,7 @@ logan.schema(
       module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
-      moz.summaryProps("nsHttpChannel", ["state", "url", "status"]);
+      schema.summaryProps("nsHttpChannel", ["state", "url", "status"]);
 
       /******************************************************************************
        * nsHttpTransaction
@@ -152,18 +135,18 @@ logan.schema(
           });
         });
       });
-      module.ruleIf("http request [", proc => proc.thread.httptransaction, function() {
+      schema.ruleIf("http request [", proc => proc.thread.httptransaction, function() {
         this.thread.httptransaction.capture().follow((obj, line) => {
           obj.capture(line);
           return line !== "]";
         });
         this.thread.httptransaction = null;
       });
-      module.ruleIf("nsHttpConnectionMgr::AtActiveConnectionLimit [ci=%s caps=%d,totalCount=%d, maxPersistConns=%d]",
+      schema.ruleIf("nsHttpConnectionMgr::AtActiveConnectionLimit [ci=%s caps=%d,totalCount=%d, maxPersistConns=%d]",
         proc => proc.thread.httptransaction, function(ci) {
           this.thread.httptransaction.capture().mention(ci);
         });
-      module.ruleIf("AtActiveConnectionLimit result: %s", proc => proc.thread.httptransaction, function() {
+      schema.ruleIf("AtActiveConnectionLimit result: %s", proc => proc.thread.httptransaction, function() {
         this.thread.httptransaction.capture();
         this.thread.httptransaction = null;
       });
@@ -176,7 +159,7 @@ logan.schema(
       module.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
         this.thread.httptransaction = this.obj(trans);
       });
-      module.ruleIf("http response [", proc => proc.thread.httptransaction, function() {
+      schema.ruleIf("http response [", proc => proc.thread.httptransaction, function() {
         this.thread.httptransaction.capture().follow((obj, line) => {
           obj.capture(line);
           return line !== "]";
@@ -207,7 +190,7 @@ logan.schema(
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      moz.summaryProps("nsHttpTransaction", ["state", "blocking", "tab-id", "url"]);
+      schema.summaryProps("nsHttpTransaction", ["state", "blocking", "tab-id", "url"]);
 
       /******************************************************************************
        * nsHttpConnection
@@ -239,7 +222,7 @@ logan.schema(
       module.rule("Destroying nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      moz.summaryProps("nsHttpConnection", ["state"]);
+      schema.summaryProps("nsHttpConnection", ["state"]);
 
       /******************************************************************************
        * nsHalfOpenSocket
@@ -251,7 +234,7 @@ logan.schema(
       module.rule("nsHalfOpenSocket::OnOutputStreamReady [this=%p ent=%s %s]", function(ptr, end, streamtype) {
         this.thread.halfopen = this.obj(ptr).capture();
       });
-      module.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn) {
+      schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn) {
         this.thread.halfopen.link(conn).capture();
         this.thread.halfopen = null;
       });
@@ -309,10 +292,10 @@ logan.schema(
             return false;
           }).mention(trans).mention(conn);
         });
-      moz.summaryProps("nsConnectionEntry", "key");
+      schema.summaryProps("nsConnectionEntry", "key");
     }); // nsHttp
 
-    moz.module("cache2", (module) => {
+    schema.module("cache2", (module) => {
       /******************************************************************************
        * CacheEntry
        ******************************************************************************/
@@ -320,20 +303,18 @@ logan.schema(
       module.rule("CacheEntry::CacheEntry [this=%p]", function(ptr) {
         this.thread.httpcacheentry = this.obj(ptr).create("CacheEntry");
       });
-      module.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key) {
+      schema.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key) {
         this.thread.httpcacheentry.prop("key", key);
         this.thread.httpcacheentry = null;
       });
-      module.rule("CacheEntry::AsyncOpen [this=%p, state=%s, flags=%x, callback=%p]", function(entry, state, falgs, cb) {
-        this.obj(entry).capture();
-      });
+      module.rule("CacheEntry::AsyncOpen [this=%p, state=%s, flags=%x, callback=%p]");
       module.rule("New CacheEntryHandle %p for entry %p", function(handle, entry) {
         this.obj(entry).capture().alias(handle);
       });
       module.rule("CacheEntry::~CacheEntry [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
-      moz.summaryProps("CacheEntry", "key");
+      schema.summaryProps("CacheEntry", "key");
     }); // cache2
   }
 ); // moz

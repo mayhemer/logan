@@ -1,3 +1,5 @@
+const LOG = false ? (output) => { console.log(output) } : () => { };
+
 var logan = null;
 
 Array.prototype.last = function() {
@@ -7,7 +9,7 @@ Array.prototype.last = function() {
   return this[this.length - 1];
 };
 
-Array.prototype.remove = function(element, finder) {
+Array.prototype.remove = function(finder) {
   let index = this.findIndex(finder);
   if (index > -1) {
     this.splice(index, 1);
@@ -32,6 +34,12 @@ function ensure(array, itemName, def = {}) {
 }
 
 (function() {
+
+  const FILE_SLICE = 1 * 1024 * 1024;
+  const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+  const USE_RULES_TREE_OPTIMIZATION = true;
+
+  let IF_RULE_INDEXER = 0;
 
   function isChildFile(file) {
     return file.name.match(/\.child-\d+(?:\.\d)?$/);
@@ -65,8 +73,20 @@ function ensure(array, itemName, def = {}) {
     return new RegExp('^' + printf + '$');
   }
 
-  const FILE_SLICE = 1 * 1024 * 1024;
-  const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+  function ruleMappingGrade1(input) {
+    let splitter = /(\W)/;
+    let grade1 = input.split(splitter, 1)[0];
+    if (!grade1) {
+      grade1 = input.split(splitter, 3).join('');
+    }
+    return grade1;
+  }
+
+  function ruleMappingGrade2(input) {
+    let grade1 = ruleMappingGrade1(input);
+    let grade2 = input.substring(grade1.length);
+    return { grade1, grade2 };
+  }
 
 
   function Schema(namespace, lineRegexp, linePreparer) {
@@ -80,14 +100,25 @@ function ensure(array, itemName, def = {}) {
     };
   }
 
-  Schema.prototype.module = function(name, builder)
-  {
+  Schema.prototype.module = function(name, builder) {
     builder(ensure(this.modules, name, new Module(name)));
   }
 
-  Schema.prototype.plainIf = function(condition, consumer) {
-    this.unmatch.push({ cond: condition, consumer: consumer });
+  Schema.prototype.plainIf = function(condition, consumer = function(ptr) { this.obj(ptr).capture(); }) {
+    let rule = { cond: condition, consumer: consumer, id: ++IF_RULE_INDEXER };
+    this.unmatch.push(rule);
+    return rule;
   };
+
+  Schema.prototype.ruleIf = function(exp, condition, consumer = function(ptr) { this.obj(ptr).capture(); }) {
+    let rule = { regexp: convertPrintfToRegexp(exp), cond: condition, consumer: consumer, id: ++IF_RULE_INDEXER };
+    this.unmatch.push(rule);
+    return rule;
+  };
+
+  Schema.prototype.removeIf = function(rule) {
+    this.unmatch.remove(item => item.id === rule.id);
+  }
 
   Schema.prototype.summaryProps = function(className, arrayOfProps) {
     this.ui.summary[className] = arrayOfProps;
@@ -96,24 +127,38 @@ function ensure(array, itemName, def = {}) {
 
   function Module(name) {
     this.name = name;
-    this.rules = [];
+    this.rules_flat = [];
+    this.rules_tree = {};
+
+    this.set_rule = function(rule, input) {
+      if (USE_RULES_TREE_OPTIMIZATION) {
+        let mapping = ruleMappingGrade2(input);
+        let grade2 = ensure(this.rules_tree, mapping.grade1, {});
+        grade2[mapping.grade2] = rule;
+      } else {
+        this.rules_flat.push(rule);
+      }
+    };
+
+    this.get_rules = function(input) {
+      if (USE_RULES_TREE_OPTIMIZATION) {
+        // logan.init() converts this to array.
+        return this.rules_tree[ruleMappingGrade1(input)] || [];
+      }
+      return this.rules_flat;
+    };
   }
 
-  Module.prototype.rule = function(exp, consumer) {
-    this.rules.push({ regexp: convertPrintfToRegexp(exp), cond: null, consumer: consumer });
-  };
-
-  Module.prototype.ruleIf = function(exp, condition, consumer) {
-    this.rules.push({ regexp: convertPrintfToRegexp(exp), cond: condition, consumer: consumer });
+  Module.prototype.rule = function(exp, consumer = function(ptr) { this.obj(ptr).capture(); }) {
+    this.set_rule({ regexp: convertPrintfToRegexp(exp), cond: null, consumer: consumer }, exp);
   };
 
 
-  function Obj(ptr, logan) {
+  function Obj(ptr) {
     this.id = logan.objects.length;
     this.props = { pointer: ptr, className: null };
     this.captures = [];
     this.shared = false;
-    this.logan = logan;
     this.file = logan._proc.file;
     this.aliases = {};
 
@@ -122,8 +167,8 @@ function ensure(array, itemName, def = {}) {
     // Otherwise there would be no other way than to use the first capture
     // that would lead to complicated duplications.
     this.placement = {
-      time: this.logan._proc.timestamp,
-      id: ++this.logan._proc.captureid,
+      time: logan._proc.timestamp,
+      id: ++logan._proc.captureid,
     };
 
     this._references = {};
@@ -139,11 +184,15 @@ function ensure(array, itemName, def = {}) {
       }
     };
 
+    this._update_grep = function() {
+      this._grep = new RegExp([this.props["pointer"]].concat(Object.keys(this.aliases)).join("|"), "g");
+    }
+
     logan.objects.push(this);
   }
 
   Obj.prototype.create = function(className) {
-    ensure(this.logan.searchProps, className, { pointer: true, state: true });
+    ensure(logan.searchProps, className, { pointer: true, state: true });
 
     if (this.props.className) {
       throw "Recreating object! (are you missing destructor rule for this class?)";
@@ -155,31 +204,58 @@ function ensure(array, itemName, def = {}) {
 
   Obj.prototype.alias = function(alias) {
     this.aliases[alias] = true;
-    this.logan._proc.objs[alias] = this;
+    this._update_grep();
+    logan._proc.objs[alias] = this;
     return this;
   };
 
   Obj.prototype.destroy = function() {
-    delete this.logan._proc.objs[this.props.pointer];
+    delete logan._proc.objs[this.props.pointer];
     for (let alias in this.aliases) {
-      delete this.logan._proc.objs[alias];
+      delete logan._proc.objs[alias];
     }
     this.prop("state", "released");
     delete this["_references"];
+
+    if (this._grep_rule) {
+      logan._schema.removeIf(this._grep_rule);
+      delete this["_grep"];
+      delete this["_grep_rule"];
+    }
     return this.capture();
   };
 
-  function Capture(obj, what) {
-    this.id = ++obj.logan._proc.captureid;
-    this.time = obj.logan._proc.timestamp;
-    this.line = obj.logan._proc.linenumber;
+  function Capture(what) {
+    this.id = ++logan._proc.captureid;
+    this.time = logan._proc.timestamp;
+    this.line = logan._proc.linenumber;
+    this.thread = logan._proc.thread.name;
     this.what = what;
   }
 
   Obj.prototype.capture = function(what) {
-    what = what || this.logan._proc.line;
-    let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(this, what);
+    what = what || logan._proc.line;
+    let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(what);
     this.captures.push(capture);
+    return this;
+  };
+
+  Obj.prototype.grep = function() {
+    this._update_grep();
+
+    // Add a plain-if rule whose condition performs interception of every unmatched
+    // line and always returns false from its condition to allow other objects capture
+    // on the same line as well.
+    //
+    // TODO - this is super slow...  rather load from file when the object is expanded
+    // in the UI
+    this._grep_rule = logan._schema.plainIf(function(state) {
+      if (state.line.match(this._grep)) {
+        this.capture();
+      }
+      return false;
+    }.bind(this), () => { throw "grep() internal consumer should never be called"; });
+
     return this;
   };
 
@@ -198,12 +274,12 @@ function ensure(array, itemName, def = {}) {
       capture.follow = cond;
     }
 
-    this.logan._proc.thread._auto_follow = capture;
+    logan._proc.thread._auto_follow = capture;
     return this;
   }
 
   Obj.prototype.prop = function(name, value, merge = false) {
-    ensure(this.logan.searchProps, this.props.className)[name] = true;
+    ensure(logan.searchProps, this.props.className)[name] = true;
 
     if (typeof merge === "funtion") {
       merge = merge(this);
@@ -236,8 +312,8 @@ function ensure(array, itemName, def = {}) {
   };
 
   Obj.prototype.link = function(that) {
-    that = this.logan._proc.obj(that);
-    let capture = new Capture(this, { linkFrom: this, linkTo: that });
+    that = logan._proc.obj(that);
+    let capture = new Capture({ linkFrom: this, linkTo: that });
     this.capture(capture);
     that.capture(capture)._maybeShared(capture);
     return this;
@@ -247,14 +323,14 @@ function ensure(array, itemName, def = {}) {
     if (typeof that === "string" && that.match(/^0+$/)) {
       return this;
     }
-    that = this.logan._proc.obj(that);
+    that = logan._proc.obj(that);
     this.capture({ expose: that });
     return this;
   };
 
   Obj.prototype.guid = function(guid) {
     this.guid = guid;
-    ensure(this.logan._proc.global, "guids")[guid] = this;
+    ensure(logan._proc.global, "guids")[guid] = this;
   };
 
 
@@ -269,13 +345,13 @@ function ensure(array, itemName, def = {}) {
         }
         var obj = this.objs[ptr];
         if (!obj) {
-          this.objs[ptr] = (obj = new Obj(ptr, logan));
+          this.objs[ptr] = (obj = new Obj(ptr));
         }
         return obj;
       },
 
       global_obj: function(guid) {
-        return this.logan._proc.global.guids[guid] || new Obj(null, this.logan);
+        return logan._proc.global.guids[guid] || new Obj(null);
       }
     },
 
@@ -302,6 +378,18 @@ function ensure(array, itemName, def = {}) {
 
     _filesToProcess: [],
 
+    init: function() {
+      if (USE_RULES_TREE_OPTIMIZATION) {
+        for (let schema of Object.values(this._schemes)) {
+          for (let module of Object.values(schema.modules)) {
+            for (let grade1 in module.rules_tree) {
+              module.rules_tree[grade1] = Object.values(module.rules_tree[grade1]);
+            }
+          }
+        }
+      }
+    },
+
     consumeFiles: function(UI, files) {
       if (this.reader) {
         this.reader.abort();
@@ -326,6 +414,9 @@ function ensure(array, itemName, def = {}) {
         }
 
         // a new file to process
+        this.__metric_process_start = new Date();
+        this.__metric_rules_match_count = 0;
+
         file = this._filesToProcess.shift();
         this.eollength = 1;
         this.filename = file.name;
@@ -367,6 +458,8 @@ function ensure(array, itemName, def = {}) {
             this.consumeLine(UI, file, line);
           }
 
+          UI.loadProgress(this.fileoffset, file.size);
+
           this.consumeFile(UI, file, offset + FILE_SLICE, previousLine);
         }
       }.bind(this);
@@ -383,26 +476,26 @@ function ensure(array, itemName, def = {}) {
       ++this._proc.linenumber;
       this._proc.lineBinaryOffset = this.fileoffset;
       this.fileoffset += line.length + this.eollength;
-      UI.loadProgress(this.fileoffset, file.size);
 
       let match = line.match(this._schema.lineRegexp);
       if (!match) {
-        this.processLine([this._schema.unmatch], file, line);
+        this.processLine(this._schema.unmatch, file, line);
         return;
       }
 
       let [module, text] = this._schema.linePreparer.apply(null, [this._proc].concat(match));
-      module = this._schema.modules[module] || { rules: [] };
-      this.processLine([module.rules, this._schema.unmatch], file, text);
+      module = this._schema.modules[module];
+      if (module && !this.processLine(module.get_rules(text), file, text)) {
+        this.processLine(this._schema.unmatch, file, text);
+      }
     },
 
     processLine: function(rules, file, line) {
       this._proc.thread._auto_follow = null;
-      for (let ruleSet of rules) {
-        if (this.processLineByRules(ruleSet, file, line)) {
-          this._proc.thread._auto_capture = this._proc.thread._auto_follow;
-          return true;
-        }
+
+      if (this.processLineByRules(rules, file, line)) {
+        this._proc.thread._auto_capture = this._proc.thread._auto_follow;
+        return true;
       }
 
       let autoCapture = this._proc.thread._auto_capture;
@@ -415,9 +508,9 @@ function ensure(array, itemName, def = {}) {
       return true;
     },
 
-    processLineByRules: function(ruleSet, file, line) {
+    processLineByRules: function(rules, file, line) {
       this._proc.line = line;
-      for (let rule of ruleSet) { // optmize this!!!
+      for (let rule of rules) {
         try {
           if (rule.cond && !rule.cond(this._proc)) {
             continue;
@@ -448,6 +541,8 @@ function ensure(array, itemName, def = {}) {
     },
 
     processRule: function(line, regexp, consumer) {
+      this.__metric_rules_match_count++;
+
       let match = line.match(regexp);
       if (!match) {
         return false;
@@ -458,6 +553,10 @@ function ensure(array, itemName, def = {}) {
     },
 
     processEOF: function(UI) {
+      let fileProcessTime = (new Date()).getTime() - this.__metric_process_start.getTime();
+      LOG("consumed file in " + (fileProcessTime / 1000) + "s");
+      LOG("rules matched " + Math.floor(this.__metric_rules_match_count / 1000) + "k");
+      LOG("efficiency " + Math.floor((this.fileoffset >> 10) / (fileProcessTime / 1000)) + " kbytes/sec");
     },
 
     processEOS: function(UI) {
