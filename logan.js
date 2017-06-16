@@ -1,4 +1,4 @@
-const LOG = false ? (output) => { console.log(output) } : () => { };
+const LOG = true ? (output) => { console.log(output) } : () => { };
 
 var logan = null;
 
@@ -35,7 +35,7 @@ function ensure(array, itemName, def = {}) {
 
 (function() {
 
-  const FILE_SLICE = 1 * 1024 * 1024;
+  const FILE_SLICE = 20 * 1024 * 1024;
   const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
   const USE_RULES_TREE_OPTIMIZATION = true;
 
