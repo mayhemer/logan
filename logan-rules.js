@@ -8,19 +8,22 @@ logan.schema("moz",
 
   (schema) => {
     schema.module("RequestContext", (module) => {
+
       /******************************************************************************
        * RequestContext
        ******************************************************************************/
 
       module.rule("RequestContext::RequestContext this=%p id=%x", function(ptr, id) {
-        this.obj(ptr).create("RequestContext").prop("id", id).grep();
+        this.obj(ptr).prop("id", id).create("RequestContext").grep();
       });
       module.rule("RequestContext::RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
       });
+      
     }); // RequestContext
 
     schema.module("nsHttp", (module) => {
+
       /******************************************************************************
        * HttpChannelChild
        ******************************************************************************/
@@ -32,7 +35,7 @@ logan.schema("moz",
         this.obj(ptr).destroy();
       });
       module.rule("HttpChannelChild::AsyncOpen [this=%p uri=%s]", function(ptr, uri) {
-        this.obj(ptr).capture().prop("url", uri);
+        this.obj(ptr).prop("url", uri).capture();
       });
       schema.summaryProps("HttpChannelChild", ["state", "url", "status"]);
 
@@ -92,25 +95,25 @@ logan.schema("moz",
         this.obj(ch).capture().link(cl);
       });
       module.rule("nsHttpChannel::ReadFromCache [this=%p] Using cached copy of: %s", function(ptr) {
-        this.obj(ptr).capture().prop("from-cache", true);
+        this.obj(ptr).prop("from-cache", true).capture();
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        this.obj(ch).capture().state("started");
+        this.obj(ch).state("started").capture();
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
-        this.obj(ch).capture().state("data");
+        this.obj(ch).state("data").capture();
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        this.obj(ch).capture().prop("status", status).state("finished");
+        this.obj(ch).prop("status", status).state("finished").capture();
       });
       module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ptr) {
-        this.obj(ptr).capture().prop("suspendcount", suspendcount => ++suspendcount);
+        this.obj(ptr).prop("suspendcount", suspendcount => ++suspendcount).capture();
       });
       module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ptr) {
-        this.obj(ptr).capture().prop("suspendcount", suspendcount => --suspendcount);
+        this.obj(ptr).prop("suspendcount", suspendcount => --suspendcount).capture();
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
-        this.obj(ptr).capture().state("cancelled").prop("status", status);
+        this.obj(ptr).state("cancelled").prop("status", status).capture();
       });
       module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
@@ -125,15 +128,15 @@ logan.schema("moz",
         this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction").grep();
       });
       module.rule("nsHttpTransaction::Init [this=%p caps=%x]", function(trans) {
-        this.obj(trans).follow((trans, line) => {
+        this.obj(trans).capture().follow((trans, line) => {
           logan.parse(line, "  window-id = %x", function(id) {
             trans.prop("tab-id", id);
           });
         });
       });
       schema.ruleIf("http request [", proc => proc.thread.httptransaction, function() {
-        this.thread.httptransaction.capture().follow((obj, line) => {
-          obj.capture(line);
+        this.thread.httptransaction.capture().follow((trans, line) => {
+          trans.capture(line);
           return line !== "]";
         });
         this.thread.httptransaction = null;
@@ -166,10 +169,10 @@ logan.schema("moz",
         this.obj(rc).link(trans);
       });
       module.rule("   blocked by request context: [rc=%p trans=%p blockers=%d]", function(rc, trans) {
-        this.obj(trans).capture().mention(rc).state("blocked");
+        this.obj(trans).state("blocked").capture().mention(rc);
       });
       module.rule("nsHttpTransaction adding blocking transaction %p from request context %p", function(trans, rc) {
-        this.obj(trans).capture().prop("blocking", "true");
+        this.obj(trans).prop("blocking", "true").capture();
       });
       module.rule("nsHttpTransaction removing blocking transaction %p from request context %p. %d blockers remain.", function(trans, rc) {
         this.obj(trans).capture().mention(rc);
@@ -178,7 +181,7 @@ logan.schema("moz",
         this.obj(trans).capture().mention(rc);
       });
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
-        this.obj(trans).capture().prop("status", status).state("closed");
+        this.obj(trans).prop("status", status).state("closed").capture();
       });
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
@@ -198,16 +201,16 @@ logan.schema("moz",
       });
       module.rule("nsHttpConnection::OnSocketWritable %p ReadSegments returned [rv=%d read=%d sock-cond=%x again=%d]", function(conn, rv, read, cond, again) {
         if (parseInt(read) > 0)
-          this.obj(conn).capture().state("sent");
+          this.obj(conn).state("sent").capture();
       });
       module.rule("nsHttpConnection::OnSocketReadable [this=%p]", function(conn) {
-        this.obj(conn).capture().state("recv");
+        this.obj(conn).state("recv").capture();
       });
       module.rule("nsHttpConnection::CloseTransaction[this=%p trans=%p reason=%x]", function(conn, trans, rv) {
-        this.obj(conn).capture().state("done").mention(trans);
+        this.obj(conn).state("done").capture().mention(trans);
       });
       module.rule("Entering Idle Monitoring Mode [this=%p]", function(conn) {
-        this.obj(conn).capture().state("idle");
+        this.obj(conn).state("idle").capture();
       });
       module.rule("nsHttpConnectionMgr::OnMsgReclaimConnection [ent=%p conn=%p]", function(ent, conn) {
         this.thread.httpconnection_reclame = this.obj(conn).capture().mention(ent);
@@ -304,14 +307,15 @@ logan.schema("moz",
             if (!ci._captured) {
               return true; // want to find the first line with two spaces
             }
-            ci._captured = undefined;
-            return false;
+            return ci._captured = undefined;
           }).mention(trans).mention(conn);
         });
       schema.summaryProps("nsConnectionEntry", "key");
+
     }); // nsHttp
 
     schema.module("cache2", (module) => {
+
       /******************************************************************************
        * CacheEntry
        ******************************************************************************/
@@ -330,6 +334,7 @@ logan.schema("moz",
         this.obj(ptr).destroy();
       });
       schema.summaryProps("CacheEntry", "key");
+      
     }); // cache2
   }
 ); // moz
