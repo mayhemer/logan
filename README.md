@@ -42,7 +42,7 @@ If some objects have matched the search criteria you should see the list of them
 
 Each search result line has a check box at its left side:
 
-- [ ] 2017-06-01 18:51:01.616 │ nsHttpTransaction │ 14D4C400 │ released │ - │ - │ https://example.com/
+- [ ] `2017-06-01 18:51:01.616 │ nsHttpTransaction │ 14D4C400 │ released │ - │ - │ https://example.com/`
 
 When you check it, all lines captured from the log belonging to the object are revealed and given a distinct color.  *Note: there are 12 distict colors automatically assigned and rotated.*
 
