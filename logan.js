@@ -88,6 +88,8 @@ function ensure(array, itemName, def = {}) {
     return { grade1, grade2 };
   }
 
+  const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
+  const NULLPTR_REGEXP = /^0+$/;
 
   function Schema(namespace, lineRegexp, linePreparer) {
     this.namespace = namespace;
@@ -98,6 +100,20 @@ function ensure(array, itemName, def = {}) {
     this.ui = {
       summary: {}, // map: className -> prop to display on the summary line
     };
+
+    // This is grep() handler
+    this.plainIf(function(state) {
+      let pointers = state.line.match(GREP_REGEXP);
+      if (pointers) {
+        for (let ptr of pointers) {
+          let obj = state.objs[ptr];
+          if (obj && obj._grep) {
+            obj.capture();
+          }
+        }
+      }
+      return false;
+    }, () => { throw "grep() internal consumer should never be called"; });
   }
 
   Schema.prototype.module = function(name, builder) {
@@ -161,6 +177,7 @@ function ensure(array, itemName, def = {}) {
     this.shared = false;
     this.file = logan._proc.file;
     this.aliases = {};
+    this._grep = false;
 
     // This is used for placing the summary of the object (to generate
     // the unique ordered position, see UI.position.)
@@ -184,10 +201,6 @@ function ensure(array, itemName, def = {}) {
       }
     };
 
-    this._update_grep = function() {
-      this._grep = new RegExp([this.props["pointer"]].concat(Object.keys(this.aliases)).join("|"), "g");
-    }
-
     logan.objects.push(this);
   }
 
@@ -204,7 +217,6 @@ function ensure(array, itemName, def = {}) {
 
   Obj.prototype.alias = function(alias) {
     this.aliases[alias] = true;
-    this._update_grep();
     logan._proc.objs[alias] = this;
     return this;
   };
@@ -217,11 +229,6 @@ function ensure(array, itemName, def = {}) {
     this.prop("state", "released");
     delete this["_references"];
 
-    if (this._grep_rule) {
-      logan._schema.removeIf(this._grep_rule);
-      delete this["_grep"];
-      delete this["_grep_rule"];
-    }
     return this.capture();
   };
 
@@ -241,21 +248,7 @@ function ensure(array, itemName, def = {}) {
   };
 
   Obj.prototype.grep = function() {
-    this._update_grep();
-
-    // Add a plain-if rule whose condition performs interception of every unmatched
-    // line and always returns false from its condition to allow other objects capture
-    // on the same line as well.
-    //
-    // TODO - this is super slow...  rather load from file when the object is expanded
-    // in the UI
-    this._grep_rule = logan._schema.plainIf(function(state) {
-      if (state.line.match(this._grep)) {
-        this.capture();
-      }
-      return false;
-    }.bind(this), () => { throw "grep() internal consumer should never be called"; });
-
+    this._grep = true;
     return this;
   };
 
@@ -320,7 +313,7 @@ function ensure(array, itemName, def = {}) {
   };
 
   Obj.prototype.mention = function(that) {
-    if (typeof that === "string" && that.match(/^0+$/)) {
+    if (typeof that === "string" && that.match(NULLPTR_REGEXP)) {
       return this;
     }
     that = logan._proc.obj(that);
