@@ -80,7 +80,7 @@ To seek back to the tail of the log, click the red &#x2b73; icon.
 
 The rules are defined in [logan-rules.js](logan-rules.js) file in a hierarchy of a *schema* (a top level name-space) - currently there is only one - "`moz`", and *modules* within the schema.  A module is an equivalent of a mozilla log module (e.g. nsHttp, cache2).  See [logan-rules.js heading](https://github.com/mayhemer/logan/blob/master/logan-rules.js) for a life example, should be easy to follow what's going on.
 
-*The schema pre-processes every line of the log with a defined root regular expression and a defined pre-process function.  If it matches, the function resolves the log module and the part of the line to be further processed by rules.  In the mozilla schema case it also sets up the thread on the processing state.  If the line doesn't match the root regular expression, it's passed directly only to ruleIf and plainIf defined rules (see below) with the current thread being assumed the last one seen - yes, this is imperfect.*
+*The schema pre-processes every line of the log with a defined root regular expression and a defined pre-process function.  If it matches, the function resolves the log module and the part of the line to be further processed by rules.  In the mozilla schema case it also sets up the thread on the processing state (described below).  If the line doesn't match the root regular expression, it's passed directly only to ruleIf and plainIf defined rules (see below) with the current thread being assumed the last one seen - yes, this is imperfect.*
 
 
 The rules themselves need a bit more thorough explanation.
@@ -131,17 +131,15 @@ Obj (an object) methods:
   * the `merge` argument can be a function too, called with one argument being the object
   * note that reading a property back is only possible via direct access on object's `props` hashtable; it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
-- `.follow(condition)`: use this to add few lines following the current line on the same thread; the `condition` function is called as long as it returns something that evaluates to `true` AND none of the defined rules has matched for a line on the current thread (note that the condition function can do anything it wants, not just capturing) ; the arguments are:
+- `.follow(consumer)`: use this to add few lines following the current line on the same thread; the `consumer` function is called as long as it returns something that evaluates to `true` AND none of the defined rules has so far matched a line on the current thread (note that the condition function can do anything it wants, not just capturing) ; the arguments are:
   * `obj`: the object this follow has been initiated for
-  * `line`: the line being currently read so that it can be used e.g. as `obj.capture(line)` to add it on the object
+  * `line`: the line being currently processed
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
 
 For convenience each of these methods (modulo documented exceptions) return back the object, so that they can be chained in the jQuery promise style.
 
-## Suggested ordering of chained calls on an object
-
-To make the capturing process reliable here is a suggested ordering of calls when chained on one line:
+To make the capturing process reliable there is a suggested ordering of calls when chained on one line:
 1. create()
 2. alias()
 3. state() or prop()
@@ -165,6 +163,8 @@ schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url) {
 The rule assumes that a rule executed just before has set `thread.httpchannel` on the **processing state** to the object we want to assign the URL to.
 
 The first argument to `schema.ruleIf()` is equal to what is being passed to `module.rule()`.  The second argument is a condition function that is evaluated prior to evaluating the formatting string.  It has an only argument - the processing state as described above.  If the condition function returns anything evaluating to `true` and the string matches, the function is called the same way as in the *simple rule* case.
+
+Note: you can define more than one conditional rule with the same formatting string.
 
 ## A conditional plain rule
 
