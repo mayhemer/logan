@@ -359,8 +359,8 @@ function ensure(array, itemName, def = {}) {
       this._schema = this._schemes[name];
     },
 
-    parse: function(line, regexp, consumer, failedConsumer) {
-      if (!this.processRule(line, convertPrintfToRegexp(regexp), consumer) && failedConsumer) {
+    parse: function(line, printf, consumer, failedConsumer) {
+      if (!this.processRule(line, convertPrintfToRegexp(printf), consumer) && failedConsumer) {
         failedConsumer(line);
       }
     },

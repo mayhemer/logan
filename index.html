@@ -13,6 +13,7 @@
 <body>
 
 <div id="tools">
+  <a href="https://github.com/mayhemer/logan/blob/master/README.md" target="_blank">?</a>
   <input id="tools_button" type="button" class="button icon" value="&#x1f6e0;" style="font-size: 18px" />
 </div>
 
@@ -28,14 +29,14 @@
 
   <br/>
 
-  <label for="search_PropValue">by</label>
+  <label for="search_PropValue">having</label>
   <select id="search_By"></select>
 
   <select id="search_Matching" class="narrow">
     <option value="*">any value</option>
-    <option value="==">exact match</option>
-    <option value="contains">contains</option>
-    <option value="!contains">not contains</option>
+    <option value="==">exactly</option>
+    <option value="contains">containing</option>
+    <option value="!contains">not containing</option>
     <option value="rx">regexp</option>
     <option value="!rx">not regexp</option>
   </select>
