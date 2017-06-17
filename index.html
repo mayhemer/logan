@@ -12,15 +12,28 @@
 </head>
 <body>
 
-<div id="tools">
-  <a href="https://github.com/mayhemer/logan/blob/master/README.md" target="_blank">?</a>
-  <input id="tools_button" type="button" class="button icon" value="&#x1f6e0;" style="font-size: 18px" />
-</div>
-
 <div id="file_load_section" class="section">
+  <span id="introduction">
+    <p>
+    This is a log analyzer intended for object-based analyzes of logs 
+    produced by <a href="https://www.mozilla.org/en-US/firefox/">Mozilla Firefox</a> or other Gecko based applications through 
+    <a href="https://developer.mozilla.org/en-US/docs/Mozilla/Debugging/HTTP_logging">MOZ_LOG</a>.
+    The documentation is available <a href="https://github.com/mayhemer/logan/blob/master/README.md">here</a>,
+    code is tracked on <a href="https://github.com/mayhemer/logan">GitHub</a>.
+    </p>
+    <p>
+    Please note that the log files will not be uploaded anywhere and will only be processed locally, on you machine.
+    </p>
+    <hr/><br/>
+  </span>
   <h2>select log files</h2>
   <input type="file" id="files" multiple />
   <div id="load_progress" class="load_progress"></div>
+</div>
+
+<div id="tools">
+  <a href="https://github.com/mayhemer/logan/blob/master/README.md" target="_blank">?</a>
+  <input id="tools_button" type="button" class="button icon" value="&#x1f6e0;" style="font-size: 18px" />
 </div>
 
 <div id="search_section" class="section">

@@ -4,7 +4,7 @@ html {
 }
 
 body {
-  background-color: #eeeeea;
+  background-color: #d5d5d5;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
 }
 pre {
@@ -30,6 +30,17 @@ div {
   display: inline;
 }
 
+span#introduction {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size-adjust: 0.4;
+}
+.topbar span#introduction {
+  display: none;
+}
+#introduction > p {
+  margin-top: 0;
+}
+
 div.load_progress {
   background-color: #008CBA;
   display: block;
@@ -40,6 +51,7 @@ div.load_progress {
 }
 
 div.section {
+  background-color: #eeeeea;
   display: none;
   margin: 15%;
   padding: 2em;

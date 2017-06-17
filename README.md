@@ -1,6 +1,6 @@
 # What is this?
 
-**LOG AN**alizer (*'logan'*) is specifically designed for log files produced by applications based on the **Mozilla Gecko Platform** through `MOZ_LOG`. This mainly means the Firefox browser.
+**LOG AN**alizer (*'logan'*) is specifically designed for log files produced by applications based on the **Mozilla Gecko Platform** through [`MOZ_LOG`](https://developer.mozilla.org/en-US/docs/Mozilla/Debugging/HTTP_logging). This mainly means the Firefox browser.
 
 The main focus is to search for objects of selected classes and their properties (e.g. `url`).  Secondary focus is to find links between objects and uncover the relation tree of objects in demand leaving all unimportant lines of the log hidden.
 
@@ -73,6 +73,8 @@ A line to seek the log to can be easily selected by clicking the text **tail** a
 All previously performed search results will update according the new seek position.  Any new search will look for objects and their property values at the current seek position.
 
 To seek back to the tail of the log, click the red &#x2b73; icon.
+
+*Note: lines in the results view that are past the seek point are marked with a red bar in the front.*
 
 # Rules definition reference
 
