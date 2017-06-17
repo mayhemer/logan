@@ -58,7 +58,7 @@ function ensure(array, itemName, def = {}) {
     "%d": "([\\d]+)",
     "%u": "([\\d]+)",
     "%s": "((?:,?[^\\s])*)",
-    "%x": "((?:0x)?[A-Fa-f0-9]+)",
+    "%[xX]": "((?:0x)?[A-Fa-f0-9]+)",
     "%\\\\\\*\\\\\\$": "(.*$)",
   };
 
@@ -112,7 +112,6 @@ function ensure(array, itemName, def = {}) {
           }
         }
       }
-      return false;
     }, () => { throw "grep() internal consumer should never be called"; });
   }
 
@@ -267,7 +266,7 @@ function ensure(array, itemName, def = {}) {
       capture.follow = cond;
     }
 
-    logan._proc.thread._auto_follow = capture;
+    logan._proc.thread._follow = capture;
     return this;
   }
 
@@ -466,39 +465,50 @@ function ensure(array, itemName, def = {}) {
     },
 
     consumeLine: function(UI, file, line) {
+      if (this.consumeLineByRules(UI, file, line)) {
+        return;
+      }
+
+      // Note that this._proc.line is set to |text| from linePreparer in processLine()
+      // which has definitely been called for this consumed line at this point.
+      let autoCapture = this._proc.thread._auto_capture;
+      if (autoCapture && !autoCapture.follow(autoCapture.obj, this._proc.line, this._proc)) {
+        this._proc.thread._auto_capture = null;
+      }      
+    },
+
+    consumeLineByRules: function(UI, file, line) {
       ++this._proc.linenumber;
       this._proc.lineBinaryOffset = this.fileoffset;
       this.fileoffset += line.length + this.eollength;
 
       let match = line.match(this._schema.lineRegexp);
       if (!match) {
-        this.processLine(this._schema.unmatch, file, line);
-        return;
+        return this.processLine(this._schema.unmatch, file, line);
       }
 
       let [module, text] = this._schema.linePreparer.apply(null, [this._proc].concat(match));
+
       module = this._schema.modules[module];
-      if (module && !this.processLine(module.get_rules(text), file, text)) {
-        this.processLine(this._schema.unmatch, file, text);
+      if (module && this.processLine(module.get_rules(text), file, text)) {
+        return true;
       }
-    },
-
-    processLine: function(rules, file, line) {
-      this._proc.thread._auto_follow = null;
-
-      if (this.processLineByRules(rules, file, line)) {
-        this._proc.thread._auto_capture = this._proc.thread._auto_follow;
+      if (this.processLine(this._schema.unmatch, file, text)) {
         return true;
       }
 
-      let autoCapture = this._proc.thread._auto_capture;
-      if (!autoCapture) {
-        return false;
+      return false;      
+    },
+
+    processLine: function(rules, file, line) {
+      this._proc.thread._follow = null;
+
+      if (this.processLineByRules(rules, file, line)) {
+        this._proc.thread._auto_capture = this._proc.thread._follow;
+        return true;
       }
-      if (!autoCapture.follow(autoCapture.obj, line, this._proc)) {
-        this._proc.thread._auto_capture = null;
-      }
-      return true;
+
+      return false;
     },
 
     processLineByRules: function(rules, file, line) {

@@ -218,6 +218,29 @@ logan.schema("moz",
       schema.summaryProps("nsHttpConnection", ["state"]);
 
       /******************************************************************************
+       * Http2Session
+       ******************************************************************************/
+
+      module.rule("Http2Session::Http2Session %p serial=%x", function(ptr) {
+        this.obj(ptr).create("Http2Session").grep();
+      });
+      module.rule("Http2Session::~Http2Session %p mDownstreamState=%x", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+      // TODO: Http2Session::AddStream *
+
+      /******************************************************************************
+       * Http2Stream
+       ******************************************************************************/
+
+      /*
+      // needs dtor log first...
+      module.rule("Http2Stream::Http2Stream %p", function(ptr) {
+        this.obj(ptr).create("Http2Stream").grep();
+      });
+      */
+
+      /******************************************************************************
        * nsHalfOpenSocket
        ******************************************************************************/
 
