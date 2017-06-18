@@ -21,6 +21,7 @@ logan is in an early development stage.
 - revealing additional lines not captured on objects on demand in the UI #17
 - way to easily customize the rules when using a life-staged instance #7
 - reload of the same log file doesn't preserve performed searches
+- no worker to do parsing and searching off the main thread (expect your browser to be freezing with large logs)
 
 # How to use it
 
