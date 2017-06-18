@@ -101,18 +101,29 @@ function ensure(array, itemName, def = {}) {
       summary: {}, // map: className -> prop to display on the summary line
     };
 
-    // This is grep() handler
-    this.plainIf(function(state) {
-      let pointers = state.line.match(GREP_REGEXP);
-      if (pointers) {
-        for (let ptr of pointers) {
-          let obj = state.objs[ptr];
-          if (obj && obj._grep) {
-            obj.capture();
+    this._finalize = function() {
+      if (USE_RULES_TREE_OPTIMIZATION) {
+        for (let module of Object.values(this.modules)) {
+          for (let grade1 in module.rules_tree) {
+            module.rules_tree[grade1] = Object.values(module.rules_tree[grade1]);
           }
         }
       }
-    }, () => { throw "grep() internal consumer should never be called"; });
+
+      // This is grep() handler, has to be added as last because its condition handler
+      // never returns true making following conditional rules process the line as well.
+      this.plainIf(function(state) {
+        let pointers = state.line.match(GREP_REGEXP);
+        if (pointers) {
+          for (let ptr of pointers) {
+            let obj = state.objs[ptr];
+            if (obj && obj._grep) {
+              obj.capture();
+            }
+          }
+        }
+      }, () => { throw "grep() internal consumer should never be called"; });
+    }
   }
 
   Schema.prototype.module = function(name, builder) {
@@ -371,14 +382,8 @@ function ensure(array, itemName, def = {}) {
     _filesToProcess: [],
 
     init: function() {
-      if (USE_RULES_TREE_OPTIMIZATION) {
-        for (let schema of Object.values(this._schemes)) {
-          for (let module of Object.values(schema.modules)) {
-            for (let grade1 in module.rules_tree) {
-              module.rules_tree[grade1] = Object.values(module.rules_tree[grade1]);
-            }
-          }
-        }
+      for (let schema of Object.values(this._schemes)) {
+        schema._finalize();
       }
     },
 
