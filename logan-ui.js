@@ -30,6 +30,7 @@
       breadcrumbs: [],
       expandedElement: null,
       display: {},
+      map: {},
       dynamicStyle: {},
       activeRevealeres: 0,
       objColors: {},
@@ -80,8 +81,9 @@
         $("#active_searches").empty();
         this.searches = [];
         $("#breadcrumbs > #list").empty();
-        $("#breadcrumbs > #map").empty();
         this.breadcrumbs = [];
+        $("#breadcrumbs > #map").empty();
+        this.map = { data: { nodes: new vis.DataSet(), edges: new vis.DataSet() } };
         $("#dynamic_style").empty();
         this.dynamicStyle = {};
 
@@ -294,7 +296,7 @@
         return (this.display[position] = element);
       },
 
-      addRevealer: function(obj, builder, placement = null, includeSummary = false, parent = null) {
+      addRevealer: function(obj, builder, placement = null, includeSummary = false, relation = {}) {
         placement = placement || obj.placement;
 
         let element = $("<div>")
@@ -306,7 +308,7 @@
 
               // Must call in this order, since onExpansion wants to get the same color
               this.objHighlighter(obj, obj, event.target.checked)();
-              this.onExpansion(obj, parent, element, placement, event.target.checked);
+              this.onExpansion(obj, relation, element, placement, event.target.checked);
               if (event.target.checked) {
                 if (includeSummary && obj.props.className) {
                   this.addSummary(obj);
@@ -363,14 +365,14 @@
           let linkFrom = capture.what.linkFrom;
           let linkTo = capture.what.linkTo;
           if (linkTo && linkFrom) {
-            let source = obj === linkTo ? linkTo : linkFrom;
+            let relation = { from: linkFrom, to: linkTo };
             let target = obj === linkTo ? linkFrom : linkTo;
             return this.addRevealer(target, (element) => {
               element
                 .addClass("expanded revealer obj-" + obj.id)
                 .append($("<span>")
                   .text(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
-            }, capture, true, source);
+            }, capture, true, relation);
           }
 
           let expose = capture.what.expose;
@@ -379,7 +381,7 @@
               element
                 .addClass("expanded revealer obj-" + obj.id)
                 .append($("<span>").text("   " + this.quick(expose)))
-            }, capture, true, obj);
+            }, capture, true);
           }
 
           // An empty or unknown capture is just ignored.
@@ -404,33 +406,18 @@
         }
       },
 
-      genMap: function() {
-        let map = $("#map").get()[0];
-        let nodes = [];
-        let edges = [];
-        for (let expand of this.breadcrumbs) {
-          nodes.push({
-            id: expand.obj.id,
-            label: this.quick(expand.obj),
-            color: this.objColor(expand.obj),
-          });
-          if (expand.parent) {
-            edges.push({ from: expand.parent.id, to: expand.obj.id });
-          }
+      showMap: function() {
+        if (this.map.map) {
+          return;
         }
-        nodes = new vis.DataSet(nodes);
-        edges = new vis.DataSet(edges);
-        let data = {
-          nodes: nodes,
-          edges: edges
-        };
+        let mapElement = $("#map").get()[0];
         let options = {
           nodes: {
             shape: "box"
           },
           edges: {
             arrows: {
-              from: {
+              to: {
                 enabled: true,
                 scaleFactor: 1,
                 type: 'arrow'
@@ -438,12 +425,13 @@
             },
           },
         };
-        this._network = new vis.Network(map, data, options);
+        this.map.map = new vis.Network(mapElement, this.map.data, options);
       },
 
       // @param capture: the capture that revealed the object so that we can
       //                 reconstruct expansions on re-search.
-      addBreadcrumb: function(expand, obj, parent, capture) {
+      addBreadcrumb: function(expand, obj, relation, capture) {
+        console.log(relation);
         if (expand) {
           expand.refs++;
           return;
@@ -456,11 +444,11 @@
 
         expand = {
           obj: obj,
-          parent: parent,
+          relation: relation,
           refs: 1,
           capture: capture,
           element: $("<span>")
-            .addClass("branch").addClass(() => parent ? "child" : "parent")
+            .addClass("branch").addClass(() => (relation.to === obj) ? "child" : "parent")
             .css("background-color", this.objColor(obj))
             .text(this.quick(obj))
             .click(function(event) {
@@ -489,10 +477,14 @@
             }.bind(this)),
         };
 
-        let parentExpand = parent ? this.breadcrumbs.find(item => item.obj === parent) : null;
+        let parentExpand = relation.from ? this.breadcrumbs.find(item => item.obj === relation.from) : null;
+        let childExpand = relation.to ? this.breadcrumbs.find(item => item.obj === relation.to) : null;
         if (parentExpand) {
           expand.element.insertAfter(parentExpand.element);
-          this.breadcrumbs.after(expand, item => item.obj === parent);
+          this.breadcrumbs.after(expand, item => item.obj === relation.from);
+        } else if (childExpand) {
+          expand.element.insertBefore(childExpand.element);
+          this.breadcrumbs.before(expand, item => item.obj === relation.to);
         } else {
           $("#list").append(expand.element);
           this.breadcrumbs.push(expand);
@@ -501,7 +493,18 @@
         if (this.breadcrumbs.length) {
           $("#show_map").show();
         }
-        this.genMap();
+        this.map.data.nodes.add({
+          id: expand.obj.id,
+          label: this.quick(expand.obj),
+          color: this.objColor(expand.obj),
+        });
+        if (relation.from) {
+          this.map.data.edges.add({
+            id: expand.obj.id,
+            from: expand.relation.from.id,
+            to: expand.relation.to.id,
+          });
+        }
       },
 
       removeBreadcrumb: function(expand, obj) {
@@ -518,15 +521,11 @@
           this.breadcrumbs.remove(item => item.obj === expand.obj);
         }
 
-        if (!this.breadcrumbs.length) {
-          $("#show_map").hide();
-          $("#map").hide();
-        } else {
-          this.genMap();
-        }
+        this.map.data.nodes.remove(expand.obj.id);
+        this.map.data.edges.remove(expand.obj.id);
       },
 
-      onExpansion: function(obj, parent, revealer, capture, revealed) {
+      onExpansion: function(obj, relation, revealer, capture, revealed) {
         if (this.inFocus) {
           this.inFocus.removeClass("focused");
         }
@@ -535,7 +534,7 @@
 
         let expand = this.breadcrumbs.find(item => item.obj === obj);
         if (revealed) {
-          this.addBreadcrumb(expand, obj, parent, capture);
+          this.addBreadcrumb(expand, obj, relation, capture);
         } else {
           this.removeBreadcrumb(expand, obj);
         }
@@ -576,7 +575,7 @@
 
   $(() => {
     logan.init();
-    
+
     $("#tools_button").click((event) => {
       alert("That's a nice settings icon, isn't? :D");
     });
@@ -642,7 +641,9 @@
 
     $("#show_map").click((event) => {
       $("#map").toggle();
-      UI.genMap();
+      if ($("#map").is(":visible")) {
+        UI.showMap();
+      }
     });
 
     let escapeHandler = (event) => {
@@ -659,6 +660,10 @@
       UI.clearResultsView();
       UI.setSearchView(true);
       logan.consumeFiles(UI, files);
+    } else if (location.search) {
+      UI.clearResultsView();
+      UI.setSearchView(true);
+      logan.consumeURL(UI, location.search.substr(1))
     } else {
       UI.setInitialView();
     }

@@ -19,9 +19,18 @@ Array.prototype.remove = function(finder) {
 Array.prototype.after = function(element, finder) {
   let index = this.findIndex(finder);
   if (index > -1) {
-    this.splice(index, 0, element);
+    this.splice(index + 1, 0, element);
   } else {
     this.push(element);
+  }
+};
+
+Array.prototype.before = function(element, finder) {
+  let index = this.findIndex(finder);
+  if (index > -1) {
+    this.splice(index, 0, element);
+  } else {
+    this.unshift(element);
   }
 };
 
@@ -387,6 +396,26 @@ function ensure(array, itemName, def = {}) {
       }
     },
 
+    consumeURL: function(UI, url) {
+      if (this.reader) {
+        this.reader.abort();
+      }
+      this.objects = [];
+      this.searchProps = {};
+      this._proc.global = {};
+      this._proc.captureid = 0;
+
+      this.seekId = 0;
+
+      fetch(url).then(function(response) {
+        return response.blob();
+      }).then(function(blob) {
+        this._filesToProcess = [blob];
+        blob.name = "_net_"
+        this.consumeFile(UI);
+      }.bind(this));
+    },
+
     consumeFiles: function(UI, files) {
       if (this.reader) {
         this.reader.abort();
@@ -479,7 +508,7 @@ function ensure(array, itemName, def = {}) {
       let autoCapture = this._proc.thread._auto_capture;
       if (autoCapture && !autoCapture.follow(autoCapture.obj, this._proc.line, this._proc)) {
         this._proc.thread._auto_capture = null;
-      }      
+      }
     },
 
     consumeLineByRules: function(UI, file, line) {
@@ -502,7 +531,7 @@ function ensure(array, itemName, def = {}) {
         return true;
       }
 
-      return false;      
+      return false;
     },
 
     processLine: function(rules, file, line) {

@@ -4,7 +4,7 @@ logan.schema("moz",
     proc.timestamp = new Date(date + "T" + time + "Z");
     proc.thread = ensure(proc.threads, proc.file.name + "|" + thread, { name: thread });
     return [module, text];
-  }, 
+  },
 
   (schema) => {
     schema.module("RequestContext", (module) => {
@@ -19,7 +19,7 @@ logan.schema("moz",
       module.rule("RequestContext::RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
       });
-      
+
     }); // RequestContext
 
     schema.module("nsHttp", (module) => {
@@ -354,7 +354,7 @@ logan.schema("moz",
         this.obj(ptr).destroy();
       });
       schema.summaryProps("CacheEntry", "key");
-      
+
     }); // cache2
   }
 ); // moz
