@@ -4,7 +4,9 @@
 <title>Mozilla Log Analyzer</title>
 <meta charset="utf-8" />
 <link rel="stylesheet" type="text/css" href="logan.css" />
+<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.20.0/vis.min.css" />
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.20.0/vis.min.js"></script>
 <script src="logan.js"></script>
 <script src="logan-ui.js"></script>
 <script src="logan-rules.js"></script>
@@ -72,7 +74,11 @@
   </div>
 </div>
 
-<div id="breadcrumbs" class=""></div>
+<div id="breadcrumbs">
+  <div id="list"></div>
+  <div id="map"></div>
+  <input id="show_map" type="button" class="button decent" value="&#x25a0;&#x2192;&#x25a0;"/>
+</div>
 
 <div id="results_section" class="section results"></div>
 

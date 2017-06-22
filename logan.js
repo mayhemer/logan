@@ -577,27 +577,27 @@ function ensure(array, itemName, def = {}) {
       var matchFunc;
       switch (match) {
         case "==": {
-          matchFunc = function(prop) { return matchValue === prop; }
+          matchFunc = function(prop) { return matchValue === prop.toString(); }
           break;
         }
         case "contains": {
           let contains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = function(prop) { return prop.match(contains); }
+          matchFunc = function(prop) { return prop.toString().match(contains); }
           break;
         }
         case "!contains": {
           let ncontains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = function(prop) { return !prop.match(ncontains); }
+          matchFunc = function(prop) { return !prop.toString().match(ncontains); }
           break;
         }
         case "rx": {
           let regexp = new RegExp(matchValue, "g");
-          matchFunc = function(prop) { return prop.match(regexp); }
+          matchFunc = function(prop) { return prop.toString().match(regexp); }
           break;
         }
         case "!rx": {
           let nregexp = new RegExp(matchValue, "g");
-          matchFunc = function(prop) { return !prop.match(nregexp); }
+          matchFunc = function(prop) { return !prop.toString().match(nregexp); }
           break;
         }
         case "*":

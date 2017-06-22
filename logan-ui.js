@@ -79,7 +79,8 @@
         this.display = {};
         $("#active_searches").empty();
         this.searches = [];
-        $("#breadcrumbs").empty();
+        $("#breadcrumbs > #list").empty();
+        $("#breadcrumbs > #map").empty();
         this.breadcrumbs = [];
         $("#dynamic_style").empty();
         this.dynamicStyle = {};
@@ -403,6 +404,43 @@
         }
       },
 
+      genMap: function() {
+        let map = $("#map").get()[0];
+        let nodes = [];
+        let edges = [];
+        for (let expand of this.breadcrumbs) {
+          nodes.push({
+            id: expand.obj.id,
+            label: this.quick(expand.obj),
+            color: this.objColor(expand.obj),
+          });
+          if (expand.parent) {
+            edges.push({ from: expand.parent.id, to: expand.obj.id });
+          }
+        }
+        nodes = new vis.DataSet(nodes);
+        edges = new vis.DataSet(edges);
+        let data = {
+          nodes: nodes,
+          edges: edges
+        };
+        let options = {
+          nodes: {
+            shape: "box"
+          },
+          edges: {
+            arrows: {
+              from: {
+                enabled: true,
+                scaleFactor: 1,
+                type: 'arrow'
+              },
+            },
+          },
+        };
+        this._network = new vis.Network(map, data, options);
+      },
+
       // @param capture: the capture that revealed the object so that we can
       //                 reconstruct expansions on re-search.
       addBreadcrumb: function(expand, obj, parent, capture) {
@@ -418,6 +456,7 @@
 
         expand = {
           obj: obj,
+          parent: parent,
           refs: 1,
           capture: capture,
           element: $("<span>")
@@ -446,7 +485,7 @@
                 }
               });
 
-              $("#breadcrumbs").append(this.bc_details = $("<div>").append(element).append("<br>"));
+              $("#list").append(this.bc_details = $("<div>").append(element).append("<br>"));
             }.bind(this)),
         };
 
@@ -455,9 +494,14 @@
           expand.element.insertAfter(parentExpand.element);
           this.breadcrumbs.after(expand, item => item.obj === parent);
         } else {
-          $("#breadcrumbs").append(expand.element);
+          $("#list").append(expand.element);
           this.breadcrumbs.push(expand);
         }
+
+        if (this.breadcrumbs.length) {
+          $("#show_map").show();
+        }
+        this.genMap();
       },
 
       removeBreadcrumb: function(expand, obj) {
@@ -472,6 +516,13 @@
         if (!expand.refs) {
           expand.element.remove();
           this.breadcrumbs.remove(item => item.obj === expand.obj);
+        }
+
+        if (!this.breadcrumbs.length) {
+          $("#show_map").hide();
+          $("#map").hide();
+        } else {
+          this.genMap();
         }
       },
 
@@ -587,6 +638,11 @@
     });
     $("#seek_to_tail").click((event) => {
       UI.seekTo(0);
+    });
+
+    $("#show_map").click((event) => {
+      $("#map").toggle();
+      UI.genMap();
     });
 
     let escapeHandler = (event) => {

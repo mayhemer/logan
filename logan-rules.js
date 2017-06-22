@@ -118,7 +118,27 @@ logan.schema("moz",
       module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
+      module.rule("nsHttpChannel::ContinueProcessResponse1 [this=%p, rv=%x]", function(ptr) {
+        this.thread.httpchannel_for_auth = this.obj(ptr).capture();
+      });
+      module.rule("nsHttpChannel::ProcessResponse [this=%p httpStatus=%d]", function(ptr) {
+        this.thread.httpchannel_for_auth = this.obj(ptr).capture();
+      });
       schema.summaryProps("nsHttpChannel", ["state", "url", "status"]);
+
+      /******************************************************************************
+       * nsHttpChannelAuthProvider
+       ******************************************************************************/
+
+      schema.ruleIf("nsHttpChannelAuthProvider::ProcessAuthentication [this=%p channel=%p code=%u SSLConnectFailed=%d]",
+        proc => proc.thread.httpchannel_for_auth, function(ptr, ch)
+      {
+        this.obj(ptr).grep()._channel = this.thread.httpchannel_for_auth;
+        this.thread.httpchannel_for_auth.alias(ch).capture().link(ptr);
+      });
+      module.rule("nsHttpChannelAuthProvider::PromptForIdentity [this=%p channel=%p]", function(ptr, ch) {
+        this.obj(ptr).capture()._channel.prop("asked-credentials", true);
+      });
 
       /******************************************************************************
        * nsHttpTransaction
@@ -195,7 +215,7 @@ logan.schema("moz",
       module.rule("Creating nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).create("nsHttpConnection").grep();
       });
-      module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%d]", function(conn, trans, caps) {
+      module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%x]", function(conn, trans, caps) {
         this.obj(conn).capture();
         this.obj(trans).state("active").link(conn);
       });
