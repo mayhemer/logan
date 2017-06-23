@@ -59,7 +59,7 @@ function ensure(array, itemName, def = {}) {
   }
 
   function escapeRegexp(s) {
-    return s.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+    return s.replace(/\n$/, "").replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
   }
 
   const printfToRegexpMap = {
@@ -345,9 +345,30 @@ function ensure(array, itemName, def = {}) {
     ensure(logan._proc.global, "guids")[guid] = this;
   };
 
+  Obj.prototype.placeholder = function(classPlaceholderName) {
+    if (this.props.className) {
+      // Already created, no need to create a placeholder
+      return this;
+    }
+    return this.create(classPlaceholderName);
+  };
+
 
   // export
   logan = {
+    Holder: function(def) {
+      for (let prop in def) {
+        this[prop] = def[prop];
+      }
+
+      this.on = function(prop, handler) {
+        if (!this[prop]) {
+          return;
+        }
+        return (this[prop] = handler(this[prop]));
+      };
+    },
+
     // processing state sub-object, passed to rule consumers
     // initialized in consumeFile(s)
     _proc: {
@@ -606,32 +627,33 @@ function ensure(array, itemName, def = {}) {
       var matchFunc;
       switch (match) {
         case "==": {
-          matchFunc = function(prop) { return matchValue === prop.toString(); }
+          matchFunc = prop => matchValue === prop.toString();
+          break;
+        }
+        case "!!": {
+          matchFunc = prop => !!prop;
           break;
         }
         case "contains": {
           let contains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = function(prop) { return prop.toString().match(contains); }
+          matchFunc = prop => prop.toString().match(contains);
           break;
         }
         case "!contains": {
           let ncontains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = function(prop) { return !prop.toString().match(ncontains); }
+          matchFunc = prop => !prop.toString().match(ncontains);
           break;
         }
         case "rx": {
           let regexp = new RegExp(matchValue, "g");
-          matchFunc = function(prop) { return prop.toString().match(regexp); }
+          matchFunc = prop => prop.toString().match(regexp);
           break;
         }
         case "!rx": {
           let nregexp = new RegExp(matchValue, "g");
-          matchFunc = function(prop) { return !prop.toString().match(nregexp); }
+          matchFunc = prop => !prop.toString().match(nregexp);
           break;
         }
-        case "*":
-          matchFunc = () => true;
-          break;
         default:
           throw "Unexpected match operator";
       }

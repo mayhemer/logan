@@ -134,8 +134,8 @@
         }
 
         let descr = search.className;
-        if (search.matching !== "*") {
-          descr += "." + search.propName + "\xa0" + search.matching + "\xa0" + search.value;
+        if (search.matching === "!!") {
+          descr = "!!" + descr + "." + search.propName;
         }
         if (search.seekId !== 0) {
           descr += " @ " + search.seekTime;
@@ -426,11 +426,26 @@
         this.map.map = new vis.Network(mapElement, this.map.data, options);
       },
 
+      relationId: function(relation) {
+        if (!relation.from) {
+          return 0;
+        }
+        return (relation.from.id << 16) + relation.to.id;
+      },
+
       // @param capture: the capture that revealed the object so that we can
       //                 reconstruct expansions on re-search.
       addBreadcrumb: function(expand, obj, relation, capture) {
         if (expand) {
           expand.refs++;
+
+          if (relation.from) {
+            this.map.data.edges.add({
+              id: this.relationId(expand.relation),
+              from: expand.relation.from.id,
+              to: expand.relation.to.id,
+            });
+          }
           return;
         }
 
@@ -475,18 +490,8 @@
             }.bind(this)),
         };
 
-        let parentExpand = relation.from ? this.breadcrumbs.find(item => item.obj === relation.from) : null;
-        let childExpand = relation.to ? this.breadcrumbs.find(item => item.obj === relation.to) : null;
-        if (parentExpand) {
-          expand.element.insertAfter(parentExpand.element);
-          this.breadcrumbs.after(expand, item => item.obj === relation.from);
-        } else if (childExpand) {
-          expand.element.insertBefore(childExpand.element);
-          this.breadcrumbs.before(expand, item => item.obj === relation.to);
-        } else {
-          $("#list").append(expand.element);
-          this.breadcrumbs.push(expand);
-        }
+        $("#list").append(expand.element);
+        this.breadcrumbs.push(expand);
 
         if (this.breadcrumbs.length) {
           $("#show_map").show();
@@ -498,7 +503,7 @@
         });
         if (relation.from) {
           this.map.data.edges.add({
-            id: expand.obj.id,
+            id: this.relationId(expand.relation),
             from: expand.relation.from.id,
             to: expand.relation.to.id,
           });
@@ -520,7 +525,13 @@
         }
 
         this.map.data.nodes.remove(expand.obj.id);
-        this.map.data.edges.remove(expand.obj.id);
+        let relationId = this.relationId(expand.relation);
+        if (relationId) {
+          this.map.data.edges.remove(relationId);
+        }
+        if (!this.breadcrumbs.length) {
+          $("#show_map").hide();
+        }
       },
 
       onExpansion: function(obj, relation, revealer, capture, revealed) {
@@ -587,7 +598,7 @@
     }).change();
 
     $("#search_Matching").on("change", (event) => {
-      (event.target.value === "*")
+      (event.target.value === "!!")
         ? $("#search_PropValue").hide() : $("#search_PropValue").show();
     }).change();
 
