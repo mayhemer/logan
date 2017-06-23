@@ -302,3 +302,7 @@ div.breadcrumb_details {
 #show_map {
   display: none;
 }
+
+div.vis-network {
+  position: absolute !important;
+}

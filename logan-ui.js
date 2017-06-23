@@ -406,24 +406,15 @@
         }
       },
 
-      showMap: function() {
+      ensureMap: function() {
         if (this.map.map) {
           return;
         }
         let mapElement = $("#map").get()[0];
         let options = {
-          nodes: {
-            shape: "box"
-          },
-          edges: {
-            arrows: {
-              to: {
-                enabled: true,
-                scaleFactor: 1,
-                type: 'arrow'
-              },
-            },
-          },
+          nodes: { shape: "box", shapeProperties: { borderRadius: 0, } },
+          edges: { arrows: { to: { enabled: true, scaleFactor: 1, type: 'arrow' } } },
+          interaction: { zoomView: false },
         };
         this.map.map = new vis.Network(mapElement, this.map.data, options);
       },
@@ -431,7 +422,6 @@
       // @param capture: the capture that revealed the object so that we can
       //                 reconstruct expansions on re-search.
       addBreadcrumb: function(expand, obj, relation, capture) {
-        console.log(relation);
         if (expand) {
           expand.refs++;
           return;
@@ -642,7 +632,7 @@
     $("#show_map").click((event) => {
       $("#map").toggle();
       if ($("#map").is(":visible")) {
-        UI.showMap();
+        UI.ensureMap();
       }
     });
 
