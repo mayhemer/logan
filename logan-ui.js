@@ -23,6 +23,7 @@
   }
 
   let SEARCH_INDEXER = 0;
+  let BREADCRUMB_INDEXER = 0;
 
   let UI =
     {
@@ -127,9 +128,17 @@
         search.id = ++SEARCH_INDEXER;
         this.searches.push(search);
 
+        if (search.seekId === undefined) {
+          search.seekId = logan.seekId;
+          search.seekTime = $("#seek_to").val();
+        }
+
         let descr = search.className;
         if (search.matching !== "*") {
           descr += "." + search.propName + "\xa0" + search.matching + "\xa0" + search.value;
+        }
+        if (search.seekId !== 0) {
+          descr += " @ " + search.seekTime;
         }
         let element = $("<div>")
           .addClass("search")
@@ -137,7 +146,7 @@
           .text(descr)
           .append($("<input>")
             .attr("type", "button")
-            .val(CLOSE_CROSS) // X
+            .val(CLOSE_CROSS)
             .addClass("button icon")
             .click(function() { this.removeSearch(search); }.bind(this))
           );
@@ -148,7 +157,8 @@
           search.className,
           search.propName,
           search.value,
-          search.matching
+          search.matching,
+          search.seekId
         );
 
         return search;
@@ -169,7 +179,7 @@
         for (search of searches) {
           this.addSearch(search);
         }
-        for (let expand of breadcrumbs) {
+        for (let expand of breadcrumbs.sort((a, b) => a.index - b.index)) {
           let capture = this.display[expand.capture.id];
           if (capture) {
             capture.children("input[type=checkbox]").click();
@@ -338,7 +348,6 @@
       addResult: function(obj) {
         return this.addRevealer(obj, (element) => {
           element
-            .addClass(() => (obj.shared) ? "shared" : "")
             .append($("<span>")
               .text(this.summary(obj)))
             ;
@@ -348,7 +357,6 @@
       addSummary: function(obj) {
         let element = $("<div>")
           .addClass("log_line expanded summary obj-" + obj.id)
-          .addClass(() => (obj.shared) ? "shared" : "")
           .append($("<span>")
             .text(this.summary(obj)))
           ;
@@ -392,7 +400,6 @@
         let line = time + " \u2502 " + capture.thread + " \u2502 " + capture.what;
         let element = $("<div>")
           .addClass("log_line expanded obj-" + obj.id)
-          .addClass(() => obj.shared ? "shared" : "")
           .append($("<pre>").text(line))
           ;
 
@@ -437,6 +444,7 @@
           relation: relation,
           refs: 1,
           capture: capture,
+          index: ++BREADCRUMB_INDEXER,
           element: $("<span>")
             .addClass("branch").addClass(() => (relation.to === obj) ? "child" : "parent")
             .css("background-color", this.objColor(obj))

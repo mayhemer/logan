@@ -602,7 +602,7 @@ function ensure(array, itemName, def = {}) {
       UI.fillSearchBy();
     },
 
-    search: function(UI, className, propName, matchValue, match) {
+    search: function(UI, className, propName, matchValue, match, seekId) {
       var matchFunc;
       switch (match) {
         case "==": {
@@ -640,14 +640,14 @@ function ensure(array, itemName, def = {}) {
         if (className != obj.props.className) {
           continue;
         }
-        if (this.seekId && obj.captures[0].id > this.seekId) {
+        if (seekId && obj.captures[0].id > seekId) {
           continue;
         }
-        if (this.seekId && obj.captures.last().id >= this.seekId) {
+        if (seekId && obj.captures.last().id >= seekId) {
           // The object lives around the cutting point, find the prop value
           var prop = "";
           let capture = obj.captures.find(capture => {
-            if (capture.id > this.seekId) {
+            if (capture.id > seekId) {
               return true;
             }
             if (typeof capture.what === "object" &&

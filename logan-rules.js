@@ -145,7 +145,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating nsHttpTransaction @%p", function(ptr) {
-        this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction").grep();
+        this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction");
       });
       module.rule("nsHttpTransaction::Init [this=%p caps=%x]", function(trans) {
         this.obj(trans).capture().follow((trans, line) => {
@@ -303,7 +303,8 @@ logan.schema("moz",
       });
       module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
         let obj = this.obj(ci).capture().follow((obj, line) => {
-          if (line.match("done listing")) {
+          if (line === "]") {
+            obj.capture(line);
             return false;
           }
           logan.parse(line, "  %p", (trans) => {
