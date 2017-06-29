@@ -347,7 +347,6 @@
 
         let element = $("<div>")
           .addClass("log_line")
-          .addClass("obj-" + obj.id)
           .addClass(() => includeSummary ? "" : "summary")
           .append($("<input type='checkbox'>")
             .on("change", function(event) {
@@ -387,6 +386,7 @@
         return this.addRevealer(obj, (element) => {
           element
             .append($("<span>")
+              .addClass("obj-" + obj.id)  
               .text(this.summary(obj)))
             ;
         });
@@ -416,6 +416,7 @@
             return this.addRevealer(target, (element) => {
               element
                 .addClass("expanded revealer")
+                //.addClass("obj-" + obj.id)
                 .append($("<span>")
                   .html(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
             }, capture, true, relation);
@@ -426,6 +427,7 @@
             return this.addRevealer(expose, (element) => {
               element
                 .addClass("expanded revealer")
+                //.addClass("obj-" + obj.id)
                 .append($("<span>").html("   " + this.quick(expose)))
             }, capture, true);
           }
