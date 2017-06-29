@@ -42,6 +42,8 @@ function ensure(array, itemName, def = {}) {
   return array[itemName];
 }
 
+const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
+
 (function() {
 
   const FILE_SLICE = 20 * 1024 * 1024;
@@ -97,7 +99,6 @@ function ensure(array, itemName, def = {}) {
     return { grade1, grade2 };
   }
 
-  const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   const NULLPTR_REGEXP = /^0+$/;
 
   function Schema(namespace, lineRegexp, linePreparer) {
@@ -124,6 +125,12 @@ function ensure(array, itemName, def = {}) {
       this.plainIf(function(state) {
         let pointers = state.line.match(GREP_REGEXP);
         if (pointers) {
+          if (pointers.length === 1 && state.line.trim() == pointers[0]) {
+            // It doesn't make sense to include lines only containing the pointer.
+            // TODO the condition here should be made even smarter to filter out
+            // more of just useless lines.
+            return;
+          }
           for (let ptr of pointers) {
             let obj = state.objs[ptr];
             if (obj && obj._grep) {
@@ -350,7 +357,7 @@ function ensure(array, itemName, def = {}) {
       // Already created, no need to create a placeholder
       return this;
     }
-    return this.create(classPlaceholderName);
+    return this.create("<" + classPlaceholderName + ">");
   };
 
 

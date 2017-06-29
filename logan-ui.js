@@ -13,6 +13,23 @@
     return "rgba(" + parseInt(match[1], 16) + "," + parseInt(match[2], 16) + "," + parseInt(match[3], 16) + "," + alpha + ")";
   }
 
+  const entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+
+  function escapeHtml(string) {
+    return String(string).replace(/[&<>"'`=\/]/g, function(s) {
+      return entityMap[s];
+    });
+  }
+  
   const CLOSE_CROSS = "\uD83D\uDDD9";
 
   let HIGHLIGHTSET = ['#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f', '#8dd3c7'];
@@ -136,6 +153,8 @@
         let descr = search.className;
         if (search.matching === "!!") {
           descr = "!!" + descr + "." + search.propName;
+        } else {
+          descr += "." + search.propName + " " + search.matching + " " + search.value;
         }
         if (search.seekId !== 0) {
           descr += " @ " + search.seekTime;
@@ -193,11 +212,28 @@
         });
       },
 
+      highlight: function(input) {
+        if (typeof input === "object") {
+          return "<span class='obj-" + input.id + "'>" + input.props.pointer + "</span>";
+        }
+
+        return input.replace(GREP_REGEXP, function(ptr) {
+          // TODO - this is the tricky part, the object has to be found
+          // by its pointer and all of its aliases and only within 
+          // the object's lifetime span.
+          let obj = null;
+          if (obj) {
+            return "<span class='obj-" + obj.id + "'>" + ptr + "</span>";
+          }
+          return ptr;
+        });
+      },
+
       objHighlighter: function(obj, source = null, set) {
         source = source || obj;
 
         let color = this.objColor(source);
-        let style = "div.log_line.obj-" + obj.id + " { background-color: " + color + "}";
+        let style = ".obj-" + obj.id + " { background-color: " + color + "}";
 
         return function(event) {
           if (set === true) {
@@ -252,7 +288,7 @@
       },
 
       quick: function(obj) {
-        return (obj.props.className || "?:" + obj.id) + " @" + obj.props.pointer;
+        return (obj.props.className || "?:" + obj.id) + " @" + this.highlight(obj);
       },
 
       closeExpansion: function(newElement = null) {
@@ -310,13 +346,15 @@
         placement = placement || obj.placement;
 
         let element = $("<div>")
-          .addClass("log_line obj-" + obj.id)
+          .addClass("log_line")
+          .addClass("obj-" + obj.id)
           .addClass(() => includeSummary ? "" : "summary")
           .append($("<input type='checkbox'>")
             .on("change", function(event) {
               let fromTop = element.offset().top - $(window).scrollTop();
 
               // Must call in this order, since onExpansion wants to get the same color
+              this.objColor(obj);
               this.objHighlighter(obj, obj, event.target.checked)();
               this.onExpansion(obj, relation, element, placement, event.target.checked);
               if (event.target.checked) {
@@ -377,9 +415,9 @@
             let target = obj === linkTo ? linkFrom : linkTo;
             return this.addRevealer(target, (element) => {
               element
-                .addClass("expanded revealer obj-" + obj.id)
+                .addClass("expanded revealer")
                 .append($("<span>")
-                  .text(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
+                  .html(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
             }, capture, true, relation);
           }
 
@@ -387,8 +425,8 @@
           if (expose) {
             return this.addRevealer(expose, (element) => {
               element
-                .addClass("expanded revealer obj-" + obj.id)
-                .append($("<span>").text("   " + this.quick(expose)))
+                .addClass("expanded revealer")
+                .append($("<span>").html("   " + this.quick(expose)))
             }, capture, true);
           }
 
@@ -400,7 +438,7 @@
         let line = time + " \u2502 " + capture.thread + " \u2502 " + capture.what;
         let element = $("<div>")
           .addClass("log_line expanded obj-" + obj.id)
-          .append($("<pre>").text(line))
+          .append($("<span>").addClass("pre").html(this.highlight(escapeHtml(line))))
           ;
 
         return this.place(capture, element);
@@ -463,7 +501,7 @@
           element: $("<span>")
             .addClass("branch").addClass(() => (relation.to === obj) ? "child" : "parent")
             .css("background-color", this.objColor(obj))
-            .text(this.quick(obj))
+            .html(this.quick(obj))
             .click(function(event) {
               if (this.bc_details) {
                 this.bc_details.remove();
@@ -480,7 +518,7 @@
                 );
               this.summary(obj, Object.keys, (obj, props) => {
                 element.append($("<div>")
-                  .text(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
+                  .html(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
                 for (let prop of props) {
                   element.append($("<div>").text(prop + " = " + obj.props[prop]));
                 }

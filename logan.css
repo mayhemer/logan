@@ -104,20 +104,24 @@ div.log_line.checked.summary {
   color: black;
 }
 div.log_line.past_capture_limit:before {
-  content: '\258E';
+  content: '\2588';
   color: red;
   position: absolute;
   left: 0;
   font-style: normal;
+  text-shadow: 1px 2px 2px black;
 }
 
 div.log_line input[type="checkbox"] {
   position: absolute;
   margin: 0;
 }
-div.log_line span,
-div.log_line pre {
+div.log_line > span {
   margin-left: 2em;
+}
+
+span.pre {
+  white-space: pre;
 }
 
 div.topbar {

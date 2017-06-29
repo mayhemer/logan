@@ -39,7 +39,7 @@ logan.schema("moz",
         this.thread.on("wyciwigchild", ch => { ch.alias(req); });
 
         this.obj(lg).prop("requests", count => ++count).prop("foreground-requests", parseInt(count) + 1).capture().link(req);
-        this.obj(req).placeholder("<request>").prop("in-load-group", lg, true);
+        this.obj(req).placeholder("request").prop("in-load-group", lg, true);
       });
       module.rule("LOADGROUP [%p]: Removing request %p %s status %x (count=%d).\n", function(lg, req, name, status, count) {
         this.obj(lg).prop("requests", count => --count).prop("foreground-requests", count).capture().mention(req);
@@ -90,7 +90,7 @@ logan.schema("moz",
       module.rule("HttpChannelChild::OnTransportAndData [this=%p]", function(ptr) {
         this.obj(ptr).state("data").capture();
       });
-      module.rule("HttpChannelChild::DoOnStatus [this=%p]", function(ptr) {
+      module.rule("HttpChannelChild::OnStopRequest [this=%p]", function(ptr) {
         this.obj(ptr).state("finished").capture();
       });
       schema.summaryProps("HttpChannelChild", ["state", "url", "status"]);
@@ -117,8 +117,8 @@ logan.schema("moz",
         });
       });
       schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url) {
-        this.thread.on("httpchannel", ch => {
-          ch.prop("url", url);
+        this.thread.on("httpchannel", channel => {
+          channel.prop("url", url);
         });
       });
       module.rule("nsHttpChannel::Init [this=%p]", function(ptr) {
@@ -127,9 +127,8 @@ logan.schema("moz",
       schema.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
         proc => proc.thread.httpchannel_init,
         function(oldch, newch) {
-          this.obj(oldch).capture().link(this.thread.on("httpchannel_init", ch => {
-            ch.alias(newch);
-          }));
+          this.thread.on("httpchannel_init", channel => { channel.alias(newch); });
+          this.obj(oldch).capture().link(newch);
         });
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
         this.obj(ptr).state("open").capture();
@@ -204,7 +203,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating nsHttpTransaction @%p", function(ptr) {
-        this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction");
+        this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction").grep();
       });
       module.rule("nsHttpTransaction::Init [this=%p caps=%x]", function(trans) {
         this.obj(trans).capture().follow((trans, line) => {
@@ -279,7 +278,7 @@ logan.schema("moz",
       });
       module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%x]", function(conn, trans, caps) {
         this.obj(conn).capture();
-        this.obj(trans).state("active").link(conn);
+        this.obj(trans).capture().state("active").link(conn);
       });
       module.rule("nsHttpConnection::OnSocketWritable %p ReadSegments returned [rv=%d read=%d sock-cond=%x again=%d]", function(conn, rv, read, cond, again) {
         if (parseInt(read) > 0)

@@ -101,20 +101,21 @@ module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(channel, t
 });
 ```
 
-The consuming function is called only when the line in the log file matches the formatting string.  Note that in 99% cases the rule string is simply a copy of the c++ `LOG()` formatting string in question.  *Internally the % directives are simply replaced with appropriate regular expressions - see [logan.js - printfToRegexpMap](https://github.com/mayhemer/logan/blob/master/logan.js#L56).*
+The consuming function is called only when the line in the log file matches the formatting string.  Note that in 99% cases the rule string is simply a copy of the c++ `LOG()` formatting string in question.  *Internally the % directives are simply replaced with appropriate regular expressions - see [logan.js - printfToRegexpMap](https://github.com/mayhemer/logan/blob/master/logan.js#L65).*
 
-For convenience the called consumer function is given the found values as arguments - containing strings, not objects directly.
+For convenience the called consumer function is given the found values as arguments - containing strings, not objects or numbers directly.
 
 `this` inside the function is assigned the **processing state** object.  Some of its properties and methods are:
 
 - `this.thread`: an object representing the thread as found on the current line, this simple object lives through out the file processing and you can store properties on it at will to build ruleIf() and plainIf() conditions based on it (more on it below)
 - `this.thread.name`: obviously the name of the thread
+- `this.thread.on("property", handler)`: a convenience method to perform a conditioned operation + change value or nullify the property in one easy step ; the handler is called when the property is non-null on the thread, the handler is passed value of that property as an argument, return value of the handler replaces the value of that property on the thread (note that when you don't return a value it effectively nullifies the property)
 - `this.line`: the currently processed line, stripped the timestamp, thread name and module name
-- `this.obj(identifier)`: this method returns a JS object representing the given `identifier` that can be then convenietly worked with, more below ; *note: the same object is always returned since its first call for the same identifier until `destroy()` is called on that object*
+- `this.obj(identifier)`: this method returns a JS object representing the given `identifier` that can be then conveniently worked with, more below ; *note: the same object is always returned since its first call for the same identifier until `destroy()` is called on that object*
 
 ## Working with objects
 
-To access an object the consumer function calls `this.obj(identifier)` as described above.  This returns an instance of `Obj` prototype.
+To access an object a rule consumer function calls `this.obj(identifier)` as described above.  That returns an instance of `Obj` prototype.
 
 Obj (an object) methods:
 - `.create("classname")`: called from constructors, this puts the object to a 'created' state and assigns its class name; such a created object lives until .destroy() is called on it
@@ -137,6 +138,7 @@ Obj (an object) methods:
   * `line`: the line being currently processed
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
+- `.placeholder("name")`: gives a placeholder name to objects that are not tracked ; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for ; calling this on an object that has been created doesn't do anything
 
 For convenience each of these methods (modulo documented exceptions) return back the object, so that they can be chained in the jQuery promise style.
 
