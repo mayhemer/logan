@@ -239,8 +239,8 @@ logan.schema("moz",
       });
       schema.ruleIf("http response [", proc => proc.thread.httptransaction, function() {
         this.thread.on("httptransaction", tr => {
-          tr.capture().follow((obj, line) => {
-            obj.capture(line);
+          tr.capture().follow((tr, line) => {
+            tr.capture(line);
             return line !== "]";
           })
         });
@@ -277,7 +277,7 @@ logan.schema("moz",
       });
       module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%x]", function(conn, trans, caps) {
         this.obj(conn).capture();
-        this.obj(trans).capture().state("active").link(conn);
+        this.obj(trans).state("active").capture().link(conn);
       });
       module.rule("nsHttpConnection::OnSocketWritable %p ReadSegments returned [rv=%d read=%d sock-cond=%x again=%d]", function(conn, rv, read, cond, again) {
         if (parseInt(read) > 0)

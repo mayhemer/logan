@@ -505,7 +505,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
             this.eollength = 2;
           }
 
-          var lines = event.target.result.split(/\r?\n/);
+          var lines = event.target.result.split(/[\r\n]+/);
 
           // This simple code assumes that a single line can't be longer than FILE_SLICE
           previousLine += lines.shift();
