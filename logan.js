@@ -42,6 +42,21 @@ function ensure(array, itemName, def = {}) {
   return array[itemName];
 }
 
+function Bag_on(prop, handler) {
+  if (!this[prop]) {
+    return;
+  }
+  return (this[prop] = handler(this[prop]));
+}
+
+function Bag(def) {
+  for (let prop in def) {
+    this[prop] = def[prop];
+  }
+
+  this.on = Bag_on.bind(this);
+}
+
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
 (function() {
@@ -198,7 +213,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
   function Obj(ptr) {
     this.id = logan.objects.length;
-    this.props = { pointer: ptr, className: null };
+    this.props = new Bag({ pointer: ptr, className: null });
     this.captures = [];
     this.shared = false;
     this.file = logan._proc.file;
@@ -226,6 +241,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         delete this["_references"];
       }
     };
+
+    this.on = Bag_on.bind(this);
 
     logan.objects.push(this);
   }
@@ -363,19 +380,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
   // export
   logan = {
-    Holder: function(def) {
-      for (let prop in def) {
-        this[prop] = def[prop];
-      }
-
-      this.on = function(prop, handler) {
-        if (!this[prop]) {
-          return;
-        }
-        return (this[prop] = handler(this[prop]));
-      };
-    },
-
     // processing state sub-object, passed to rule consumers
     // initialized in consumeFile(s)
     _proc: {

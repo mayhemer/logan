@@ -132,6 +132,7 @@ Obj (an object) methods:
   * when `value` is a function it will be called with one argument being the existing property value or 0 (a number) when the property has not yet been set, the result of the function is then stored as a new property value (ignoring the `merge` argument!); this is convenient for counters
   * the `merge` argument can be a function too, called with one argument being the object
   * note that reading a property back is only possible via direct access on object's `props` hashtable; it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
+- `.props`: property Bag - a simple hashtable - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
 - `.follow(consumer)`: use this to add few lines following the current line on the same thread; the `consumer` function is called as long as it returns something that evaluates to `true` AND none of the defined rules has so far matched a line on the current thread (note that the condition function can do anything it wants, not just capturing) ; the arguments are:
   * `obj`: the object this follow has been initiated for
@@ -139,6 +140,7 @@ Obj (an object) methods:
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
 - `.placeholder("name")`: gives a placeholder name to objects that are not tracked ; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for ; calling this on an object that has been created doesn't do anything
+- `.on("object_property", handler)`: see **this.thread.on** above for details, note this is working with JS properties you may have set directly on the *Obj* instance and not what has been set with the *.prop()* method!
 
 For convenience each of these methods (modulo documented exceptions) return back the object, so that they can be chained in the jQuery promise style.
 

@@ -2,7 +2,7 @@ logan.schema("moz",
   /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/,
   (proc, all, date, time, thread, level, module, text) => {
     proc.timestamp = new Date(date + "T" + time + "Z");
-    proc.thread = ensure(proc.threads, proc.file.name + "|" + thread, () => new logan.Holder({ name: thread }));
+    proc.thread = ensure(proc.threads, proc.file.name + "|" + thread, () => new Bag({ name: thread }));
     return [module, text];
   },
 
@@ -178,9 +178,9 @@ logan.schema("moz",
         this.thread.httpchannel_for_auth = this.obj(ptr).capture();
       });
       module.rule("nsHttpChannel::ProcessResponse [this=%p httpStatus=%d]", function(ptr, status) {
-        this.obj(ptr).prop("http-status", status, true).capture();
+        this.thread.httpchannel_for_auth = this.obj(ptr).prop("http-status", status, true).capture();
       });
-      schema.summaryProps("nsHttpChannel", ["state", "url", "status"]);
+      schema.summaryProps("nsHttpChannel", ["state", "http-status", "url", "status"]);
 
       /******************************************************************************
        * nsHttpChannelAuthProvider
@@ -189,13 +189,12 @@ logan.schema("moz",
       schema.ruleIf("nsHttpChannelAuthProvider::ProcessAuthentication [this=%p channel=%p code=%u SSLConnectFailed=%d]",
         proc => proc.thread.httpchannel_for_auth, function(ptr, ch)
       {
-        this.obj(ptr).grep()._channel = this.thread.httpchannel_for_auth;
         this.thread.on("httpchannel_for_auth", ch => {
-          ch.alias(ch).capture().link(ptr)
+          this.obj(ptr).placeholder("nsHttpChannelAuthProvider").grep()._channel = ch.alias(ch).capture().link(ptr);
         });
       });
       module.rule("nsHttpChannelAuthProvider::PromptForIdentity [this=%p channel=%p]", function(ptr, ch) {
-        this.obj(ptr).capture()._channel.prop("asked-credentials", true);
+        this.obj(ptr).capture().on("_channel", ch => ch.prop("asked-credentials", true));
       });
 
       /******************************************************************************
@@ -217,7 +216,7 @@ logan.schema("moz",
           trans.capture().follow((trans, line) => {
             trans.capture(line);
             return line !== "]";
-          })
+          });
         });
       });
       schema.ruleIf("nsHttpConnectionMgr::AtActiveConnectionLimit [ci=%s caps=%d,totalCount=%d, maxPersistConns=%d]",
