@@ -298,7 +298,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this;
   };
 
-  Obj.prototype.follow = function(cond) {
+  Obj.prototype.follow = function(cond, consumer, error = () => true) {
     let capture = {
       obj: this,
     };
@@ -309,8 +309,16 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         obj.capture(line);
         return --capture.count;
       };
-    } else {
+    } else if (typeof cond === "string") {
+      capture.follow = (obj, line, proc) => {
+        return logan.parse(line, cond, function() {
+          return consumer.apply(this, [obj].concat(Array.from(arguments)).concat([this]));
+        }, (line) => error(obj, line));
+      };
+    } else if (typeof cond === "function") {
       capture.follow = cond;
+    } else {
+      throw "Internal error: follow 'cond' argument unexpected type '" + typeof cond + "'";
     }
 
     logan._proc.thread._follow = capture;
@@ -416,9 +424,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     },
 
     parse: function(line, printf, consumer, failedConsumer) {
-      if (!this.processRule(line, convertPrintfToRegexp(printf), consumer) && failedConsumer) {
-        failedConsumer(line);
-      }
+      return this.processRule(line, convertPrintfToRegexp(printf), consumer) ||
+        (failedConsumer && failedConsumer.call(this._proc, line));
     },
 
 
@@ -592,10 +599,14 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
     processLineByRules: function(rules, file, line) {
       this._proc.line = line;
+      let conditionResult;
       for (let rule of rules) {
         try {
-          if (rule.cond && !rule.cond(this._proc)) {
-            continue;
+          if (rule.cond) {
+            conditionResult = rule.cond(this._proc);
+            if (!conditionResult) {
+              continue;
+            }
           }
         } catch (exception) {
           throw this.exceptionParse(exception);
@@ -603,18 +614,20 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
         if (!rule.regexp) {
           if (!rule.cond) {
-            throw "INTERNAL ERROR: No regexp and no cond on a rule";
+            throw this.exceptionParse("INTERNAL ERROR: No regexp and no cond on a rule");
           }
 
           try {
-            rule.consumer.call(this._proc, line);
+            rule.consumer.call(this._proc, line, conditionResult);
           } catch (exception) {
             throw this.exceptionParse(exception);
           }
           return true;
         }
 
-        if (!this.processRule(line, rule.regexp, rule.consumer)) {
+        if (!this.processRule(line, rule.regexp, function() {
+              rule.consumer.apply(this, Array.from(arguments).concat(conditionResult));
+            })) {
           continue;
         }
         return true;

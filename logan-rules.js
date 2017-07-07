@@ -111,14 +111,11 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating nsHttpChannel [this=%p]", function(ptr) {
-        this.thread.httpchannel = this.obj(ptr).create("nsHttpChannel").grep();
-        this.thread.on("httpchannelparent", parent => {
-          parent.link(this.thread.httpchannel);
+        let httpchannel = this.obj(ptr).create("nsHttpChannel").grep().follow("uri=%s", (ch, uri) => {
+          ch.prop("url", uri);
         });
-      });
-      schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url) {
-        this.thread.on("httpchannel", channel => {
-          channel.prop("url", url);
+        this.thread.on("httpchannelparent", parent => {
+          parent.link(httpchannel);
         });
       });
       module.rule("nsHttpChannel::Init [this=%p]", function(ptr) {
@@ -126,8 +123,9 @@ logan.schema("moz",
       });
       schema.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
         proc => proc.thread.httpchannel_init,
-        function(oldch, newch) {
-          this.thread.on("httpchannel_init", channel => { channel.alias(newch); });
+        function(oldch, newch, presmethod, channel) {
+          this.thread.httpchannel_init = null;
+          channel.alias(newch);
           this.obj(oldch).capture().link(newch);
         });
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
@@ -190,11 +188,10 @@ logan.schema("moz",
        ******************************************************************************/
 
       schema.ruleIf("nsHttpChannelAuthProvider::ProcessAuthentication [this=%p channel=%p code=%u SSLConnectFailed=%d]",
-        proc => proc.thread.httpchannel_for_auth, function(ptr, ch)
+        proc => proc.thread.httpchannel_for_auth, function(ptr, ch, code, sslcon, auth_ch)
       {
-        this.thread.on("httpchannel_for_auth", ch => {
-          this.obj(ptr).placeholder("nsHttpChannelAuthProvider").grep()._channel = ch.alias(ch).capture().link(ptr);
-        });
+        this.thread.httpchannel_for_auth = null;
+        this.obj(ptr).placeholder("nsHttpChannelAuthProvider").grep()._channel = auth_ch.alias(ch).capture().link(ptr);
       });
       module.rule("nsHttpChannelAuthProvider::PromptForIdentity [this=%p channel=%p]", function(ptr, ch) {
         this.obj(ptr).capture().on("_channel", ch => ch.prop("asked-credentials", true));
@@ -208,28 +205,24 @@ logan.schema("moz",
         this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction").grep();
       });
       module.rule("nsHttpTransaction::Init [this=%p caps=%x]", function(trans) {
-        this.obj(trans).capture().follow((trans, line) => {
-          logan.parse(line, "  window-id = %x", function(id) {
-            trans.prop("tab-id", id);
-          });
+        this.obj(trans).capture().follow("  window-id = %x", function(trans, id) {
+          trans.prop("tab-id", id);
         });
       });
-      schema.ruleIf("http request [", proc => proc.thread.httptransaction, function() {
-        this.thread.on("httptransaction", trans => {
-          trans.capture().follow((trans, line) => {
-            trans.capture(line);
-            return line !== "]";
-          });
+      schema.ruleIf("http request [", proc => proc.thread.httptransaction, function(trans) {
+        this.thread.httptransaction = null;
+        trans.capture().follow((trans, line) => {
+          trans.capture(line);
+          return line !== "]";
         });
       });
       schema.ruleIf("nsHttpConnectionMgr::AtActiveConnectionLimit [ci=%s caps=%d,totalCount=%d, maxPersistConns=%d]",
-        proc => proc.thread.httptransaction, function(ci) {
-          this.thread.httptransaction.capture().mention(ci);
+        proc => proc.thread.httptransaction, function(ci, caps, total, max, trans) {
+          trans.capture().mention(ci);
         });
-      schema.ruleIf("AtActiveConnectionLimit result: %s", proc => proc.thread.httptransaction, function() {
-        this.thread.on("httptransaction", tr => {
-          tr.capture();
-        });
+      schema.ruleIf("AtActiveConnectionLimit result: %s", proc => proc.thread.httptransaction, function(atlimit, trans) {
+        this.thread.httptransaction = null;
+        trans.capture();
       });
       module.rule("  adding transaction to pending queue [trans=%p pending-count=%d]", function(trans, pc) {
         trans = this.obj(trans).state("pending").capture();
@@ -240,12 +233,11 @@ logan.schema("moz",
       module.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
         this.thread.httptransaction = this.obj(trans);
       });
-      schema.ruleIf("http response [", proc => proc.thread.httptransaction, function() {
-        this.thread.on("httptransaction", tr => {
-          tr.capture().follow((tr, line) => {
-            tr.capture(line);
-            return line !== "]";
-          })
+      schema.ruleIf("http response [", proc => proc.thread.httptransaction, function(trans) {
+        this.thread.httptransaction = null;
+        trans.capture().follow((trans, line) => {
+          trans.capture(line);
+          return line !== "]";
         });
       });
       module.rule("nsHttpTransaction %p SetRequestContext %p", function(trans, rc) {
@@ -336,10 +328,9 @@ logan.schema("moz",
       module.rule("nsHalfOpenSocket::OnOutputStreamReady [this=%p ent=%s %s]", function(ptr, end, streamtype) {
         this.thread.halfopen = this.obj(ptr).capture();
       });
-      schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn) {
-        this.thread.on("halfopen", ho => {
-          ho.link(conn).capture();
-        });
+      schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn, ho) {
+        this.thread.halfopen = null;
+        ho.link(conn).capture();
       });
       module.rule("Destroying nsHalfOpenSocket [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
@@ -365,18 +356,11 @@ logan.schema("moz",
         });
       });
       module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
-        let obj = this.obj(ci).capture().follow((obj, line) => {
-          if (line === "]") {
-            obj.capture(line);
-            return false;
-          }
-          logan.parse(line, "  %p", (trans) => {
-            let _trans = logan._proc.obj(trans);
-            obj.mention(trans);
-          }, (line) => {
-            obj.capture(line);
-          });
-          return true;
+        let obj = this.obj(ci).capture().follow("  %p", (obj, trans) => {
+          return obj.mention(trans);
+        }, (obj, line) => {
+          obj.capture(line);
+          return line !== "]";
         });
       });
       module.rule("nsHttpConnectionMgr::TryDispatchTransaction without conn " +
@@ -407,10 +391,9 @@ logan.schema("moz",
       module.rule("CacheEntry::CacheEntry [this=%p]", function(ptr) {
         this.thread.httpcacheentry = this.obj(ptr).create("CacheEntry").grep();
       });
-      schema.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key) {
-        this.thread.on("httpcacheentry", entry => {
-          entry.prop("key", key);
-        });
+      schema.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key, entry) {
+        this.thread.httpcacheentry = null;
+        entry.prop("key", key);
       });
       module.rule("New CacheEntryHandle %p for entry %p", function(handle, entry) {
         this.obj(entry).capture().alias(handle);

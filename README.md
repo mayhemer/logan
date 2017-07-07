@@ -134,11 +134,26 @@ Obj (an object) methods:
   * note that reading a property back is only possible via direct access on object's `props` hashtable; it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
 - `.props`: property Bag - a simple hashtable - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
-- `.follow(consumer)`: use this to add few lines following the current line on the same thread; the `consumer` function is called as long as it returns something that evaluates to `true` AND none of the defined rules has so far matched a line on the current thread (note that the condition function can do anything it wants, not just capturing) ; the arguments are:
+- `.follow("format", consumer, failure = null)`: use this to process lines following the current line on the same thread; the follow is engaged as long as no other rule matches on the same thread and as long as the the consumer's or failure's (if provided) result is evaluating to `true`
+
+  `consumer` is called only when a line matches the format string, the arguments are: 
+  * this: the processing state
+  * `obj`: the object this follow has been initiated for
+  * found values: passed the same way as for a rule consumer (see **A simple rule** section)
+  * `proc`: the processing state as described above
+  * result: *true* to continue the follow, *false* to stop it
+  
+  the optional `failure` is called when a line doesn't match the format with following arguments
+  * this: the processing state
+  * `obj`: the object this follow has been initiated for
+  * `line`: the line being currently processed
+  * result: *true* to continue the follow, *false* to stop it
+- `.follow(consumer)`: similar to the above form of `.follow()` but without a rule-like formating; the `consumer` function is called as long as no other rule matches on the same thread and as long as the the consumer's result is evaluating to `true` (note that the consumer function can do anything it wants, not just capturing) ; the arguments are:
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
+- `.follow(n)`: this will simply capture *n* following lines, the follow will stop sooner if a rule matches on the same thread
 - `.placeholder("name")`: gives a placeholder name to objects that are not tracked ; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for ; calling this on an object that has been created doesn't do anything
 - `.on("object_property", handler)`: see **this.thread.on** above for details, note this is working with JS properties you may have set directly on the *Obj* instance and not what has been set with the *.prop()* method!
 
@@ -183,7 +198,7 @@ schema.plainIf(proc => proc.thread.someCondition, function(line) {
 
 The line argument is holding the currently processed line.
 
-To process a plain line you can use `logan.parse(input, format, consumer, failure = null)` method:
+To process a plain line you can use `logan.parse("input", "format", consumer, failure = null)` method:
 * the `input` argument is the unprocessed input string (e.g. `line` from the example above)
 * `format` is a printf formatting, same as in case of a rule definition to process the input
 * `consumer` is called, when `input` is matching `format`, with arguments filled with resolved format parameters - the same way as in case of a rule consumer
