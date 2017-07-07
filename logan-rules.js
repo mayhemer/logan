@@ -136,6 +136,9 @@ logan.schema("moz",
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
       });
+      module.rule("nsHttpChannel::TriggerNetwork [this=%p]", function(ptr) {
+        this.obj(ptr).capture().follow(1);
+      });
       module.rule("nsHttpChannel::OnCacheEntryCheck enter [channel=%p entry=%p]", function(ch, entry) {
         this.obj(ch).capture().mention(entry).follow((obj) => obj.capture());
       });
