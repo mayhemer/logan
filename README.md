@@ -103,7 +103,7 @@ module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(channel, t
 
 The consuming function is called only when the line in the log file matches the formatting string.  Note that in 99% cases the rule string is simply a copy of the c++ `LOG()` formatting string in question.  *Internally the % directives are simply replaced with appropriate regular expressions - see [logan.js - printfToRegexpMap](https://github.com/mayhemer/logan/blob/master/logan.js#L65).*
 
-For convenience the called consumer function is given the found values as arguments - containing strings, not objects or numbers directly.
+For convenience the called consumer function is given the found values as arguments - containing strings, *not* objects or numbers directly.
 
 `this` inside the function is assigned the **processing state** object.  Some of its properties and methods are:
 
@@ -170,19 +170,19 @@ To make the capturing process reliable there is a suggested ordering of calls wh
 
 ## A conditional rule
 
-This can be used for adding rules for lines that are too general or indistingushable or when the object to relate it to cannot be determined from the line itself.
+This can be used for adding rules for lines that are too general or indistinguishable or when the object to relate it to cannot be determined from the line itself.
 
 An example of a conditional rule definition:
 
 ```javascript
-schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url) {
-  this.thread.httpchannel.prop("url", url);
-  this.thread.httpchannel = null;
+schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url, channel) {
+  this.thread.httpchannel = null; // we only want to hit this once
+  channel.prop("url", url);
 });
 ```
 The rule assumes that a rule executed just before has set `thread.httpchannel` on the **processing state** to the object we want to assign the URL to.
 
-The first argument to `schema.ruleIf()` is equal to what is being passed to `module.rule()`.  The second argument is a condition function that is evaluated prior to evaluating the formatting string.  It has an only argument - the processing state as described above.  If the condition function returns anything evaluating to `true` and the string matches, the function is called the same way as in the *simple rule* case.
+The first argument to `schema.ruleIf()` is equal to what is being passed to `module.rule()`.  The second argument is a condition function that is evaluated prior to evaluating the formatting string.  It has an only argument - the processing state as described above.  If the condition function returns anything evaluating to `true` and the string matches, the function is called the same way as in the *simple rule* case with one added argument at the end - the result of the condition for convenience.
 
 Note: you can define more than one conditional rule with the same formatting string.
 
@@ -191,12 +191,12 @@ Note: you can define more than one conditional rule with the same formatting str
 Execution of the consumer of such a rule is conditioned only by evaluation of the condition function and nothing else.
 
 ```javascript
-schema.plainIf(proc => proc.thread.someCondition, function(line) {
+schema.plainIf(proc => proc.thread.someCondition, function(line, condition) {
   ...
 });
 ```
 
-The line argument is holding the currently processed line.
+The line argument is holding the currently processed line.  The condition argument keeps the result of the condition evaluation (proc.thread.someCondition in this case.)
 
 To process a plain line you can use `logan.parse("input", "format", consumer, failure = null)` method:
 * the `input` argument is the unprocessed input string (e.g. `line` from the example above)

@@ -42,20 +42,18 @@ function ensure(array, itemName, def = {}) {
   return array[itemName];
 }
 
-function Bag_on(prop, handler) {
-  if (!this[prop]) {
-    return;
-  }
-  return (this[prop] = handler(this[prop]));
-}
-
 function Bag(def) {
   for (let prop in def) {
     this[prop] = def[prop];
   }
-
-  this.on = Bag_on.bind(this);
 }
+
+Bag.prototype.on = function(prop, handler) {
+  if (!this[prop]) {
+    return;
+  }
+  return (this[prop] = handler(this[prop]));
+};
 
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
@@ -242,10 +240,10 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       }
     };
 
-    this.on = Bag_on.bind(this);
-
     logan.objects.push(this);
   }
+
+  Obj.prototype.on = Bag.prototype.on;
 
   Obj.prototype.create = function(className) {
     if (this.props.className) {

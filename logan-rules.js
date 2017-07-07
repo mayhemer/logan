@@ -356,10 +356,10 @@ logan.schema("moz",
         });
       });
       module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
-        let obj = this.obj(ci).capture().follow("  %p", (obj, trans) => {
-          return obj.mention(trans);
-        }, (obj, line) => {
-          obj.capture(line);
+        this.obj(ci).capture().follow("  %p", (ci, trans) => {
+          return ci.mention(trans);
+        }, (ci, line) => {
+          ci.capture(line);
           return line !== "]";
         });
       });
