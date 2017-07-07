@@ -248,11 +248,14 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   }
 
   Obj.prototype.create = function(className) {
+    if (this.props.className) {
+      console.warn(logan.exceptionParse("object already exists, recreting automatically from scratch"));
+      this.destroy();
+      return logan._proc.obj(this.__most_recent_accessor).create(className);
+    }
+
     ensure(logan.searchProps, className, { pointer: true, state: true });
 
-    if (this.props.className) {
-      throw "Recreating object! (are you missing destructor rule for this class?)";
-    }
     this.props.className = className;
     this.prop("state", "created");
     return this.capture();
@@ -391,6 +394,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         if (!obj) {
           this.objs[ptr] = (obj = new Obj(ptr));
         }
+        obj.__most_recent_accessor = ptr;
         return obj;
       },
 
@@ -419,6 +423,15 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
 
     // The rest is considered private
+
+    exceptionParse: function(exception) {
+      if (typeof exception === "object") {
+        exception = "'" + exception.message + "' at " + exception.fileName + ":" + exception.lineNumber
+      }
+      exception += "\nwhile processing '" + this._proc.line +
+                   "'\nat " + this._proc.file.name + ":" + this._proc.linenumber;
+      return exception;
+    },
 
     _filesToProcess: [],
 
@@ -524,7 +537,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
       this.reader.onerror = function(event) {
         this.reader = null;
-        alert(event);
+        throw event.type;
       }.bind(this);
 
       this.reader.readAsBinaryString(blob);
@@ -584,11 +597,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
           if (rule.cond && !rule.cond(this._proc)) {
             continue;
           }
-        } catch (e) {
-          alert("\"" + e.message + "\" while processing rule condition at " + e.fileName + ":" + e.lineNumber +
-            "\n\nprocessed text: " + line + " at " + file.name + ":" + this._proc.linenumber +
-            "\n\nfile loading stopped");
-          throw e;
+        } catch (exception) {
+          throw this.exceptionParse(exception);
         }
 
         if (!rule.regexp) {
@@ -596,7 +606,11 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
             throw "INTERNAL ERROR: No regexp and no cond on a rule";
           }
 
-          rule.consumer.call(this._proc, line);
+          try {
+            rule.consumer.call(this._proc, line);
+          } catch (exception) {
+            throw this.exceptionParse(exception);
+          }
           return true;
         }
 
@@ -617,7 +631,11 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         return false;
       }
 
-      consumer.apply(this._proc, match.slice(1));
+      try {
+        consumer.apply(this._proc, match.slice(1));
+      } catch (exception) {
+        throw this.exceptionParse(exception);
+      }
       return true;
     },
 

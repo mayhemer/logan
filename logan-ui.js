@@ -64,6 +64,7 @@
       setInitialView: function() {
         $("#file_load_section").removeClass().addClass("section").show();
         $("#active_searches").hide();
+        $("#error_section").empty().hide();
         $("#search_section").hide();
         $("#seek").hide();
         $("#breadcrumbs").hide();
@@ -72,6 +73,7 @@
       setSearchView: function(reset) {
         $("#file_load_section").removeClass().addClass("topbar").show();
         $("#active_searches").hide();
+        $("#error_section").empty().hide();
         $("#search_section").show();
         $("#seek").hide();
         $("#breadcrumbs").hide();
@@ -87,6 +89,7 @@
       setResultsView: function() {
         $("#search_section").removeClass().addClass("topbar").show();
         $("#active_searches").show();
+        $("#error_section").hide();
         $("#results_section").show();
         $("#seek").show();
         $("#breadcrumbs").show();
@@ -624,6 +627,10 @@
 
   $(() => {
     logan.init();
+
+    window.onerror = function(msg) {
+      $("#error_section").show().text(msg);
+    };
 
     $("#tools_button").click((event) => {
       alert("That's a nice settings icon, isn't? :D");

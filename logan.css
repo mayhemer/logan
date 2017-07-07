@@ -56,13 +56,20 @@ div.section {
   margin: 15%;
   padding: 2em;
   align-self: center;
-  border: solid 1px gray;
+  border: solid 1px;
 }
 
 div#tools {
   position: absolute;
   top: 2px;
   right: 2px;
+}
+
+div#error_section {
+  background-color: red;
+  color: white;
+  font-weight: bold;
+  white-space: pre-line;  
 }
 
 div.results {
