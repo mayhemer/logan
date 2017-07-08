@@ -118,7 +118,7 @@ For convenience the called consumer function is given the found values as argume
 To access an object a rule consumer function calls `this.obj(identifier)` as described above.  That returns an instance of `Obj` prototype.
 
 Obj (an object) methods:
-- `.create("classname")`: called from constructors, this puts the object to a 'created' state and assigns its class name; such a created object lives until .destroy() is called on it
+- `.create("classname")`: called from constructors, this puts the object to a 'created' state and assigns its class name; such a created object lives until .destroy() is called on it; if called on an already created object, it's first destroyed and then created as a new object, a warning is shown in the web console that an object's been recreated
 - `.destroy()`: called from destructors, this sets the state of the object to 'released' and removes the object from the processing state; it means that a following call to `this.obj()` with the same identifier value will return a new blank instance
 - `.capture("string" or no argument)`: this adds a line to the object so that it then appears in the results when the object is revealed in the results view; when there is no argument passed, the currently processed line is automatically added
 - `.alias("alias")`: an object can be identified by multiple values sometimes thanks static_cast pointer shifts, wrapping helper classes ("handlers"), or simply by a unique key instead of a pointer; this method allows you to define such an alias so that calls to `this.obj("alias")` will resolve to this object
@@ -134,7 +134,7 @@ Obj (an object) methods:
   * note that reading a property back is only possible via direct access on object's `props` hashtable; it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
 - `.props`: property Bag - a simple hashtable - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
-- `.follow("format", consumer, failure = null)`: use this to process lines following the current line on the same thread; the follow is engaged as long as no other rule matches on the same thread and as long as the the consumer's or failure's (if provided) result is evaluating to `true`
+- `.follow("format", consumer[, failure])`: use this to process lines following the current line on the same thread; the follow is engaged as long as no other rule matches on the same thread and as long as the the consumer's or failure's (if provided) result is evaluating to `true`
 
   `consumer` is called only when a line matches the format string, the arguments are: 
   * this: the processing state
@@ -198,7 +198,7 @@ schema.plainIf(proc => proc.thread.someCondition, function(line, condition) {
 
 The line argument is holding the currently processed line.  The condition argument keeps the result of the condition evaluation (proc.thread.someCondition in this case.)
 
-To process a plain line you can use `logan.parse("input", "format", consumer, failure = null)` method:
+To process a plain line you can use `logan.parse("input", "format", consumer[, failure])` method:
 * the `input` argument is the unprocessed input string (e.g. `line` from the example above)
 * `format` is a printf formatting, same as in case of a rule definition to process the input
 * `consumer` is called, when `input` is matching `format`, with arguments filled with resolved format parameters - the same way as in case of a rule consumer
