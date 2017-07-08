@@ -154,7 +154,7 @@ Obj (an object) methods:
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
 - `.follow(n)`: this will simply capture *n* following lines, the follow will stop sooner if a rule matches on the same thread
-- `.placeholder("name")`: gives a placeholder name to objects that are not tracked ; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for ; calling this on an object that has been created doesn't do anything
+- `.class("name")`: gives a class name to objects that are not tracked (no rules defined for them) or are partial in the log which has been started later during the session; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for, state is set to "partial" and "missing-constructor" property is set to `true` ; calling this on an object that has been `create()`ed doesn't do anything
 - `.on("object_property", handler)`: see **this.thread.on** above for details, note this is working with JS properties you may have set directly on the *Obj* instance and not what has been set with the *.prop()* method!
 
 For convenience each of these methods (modulo documented exceptions) return back the object, so that they can be chained in the jQuery promise style.

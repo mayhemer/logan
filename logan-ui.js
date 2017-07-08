@@ -126,7 +126,7 @@
 
       fillClassNames: function(classNames) {
         let select = $("#search_className");
-        for (let className in classNames) {
+        for (let className of Object.keys(classNames).sort()) {
           if (className !== "null") {
             select.append($("<option>").attr("value", className).text(className));
           }

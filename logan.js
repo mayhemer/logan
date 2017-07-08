@@ -378,12 +378,12 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     ensure(logan._proc.global, "guids")[guid] = this;
   };
 
-  Obj.prototype.placeholder = function(classPlaceholderName) {
+  Obj.prototype.class = function(className) {
     if (this.props.className) {
-      // Already created, no need to create a placeholder
+      // Already created
       return this;
     }
-    return this.create("<" + classPlaceholderName + ">");
+    return this.create(className).state("partial").prop("missing-constructor", true);
   };
 
 

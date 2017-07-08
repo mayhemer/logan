@@ -39,7 +39,7 @@ logan.schema("moz",
         this.thread.on("wyciwigchild", ch => { ch.alias(req); });
 
         this.obj(lg).prop("requests", count => ++count).prop("foreground-requests", parseInt(count) + 1).capture().link(req);
-        this.obj(req).placeholder("request").prop("in-load-group", lg, true);
+        this.obj(req).class("unknown request").prop("in-load-group", lg, true);
       });
       module.rule("LOADGROUP [%p]: Removing request %p %s status %x (count=%d).\n", function(lg, req, name, status, count) {
         this.obj(lg).prop("requests", count => --count).prop("foreground-requests", count).capture().mention(req);
@@ -191,7 +191,7 @@ logan.schema("moz",
         proc => proc.thread.httpchannel_for_auth, function(ptr, ch, code, sslcon, auth_ch)
       {
         this.thread.httpchannel_for_auth = null;
-        this.obj(ptr).placeholder("nsHttpChannelAuthProvider").grep()._channel = auth_ch.alias(ch).capture().link(ptr);
+        this.obj(ptr).class("nsHttpChannelAuthProvider").grep()._channel = auth_ch.alias(ch).capture().link(ptr);
       });
       module.rule("nsHttpChannelAuthProvider::PromptForIdentity [this=%p channel=%p]", function(ptr, ch) {
         this.obj(ptr).capture().on("_channel", ch => ch.prop("asked-credentials", true));
@@ -275,11 +275,13 @@ logan.schema("moz",
         this.obj(trans).state("active").capture().link(conn);
       });
       module.rule("nsHttpConnection::OnSocketWritable %p ReadSegments returned [rv=%d read=%d sock-cond=%x again=%d]", function(conn, rv, read, cond, again) {
-        if (parseInt(read) > 0)
-          this.obj(conn).state("sent").capture();
+        conn = this.obj(conn).class("nsHttpConnection").capture().grep();
+        if (parseInt(read) > 0) {
+          conn.state("sent");
+        }
       });
       module.rule("nsHttpConnection::OnSocketReadable [this=%p]", function(conn) {
-        this.obj(conn).state("recv").capture();
+        this.obj(conn).class("nsHttpConnection").state("recv").capture().grep();
       });
       module.rule("nsHttpConnection::CloseTransaction[this=%p trans=%p reason=%x]", function(conn, trans, rv) {
         this.obj(conn).state("done").capture().mention(trans);
@@ -368,14 +370,8 @@ logan.schema("moz",
         "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
           this.thread.httptransaction = this.obj(trans).capture("Attempt to dispatch on " + ci_key).mention(ci_key);
           this.thread.conn_info = this.obj(ci_key).capture().follow((ci, line) => {
-            if (line.match(/^\s\s/)) {
-              ci.capture();
-              return ci._captured = true;
-            }
-            if (!ci._captured) {
-              return true; // want to find the first line with two spaces
-            }
-            return ci._captured = undefined;
+            ci.capture();
+            return line.match(/^\s\s/);
           }).mention(trans).mention(conn);
         });
       schema.summaryProps("nsConnectionEntry", "key");
