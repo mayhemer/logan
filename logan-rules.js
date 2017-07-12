@@ -14,9 +14,9 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("RequestContext::RequestContext this=%p id=%x", function(ptr, id) {
-        this.obj(ptr).prop("id", id).create("RequestContext").grep();
+        this.obj(ptr).create("RequestContext").prop("id", id).grep();
       });
-      module.rule("RequestContext::RequestContext this=%p blockers=%u", function(ptr) {
+      module.rule("RequestContext::~RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
       });
 
@@ -138,9 +138,15 @@ logan.schema("moz",
         this.obj(ptr).capture().follow(1);
       });
       module.rule("nsHttpChannel::OnCacheEntryCheck enter [channel=%p entry=%p]", function(ch, entry) {
-        this.obj(ch).capture().mention(entry).follow((obj) => obj.capture());
+        this.obj(ch).capture().mention(entry).follow(
+          "nsHTTPChannel::OnCacheEntryCheck exit [this=%p doValidation=%d result=%d]", (obj, ptr, doValidation) => {
+            obj.capture().prop("revalidates-cache", doValidation);
+            return false;
+          }, (obj) => {
+            return obj.capture();
+          }
+        );
       });
-      module.rule("nsHTTPChannel::OnCacheEntryCheck exit [this=%p doValidation=%d result=%d]"); // to stop the follow()
       module.rule("nsHttpChannel::OnCacheEntryAvailable [this=%p entry=%p new=%d appcache=%p status=%x mAppCache=%p mAppCacheForWrite=%p]", function(ch, entry, isnew) {
         this.obj(ch).capture().link(entry);
       });
@@ -307,18 +313,22 @@ logan.schema("moz",
       module.rule("Http2Session::~Http2Session %p mDownstreamState=%x", function(ptr) {
         this.obj(ptr).destroy();
       });
-      // TODO: Http2Session::AddStream *
+      module.rule("Http2Session::AddStream session=%p stream=%p serial=%u NextID=0x%X (tentative)",
+        function(session, stream, serial, id) {
+          this.obj(session).link(this.obj(stream).prop("id", id));
+        }
+      );
 
       /******************************************************************************
        * Http2Stream
        ******************************************************************************/
 
-      /*
-      // needs dtor log first...
       module.rule("Http2Stream::Http2Stream %p", function(ptr) {
         this.obj(ptr).create("Http2Stream").grep();
       });
-      */
+      module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
+        this.obj(ptr).destroy();
+      });
 
       /******************************************************************************
        * nsHalfOpenSocket
