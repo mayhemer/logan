@@ -674,7 +674,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       UI.fillSearchBy();
     },
 
-    search: function(UI, className, propName, matchValue, match, seekId) {
+    search: function(UI, className, propName, matchValue, match, seekId, coloring) {
       var matchFunc;
       switch (match) {
         case "==": {
@@ -747,7 +747,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         if (!matchFunc(prop)) {
           continue;
         }
-        UI.addResult(obj).addClass("result");
+        UI.addResult(obj).addClass("result").css("color", coloring);
       }
     },
   }; // logan impl

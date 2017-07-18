@@ -29,13 +29,20 @@
       return entityMap[s];
     });
   }
-  
+
   const CLOSE_CROSS = "\uD83D\uDDD9";
 
   let HIGHLIGHTSET = ['#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f', '#8dd3c7'];
   function nextHighlightColor() {
     let result = HIGHLIGHTSET[0];
     HIGHLIGHTSET.push(HIGHLIGHTSET.shift());
+    return result;
+  }
+
+  let SEARCHHIGHLIGH = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02'];
+  function nextSearchColor() {
+    let result = SEARCHHIGHLIGH[0];
+    SEARCHHIGHLIGH.push(SEARCHHIGHLIGH.shift());
     return result;
   }
 
@@ -148,6 +155,10 @@
         search.id = ++SEARCH_INDEXER;
         this.searches.push(search);
 
+        if (search.color === undefined) {
+          search.color = nextSearchColor();
+        }
+
         if (search.seekId === undefined) {
           search.seekId = logan.seekId;
           search.seekTime = $("#seek_to").val();
@@ -167,6 +178,7 @@
         let element = $("<div>")
           .addClass("search")
           .attr("id", "search-" + search.id)
+          .css("color", search.color)
           .text(descr)
           .append($("<input>")
             .attr("type", "button")
@@ -182,7 +194,8 @@
           search.propName,
           search.value,
           search.matching,
-          search.seekId
+          search.seekId,
+          search.color
         );
 
         return search;
@@ -224,7 +237,7 @@
 
         return input.replace(GREP_REGEXP, function(ptr) {
           // TODO - this is the tricky part, the object has to be found
-          // by its pointer and all of its aliases and only within 
+          // by its pointer and all of its aliases and only within
           // the object's lifetime span.
           let obj = null;
           if (obj) {
@@ -391,7 +404,7 @@
         return this.addRevealer(obj, (element) => {
           element
             .append($("<span>")
-              .addClass("obj-" + obj.id)  
+              .addClass("obj-" + obj.id)
               .text(this.summary(obj)))
             ;
         });
