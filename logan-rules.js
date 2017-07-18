@@ -200,7 +200,7 @@ logan.schema("moz",
           this.obj(oldch).capture().link(newch);
         });
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
-        this.obj(ptr).state("open").capture();
+        this.obj(ptr).state("open").capture().__opentime = this.timestamp.getTime();
       });
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
@@ -232,13 +232,24 @@ logan.schema("moz",
         this.obj(ptr).prop("from-cache", true).capture();
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        this.obj(ch).state("started").capture();
+        ch = this.obj(ch);
+        ch.prop("start-time", this.timestamp.getTime() - ch.__opentime)
+          .state("started")
+          .capture();
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
-        this.obj(ch).state("data").capture();
+        ch = this.obj(ch);
+        ch.propIfNull("first-data-time", this.timestamp.getTime() - ch.__opentime)
+          .prop("last-data-time", this.timestamp.getTime() - ch.__opentime)
+          .state("data")
+          .capture();
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        this.obj(ch).prop("status", status).state("finished").capture();
+        ch = this.obj(ch);
+        ch.prop("status", status)
+          .prop("stop-time", this.timestamp.getTime() - ch.__opentime)
+          .state("finished")
+          .capture();
       });
       module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ptr) {
         this.obj(ptr).prop("suspendcount", suspendcount => ++suspendcount).capture();
@@ -257,6 +268,23 @@ logan.schema("moz",
       });
       module.rule("nsHttpChannel::ProcessResponse [this=%p httpStatus=%d]", function(ptr, status) {
         this.thread.httpchannel_for_auth = this.obj(ptr).prop("http-status", status, true).capture();
+      });
+      module.rule("sending progress notification [this=%p status=%x progress=%d/%d]", function(ch, status) {
+        let status_string = "?";
+        switch (parseInt(status, 16)) {
+          case 0x804B0008: status_string = "STATUS_READING"; break;
+          case 0x804B0009: status_string = "STATUS_WRITING"; break;
+          case 0x804b0003: status_string = "STATUS_RESOLVING"; break;
+          case 0x804b000b: status_string = "STATUS_RESOLVED"; break;
+          case 0x804b0007: status_string = "STATUS_CONNECTING_TO"; break;
+          case 0x804b0004: status_string = "STATUS_CONNECTED_TO"; break;
+          case 0x804B000C: status_string = "STATUS_TLS_HANDSHAKE_STARTING"; break;
+          case 0x804B000D: status_string = "STATUS_TLS_HANDSHAKE_ENDED"; break;
+          case 0x804b0005: status_string = "STATUS_SENDING_TO"; break;
+          case 0x804b000a: status_string = "STATUS_WAITING_FOR"; break;
+          case 0x804b0006: status_string = "STATUS_RECEIVING_FROM"; break;
+        }
+        this.obj(ch).capture().capture("  " + status + " = " + status_string);
       });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 

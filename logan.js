@@ -689,6 +689,14 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
           matchFunc = prop => !prop;
           break;
         }
+        case ">": {
+          matchFunc = prop => prop > matchValue;
+          break;
+        }
+        case "<": {
+          matchFunc = prop => prop < matchValue;
+          break;
+        }
         case "contains": {
           let contains = new RegExp(escapeRegexp(matchValue), "g");
           matchFunc = prop => prop.toString().match(contains);
