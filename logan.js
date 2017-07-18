@@ -103,6 +103,11 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     if (!grade1) {
       grade1 = input.split(splitter, 3).join('');
     }
+    if (grade1 && grade1.match(/%/)) {
+      // grade1 contains a dynamic part, use the whole input as mapping
+      // this is specially handled in module.set_rule
+      return input;
+    }
     return grade1;
   }
 
@@ -188,8 +193,13 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.set_rule = function(rule, input) {
       if (USE_RULES_TREE_OPTIMIZATION) {
         let mapping = ruleMappingGrade2(input);
-        let grade2 = ensure(this.rules_tree, mapping.grade1, {});
-        grade2[mapping.grade2] = rule;
+        if (mapping.grade2) {
+          let grade2 = ensure(this.rules_tree, mapping.grade1, {});
+          grade2[mapping.grade2] = rule;
+        } else {
+          // all one-grade rules go alone, to allow dynamic parts to be at the begining of rules
+          this.rules_flat.push(rule);
+        }
       } else {
         this.rules_flat.push(rule);
       }
@@ -197,8 +207,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
     this.get_rules = function(input) {
       if (USE_RULES_TREE_OPTIMIZATION) {
-        // logan.init() converts this to array.
-        return this.rules_tree[ruleMappingGrade1(input)] || [];
+        // logan.init() converts rules_tree to array.
+        return (this.rules_tree[ruleMappingGrade1(input)] || []).concat(this.rules_flat);
       }
       return this.rules_flat;
     };
@@ -213,7 +223,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.id = logan.objects.length;
     this.props = new Bag({ pointer: ptr, className: null });
     this.captures = [];
-    this.shared = false;
     this.file = logan._proc.file;
     this.aliases = {};
     this._grep = false;
@@ -225,19 +234,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.placement = {
       time: logan._proc.timestamp,
       id: ++logan._proc.captureid,
-    };
-
-    this._references = {};
-    this._maybeShared = function(capture) {
-      if (this.shared) {
-        return;
-      }
-      let className = capture.what.linkFrom.props.className;
-      ensure(this._references, className, 0);
-      if (++this._references[className] > 1) {
-        this.shared = true;
-        delete this["_references"];
-      }
     };
 
     logan.objects.push(this);
@@ -342,6 +338,20 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this.capture({ prop: name, value: this.props[name] });
   };
 
+  Obj.prototype.propIf = function(name, value, cond, merge) {
+    if (!cond(this)) {
+      return this;
+    }
+    return this.prop(name, value, merge);
+  };
+
+  Obj.prototype.propIfNull = function(name, value) {
+    if (name in this.props) {
+      return this;
+    }
+    return this.prop(name, value);
+  };
+
   Obj.prototype.state = function(state, merge = false) {
     if (!state) {
       return this.props["state"];
@@ -360,7 +370,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     that = logan._proc.obj(that);
     let capture = new Capture({ linkFrom: this, linkTo: that });
     this.capture(capture);
-    that.capture(capture)._maybeShared(capture);
+    that.capture(capture);
     return this;
   };
 
@@ -518,7 +528,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
       this.reader = new FileReader();
       this.reader.onloadend = function(event) {
-        if (event.target.readyState == FileReader.DONE) {
+        if (event.target.readyState == FileReader.DONE && event.target.result) {
           if (offset === 0 && event.target.result.match('\r\n')) {
             this.eollength = 2;
           }
@@ -541,6 +551,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       }.bind(this);
 
       this.reader.onerror = function(event) {
+        this.reader.abort();
         this.reader = null;
         throw event.type;
       }.bind(this);
@@ -672,6 +683,10 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         }
         case "!!": {
           matchFunc = prop => !!prop;
+          break;
+        }
+        case "!": {
+          matchFunc = prop => !prop;
           break;
         }
         case "contains": {

@@ -49,7 +49,7 @@ logan.schema("moz",
         this.obj(lg).prop("requests", count => ++count).capture();
         this.obj(req).prop("not-found-in-loadgroup", true);
       });
-      schema.summaryProps("nsLoadGroup", ["state", "requests", "foreground-requests"]);
+      schema.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
 
     }); // LoadGroup
 
@@ -69,6 +69,77 @@ logan.schema("moz",
       });
     });
 
+    schema.module("imgRequest", (module) => {
+
+      /******************************************************************************
+       * imgLoader
+       ******************************************************************************/
+      module.rule("%d [this=%p] imgLoader::LoadImage (aURI=\"%s\") {ENTER}", function(now, ptr, uri) {
+        this.thread.load_image_uri = uri;
+        this.thread.httpchannelchild = null;
+      });
+      module.rule("%d [this=%p] imgLoader::LoadImage {EXIT}", function(now, ptr) {
+        this.thread.load_image_uri = undefined;
+      });
+      module.rule("%d [this=%p] imgLoader::LoadImage |cache hit| (request=\"%p\")", function(now, ptr, request) {
+        this.obj(request).prop("cache-hit", true).capture();
+      });
+      module.rule("[this=%p] imgLoader::LoadImage -- Created new imgRequest [request=%p]", function(ptr, request) {
+        this.thread.on("httpchannelchild", (ch) => {
+          this.obj(request).capture().link(ch);
+          return ch;
+        });
+      });
+
+      /******************************************************************************
+       * imgRequest
+       ******************************************************************************/
+      module.rule("%d [this=%p] imgRequest::imgRequest()", function(now, ptr) {
+        this.obj(ptr).create("imgRequest")
+          .prop("url", this.thread.load_image_uri)
+          .grep();
+      });
+      module.rule("%d [this=%p] imgRequest::Init", function(now, ptr) {
+        this.obj(ptr).__opentime = this.timestamp;
+      });
+      module.rule("%d [this=%p] imgRequest::AddProxy (proxy=%p) {ENTER}", function(now, ptr, proxy) {
+        this.obj(ptr).capture();
+        this.obj(proxy).link(ptr);
+      });
+      module.rule("[this=%p] imgRequest::BoostPriority for category %x", function(ptr, cat) {
+        this.obj(ptr)
+          .prop("priority-boost-cat", cat, true)
+          .propIf("priority-boost-too-late", cat, obj => "open-to-first-data" in obj.props, true)
+          .capture();
+      });
+      module.rule("%d [this=%p] imgRequest::OnDataAvailable (count=\"%d\") {ENTER}", function(now, ptr, count) {
+        let request = this.obj(ptr);
+        request.capture().propIfNull("open-to-first-data", this.timestamp.getTime() - request.__opentime.getTime());
+      });
+      module.rule("%d [this=%p] imgRequest::OnStopRequest", function(now, ptr) {
+        let request = this.obj(ptr);
+        request.capture().prop("open-to-stop", this.timestamp.getTime() - request.__opentime.getTime());
+      });
+      module.rule("%d [this=%p] imgRequest::~imgRequest() (keyuri=\"%s\")", function(now, ptr, key) {
+        this.obj(ptr).destroy();
+      });
+      module.rule("%d [this=%p] imgRequest::~imgRequest()", function(now, ptr) {
+        this.obj(ptr).destroy();
+      });
+      schema.summaryProps("imgRequest", ["url"]);
+
+      /******************************************************************************
+       * imgRequestProxy
+       ******************************************************************************/
+      module.rule("%d [this=%p] imgRequestProxy::imgRequestProxy", function(now, ptr) {
+        this.obj(ptr).create("imgRequestProxy").grep();
+      });
+      module.rule("%d [this=%p] imgRequestProxy::~imgRequestProxy", function(now, ptr) {
+        this.obj(ptr).destroy();
+      });
+
+    }); // imageRequest
+
     schema.module("nsHttp", (module) => {
 
       /******************************************************************************
@@ -76,7 +147,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating HttpChannelChild @%p", function(ptr) {
-        this.obj(ptr).create("HttpChannelChild").grep();
+        this.thread.httpchannelchild = this.obj(ptr).create("HttpChannelChild").grep();
       });
       module.rule("Destroying HttpChannelChild @%p", function(ptr) {
         this.obj(ptr).destroy();
@@ -93,7 +164,7 @@ logan.schema("moz",
       module.rule("HttpChannelChild::OnStopRequest [this=%p]", function(ptr) {
         this.obj(ptr).state("finished").capture();
       });
-      schema.summaryProps("HttpChannelChild", ["state", "url", "status"]);
+      schema.summaryProps("HttpChannelChild", ["url", "status"]);
 
       /******************************************************************************
        * HttpChannelParent
@@ -187,7 +258,7 @@ logan.schema("moz",
       module.rule("nsHttpChannel::ProcessResponse [this=%p httpStatus=%d]", function(ptr, status) {
         this.thread.httpchannel_for_auth = this.obj(ptr).prop("http-status", status, true).capture();
       });
-      schema.summaryProps("nsHttpChannel", ["state", "http-status", "url", "status"]);
+      schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
       /******************************************************************************
        * nsHttpChannelAuthProvider
@@ -267,7 +338,7 @@ logan.schema("moz",
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("nsHttpTransaction", ["state", "blocking", "tab-id", "url"]);
+      schema.summaryProps("nsHttpTransaction", ["blocking", "tab-id", "url"]);
 
       /******************************************************************************
        * nsHttpConnection
@@ -301,7 +372,6 @@ logan.schema("moz",
       module.rule("Destroying nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("nsHttpConnection", ["state"]);
 
       /******************************************************************************
        * Http2Session

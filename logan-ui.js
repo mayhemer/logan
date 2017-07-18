@@ -156,6 +156,8 @@
         let descr = search.className;
         if (search.matching === "!!") {
           descr = "!!" + descr + "." + search.propName;
+        } else if (search.matching === "!") {
+          descr = "!" + descr + "." + search.propName;
         } else {
           descr += "." + search.propName + " " + search.matching + " " + search.value;
         }
@@ -251,7 +253,7 @@
 
       summaryProps: function(props) {
         var custom = logan._schema.ui.summary[props.className] || [];
-        return ["className", "pointer"].concat(custom);
+        return ["className", "pointer", "state"].concat(custom);
       },
 
       summary: function(obj, propKeys = this.summaryProps, generate = (source, props) => {
@@ -645,7 +647,7 @@
     }).change();
 
     $("#search_Matching").on("change", (event) => {
-      (event.target.value === "!!")
+      (event.target.value === "!!" || event.target.value === "!")
         ? $("#search_PropValue").hide() : $("#search_PropValue").show();
     }).change();
 

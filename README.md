@@ -131,8 +131,10 @@ Obj (an object) methods:
   * when `value` is undefined, the property will be removed from the object
   * when `value` is a function it will be called with one argument being the existing property value or 0 (a number) when the property has not yet been set, the result of the function is then stored as a new property value (ignoring the `merge` argument!); this is convenient for counters
   * the `merge` argument can be a function too, called with one argument being the object
-  * note that reading a property back is only possible via direct access on object's `props` hashtable; it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
-- `.props`: property Bag - a simple hashtable - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
+  * note that reading a property back is only possible via direct access on object's `props` simple object (a hashtable); it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
+- `.propIfNull("name", value)`: sets the property but only when it's not already present; use to set a property only once
+- `.propIf("name", value, cond, merge)`: sets the property only when `cond` evaluates to `true`; the `cond` function is called with the object as the only argument
+- `.props`: property Bag - a simple object - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
 - `.follow("format", consumer[, failure])`: use this to process lines following the current line on the same thread; the follow is engaged as long as no other rule matches on the same thread and as long as the the consumer's or failure's (if provided) result is evaluating to `true`
 
