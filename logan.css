@@ -108,7 +108,7 @@ div.log_line.expanded.shared {
 div.log_line.expanded.summary,
 div.log_line.checked.summary {
   font-weight: bolder;
-  color: black;
+  color: black !important;
 }
 div.log_line.past_capture_limit:before {
   content: '\2588';
