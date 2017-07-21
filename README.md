@@ -112,6 +112,8 @@ For convenience the called consumer function is given the found values as argume
 - `this.thread.on("property", handler)`: a convenience method to perform a conditioned operation + change value or nullify the property in one easy step ; the handler is called when the property is non-null on the thread, the handler is passed value of that property as an argument, return value of the handler replaces the value of that property on the thread (note that when you don't return a value it effectively nullifies the property)
 - `this.line`: the currently processed line, stripped the timestamp, thread name and module name
 - `this.obj(identifier)`: this method returns a JS object representing the given `identifier` that can be then conveniently worked with, more below ; *note: the same object is always returned since its first call for the same identifier until `destroy()` is called on that object*
+- `this.objIf(identifier)`: same as above, but if the object doesn't exist it's automatically created, only a temporary object is returned so that there is no need to check the result is not null and write the code the same way as when using `this.obj()`.
+- `this.duration(timestamp)`: calculates number of milliseconds since timestamp till now, timestamp is expected to be a Date object
 
 ## Working with objects
 

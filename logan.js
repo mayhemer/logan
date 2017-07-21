@@ -414,6 +414,25 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         return obj;
       },
 
+      objIf: function(ptr) {
+        if (Obj.prototype.isPrototypeOf(ptr)) {
+          return ptr;
+        }
+        var obj = this.objs[ptr];
+        if (!obj) {
+          return new Obj(ptr); // temporary, but never put to the tracking array
+        }
+        obj.__most_recent_accessor = ptr;
+        return obj;
+      },
+
+      duration: function(timestamp) {
+        if (!timestamp) {
+          return undefined;
+        }
+        return this.timestamp.getTime() - timestamp.getTime();
+      },
+
       global_obj: function(guid) {
         return logan._proc.global.guids[guid] || new Obj(null);
       }
@@ -676,17 +695,18 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
     search: function(UI, className, propName, matchValue, match, seekId, coloring) {
       var matchFunc;
+      propToString = (prop) => (prop === undefined ? "" : prop.toString());
       switch (match) {
         case "==": {
-          matchFunc = prop => matchValue === prop.toString();
+          matchFunc = prop => matchValue == propToString(prop);
           break;
         }
         case "!!": {
-          matchFunc = prop => !!prop;
+          matchFunc = prop => prop !== undefined;
           break;
         }
         case "!": {
-          matchFunc = prop => !prop;
+          matchFunc = prop => prop === undefined;
           break;
         }
         case ">": {
@@ -699,22 +719,22 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         }
         case "contains": {
           let contains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = prop => prop.toString().match(contains);
+          matchFunc = prop => propToString(prop).match(contains);
           break;
         }
         case "!contains": {
           let ncontains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = prop => !prop.toString().match(ncontains);
+          matchFunc = prop => !propToString(prop).match(ncontains);
           break;
         }
         case "rx": {
           let regexp = new RegExp(matchValue, "g");
-          matchFunc = prop => prop.toString().match(regexp);
+          matchFunc = prop => propToString(prop).match(regexp);
           break;
         }
         case "!rx": {
           let nregexp = new RegExp(matchValue, "g");
-          matchFunc = prop => !prop.toString().match(nregexp);
+          matchFunc = prop => !propToString(prop).match(nregexp);
           break;
         }
         default:
@@ -742,7 +762,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
             return false;
           }, this);
         } else {
-          var prop = obj.props[propName] || "";
+          var prop = obj.props[propName];
         }
         if (!matchFunc(prop)) {
           continue;
