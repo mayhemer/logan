@@ -7,6 +7,23 @@ logan.schema("moz",
   },
 
   (schema) => {
+    function convertProgressStatus(status) {
+      let status_string = "?";
+      switch (parseInt(status, 16)) {
+        case 0x804B0008: status_string = "STATUS_READING"; break;
+        case 0x804B0009: status_string = "STATUS_WRITING"; break;
+        case 0x804b0003: status_string = "STATUS_RESOLVING"; break;
+        case 0x804b000b: status_string = "STATUS_RESOLVED"; break;
+        case 0x804b0007: status_string = "STATUS_CONNECTING_TO"; break;
+        case 0x804b0004: status_string = "STATUS_CONNECTED_TO"; break;
+        case 0x804B000C: status_string = "STATUS_TLS_HANDSHAKE_STARTING"; break;
+        case 0x804B000D: status_string = "STATUS_TLS_HANDSHAKE_ENDED"; break;
+        case 0x804b0005: status_string = "STATUS_SENDING_TO"; break;
+        case 0x804b000a: status_string = "STATUS_WAITING_FOR"; break;
+        case 0x804b0006: status_string = "STATUS_RECEIVING_FROM"; break;
+      }
+    }
+
     schema.module("RequestContext", (module) => {
 
       /******************************************************************************
@@ -259,11 +276,10 @@ logan.schema("moz",
         this.obj(ch).capture().link(entry);
       });
       module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(ch, tr) {
-        this.obj(ch).capture().link(tr);
-        this.obj(tr).prop("url", this.obj(ch).props["url"]);
+        this.obj(ch).capture().link(this.obj(tr).prop("url", this.obj(ch).props["url"]));
       });
       module.rule("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]", function(cl, ch) {
-        this.obj(ch).capture().link(cl);
+        this.obj(ch).capture().link(this.obj(cl).class("nsChannelClassifier"));
       });
       module.rule("nsHttpChannel::ReadFromCache [this=%p] Using cached copy of: %s", function(ptr) {
         this.obj(ptr).prop("from-cache", true).capture();
@@ -304,21 +320,7 @@ logan.schema("moz",
         this.thread.httpchannel_for_auth = this.obj(ptr).prop("http-status", status, true).capture();
       });
       module.rule("sending progress notification [this=%p status=%x progress=%d/%d]", function(ch, status) {
-        let status_string = "?";
-        switch (parseInt(status, 16)) {
-          case 0x804B0008: status_string = "STATUS_READING"; break;
-          case 0x804B0009: status_string = "STATUS_WRITING"; break;
-          case 0x804b0003: status_string = "STATUS_RESOLVING"; break;
-          case 0x804b000b: status_string = "STATUS_RESOLVED"; break;
-          case 0x804b0007: status_string = "STATUS_CONNECTING_TO"; break;
-          case 0x804b0004: status_string = "STATUS_CONNECTED_TO"; break;
-          case 0x804B000C: status_string = "STATUS_TLS_HANDSHAKE_STARTING"; break;
-          case 0x804B000D: status_string = "STATUS_TLS_HANDSHAKE_ENDED"; break;
-          case 0x804b0005: status_string = "STATUS_SENDING_TO"; break;
-          case 0x804b000a: status_string = "STATUS_WAITING_FOR"; break;
-          case 0x804b0006: status_string = "STATUS_RECEIVING_FROM"; break;
-        }
-        this.obj(ch).capture().capture("  " + status + " = " + status_string);
+        this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
       });
       module.rule("HttpBaseChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
         this.thread.tail_request = this.obj(ch).capture().mention(rc);
@@ -435,9 +437,17 @@ logan.schema("moz",
         if (parseInt(read) > 0) {
           conn.state("sent");
         }
+        this.thread.on("sockettransport", st => {
+          conn.mention(st);
+          return st;
+        });
       });
       module.rule("nsHttpConnection::OnSocketReadable [this=%p]", function(conn) {
-        this.obj(conn).class("nsHttpConnection").state("recv").capture().grep();
+        conn = this.obj(conn).class("nsHttpConnection").state("recv").capture().grep();
+        this.thread.on("sockettransport", st => {
+          conn.mention(st);
+          return st;
+        });
       });
       module.rule("nsHttpConnection::CloseTransaction[this=%p trans=%p reason=%x]", function(conn, trans, rv) {
         this.obj(conn).state("done").capture().mention(trans);
@@ -447,6 +457,9 @@ logan.schema("moz",
       });
       module.rule("nsHttpConnectionMgr::OnMsgReclaimConnection [ent=%p conn=%p]", function(ent, conn) {
         this.thread.httpconnection_reclame = this.obj(conn).capture().mention(ent);
+      });
+      module.rule("nsHttpConnection::MoveTransactionsToSpdy moves single transaction %p into SpdySession %p", function(tr, session) {
+        this.thread.httpspdytransaction = this.obj(tr);
       });
       module.rule("Destroying nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).destroy();
@@ -464,20 +477,46 @@ logan.schema("moz",
       });
       module.rule("Http2Session::AddStream session=%p stream=%p serial=%u NextID=0x%X (tentative)",
         function(session, stream, serial, id) {
-          this.obj(session).link(this.obj(stream).prop("id", id));
-        }
-      );
+          this.obj(session).class("Http2Session").grep().link(this.obj(stream).prop("id", id));
+        });
 
       /******************************************************************************
        * Http2Stream
        ******************************************************************************/
 
       module.rule("Http2Stream::Http2Stream %p", function(ptr) {
-        this.obj(ptr).create("Http2Stream").grep();
+        let stream = this.obj(ptr).create("Http2Stream").grep();
+        this.thread.on("httpspdytransaction", tr => {
+          tr.link(stream);
+          stream.prop("url", tr.props["url"]);
+        });
       });
       module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
         this.obj(ptr).destroy();
       });
+      module.rule("Http2Stream::ChangeState() %p from %d to %d", function(stream, oldst, newst) {
+        switch (parseInt(newst)) {
+          case 0: newst = "GENERATING_HEADERS"; break;
+          case 1: newst = "GENERATING_BODY"; break;
+          case 2: newst = "SENDING_BODY"; break;
+          case 3: newst = "SENDING_FIN_STREAM"; break;
+          case 4: newst = "UPSTREAM_COMPLETE"; break;
+        }
+        this.obj(stream).prop("upstreamstate", newst).capture();
+      });
+      module.rule("Http2Session::ReadSegments %p stream=%p stream send complete", function(sess, stream) {
+        this.obj(stream).state("sent").capture();
+      });
+      module.rule("Http2Stream::ConvertResponseHeaders %p response code %d", function(stream, code) {
+        this.obj(stream).state("headers").capture();
+      });
+      module.rule("Start Processing Data Frame. Session=%p Stream ID %X Stream Ptr %p Fin=%d Len=%d", function(sess, streamid, stream, fin, len) {
+        this.obj(stream).state("data").capture();
+      });
+      module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
+        this.obj(stream).state("closed").prop("status", result).capture();
+      });
+      schema.summaryProps("Http2Stream", ["status", "url"]);
 
       /******************************************************************************
        * nsHalfOpenSocket
@@ -491,6 +530,7 @@ logan.schema("moz",
       });
       schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn, ho) {
         this.thread.halfopen = null;
+        this.thread.on("sockettransport", st => { this.obj(conn).link(st); });
         ho.link(conn).capture();
       });
       module.rule("Destroying nsHalfOpenSocket [this=%p]", function(ptr) {
@@ -525,17 +565,47 @@ logan.schema("moz",
         });
       });
       module.rule("nsHttpConnectionMgr::TryDispatchTransaction without conn " +
-        "[trans=%p halfOpen=%p conn=%p ci=%p ci=%s caps=%x tunnelprovider=%p " +
-        "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
+                  "[trans=%p halfOpen=%p conn=%p ci=%p ci=%s caps=%x tunnelprovider=%p " +
+                  "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
           this.thread.httptransaction = this.obj(trans).capture("Attempt to dispatch on " + ci_key).mention(ci_key);
           this.thread.conn_info = this.obj(ci_key).capture().follow((ci, line) => {
             ci.capture();
             return line.match(/^\s\s/);
           }).mention(trans).mention(conn);
         });
+      schema.ruleIf("Spdy Dispatch Transaction via Activate(). Transaction host = %s, Connection host = %s",
+        proc => proc.thread.httptransaction, function(trhost, conhost, tr) {
+          this.thread.httpspdytransaction = tr;
+        });
       schema.summaryProps("nsConnectionEntry", "key");
 
     }); // nsHttp
+
+    schema.module("nsSocketTransport", (module) => {
+
+      /******************************************************************************
+       * nsSocketTransport
+       ******************************************************************************/
+      module.rule("creating nsSocketTransport @%p", function(ptr) {
+        this.obj(ptr).create("nsSocketTransport").grep();
+      });
+      module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
+        this.thread.sockettransport = this.obj(ptr).class("nsSocketTransport").prop("last-poll-flags", flgs).capture();
+      });
+      module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(tr, st) {
+        this.obj(tr).class("nsSocketTransport").prop("last-status", convertProgressStatus(st));
+      });
+      module.rule("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
+        this.thread.on("sockettransport", st => st.alias(ptr).prop("output-cond", cond).capture());
+      });
+      module.rule("nsSocketInputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
+        this.thread.on("sockettransport", st => st.alias(ptr).prop("input-cond", cond).capture());
+      });
+      module.rule("destroying nsSocketTransport @%p", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+    }); // nsSocketTransport
 
     schema.module("cache2", (module) => {
 
