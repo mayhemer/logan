@@ -19,6 +19,40 @@ logan.schema("moz",
       module.rule("RequestContext::~RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
       });
+      module.rule("RequestContext::IsContextTailBlocked request blocked this=%p, requst=%p, queued=%u", function(rc, req, queued) {
+        this.thread.on("tail_request", (tail) => {
+          tail.alias(req).prop("tail-blocked", true).__blocktime = this.timestamp;
+        });
+        this.obj(rc).capture().mention(req);
+      });
+      module.rule("RequestContext::ScheduleUnblock this=%p non-tails=%d", function(rc, nontails) {
+        this.obj(rc).capture().__unblocktime =
+          (nontails === "0") ? this.timestamp : undefined;
+      });
+      module.rule("RequestContext::ProcessTailQueue this=%p, queued=%u, rv=%x", function(rc, queued, rv) {
+        rc = this.obj(rc);
+        rc.on("__unblocktime", (time) => {
+          let duration = this.duration(time)
+          rc.prop("unblock-duration", duration, true)
+            .capture("  after " + duration + "ms");
+        });
+        rc.capture();
+      });
+      module.rule("RequestContext::RemoveNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
+        rc = this.obj(rc).capture();
+        this.thread.on("tail_request", (ch) => rc.mention(ch));
+      });
+      module.rule("RequestContext::AddNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
+        rc = this.obj(rc).capture().follow("  timer canceled", rc => {
+          rc.capture().on("__unblocktime", (time) => {
+            let duration = this.duration(time)
+            rc.prop("cancelled-unblock-duration", duration, true)
+              .capture("  after " + duration + "ms");
+          });
+        });
+        this.thread.on("tail_request", (ch) => rc.mention(ch));
+      });
+      schema.summaryProps("RequestContext", ["cancelled-unblock-duration"]);
 
     }); // RequestContext
 
@@ -100,7 +134,7 @@ logan.schema("moz",
           .grep();
       });
       module.rule("%d [this=%p] imgRequest::Init", function(now, ptr) {
-        this.obj(ptr).__opentime = this.timestamp;
+        this.obj(ptr).capture().__opentime = this.timestamp;
       });
       module.rule("%d [this=%p] imgRequest::AddProxy (proxy=%p) {ENTER}", function(now, ptr, proxy) {
         this.obj(ptr).capture();
@@ -114,11 +148,11 @@ logan.schema("moz",
       });
       module.rule("%d [this=%p] imgRequest::OnDataAvailable (count=\"%d\") {ENTER}", function(now, ptr, count) {
         let request = this.obj(ptr);
-        request.capture().propIfNull("open-to-first-data", this.timestamp.getTime() - request.__opentime.getTime());
+        request.capture().propIfNull("open-to-first-data", this.duration(request.__opentime));
       });
       module.rule("%d [this=%p] imgRequest::OnStopRequest", function(now, ptr) {
         let request = this.obj(ptr);
-        request.capture().prop("open-to-stop", this.timestamp.getTime() - request.__opentime.getTime());
+        request.capture().prop("open-to-stop", this.duration(request.__opentime));
       });
       module.rule("%d [this=%p] imgRequest::~imgRequest() (keyuri=\"%s\")", function(now, ptr, key) {
         this.obj(ptr).destroy();
@@ -189,6 +223,9 @@ logan.schema("moz",
           parent.link(httpchannel);
         });
       });
+      module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
       module.rule("nsHttpChannel::Init [this=%p]", function(ptr) {
         this.thread.httpchannel_init = this.obj(ptr).capture();
       });
@@ -200,7 +237,7 @@ logan.schema("moz",
           this.obj(oldch).capture().link(newch);
         });
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
-        this.obj(ptr).state("open").capture().__opentime = this.timestamp.getTime();
+        this.obj(ptr).state("open").capture().__opentime = this.timestamp;
       });
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
@@ -233,21 +270,21 @@ logan.schema("moz",
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         ch = this.obj(ch);
-        ch.prop("start-time", this.timestamp.getTime() - ch.__opentime)
+        ch.prop("start-time", this.duration(ch.__opentime))
           .state("started")
           .capture();
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
         ch = this.obj(ch);
-        ch.propIfNull("first-data-time", this.timestamp.getTime() - ch.__opentime)
-          .prop("last-data-time", this.timestamp.getTime() - ch.__opentime)
+        ch.propIfNull("first-data-time", this.duration(ch.__opentime))
+          .prop("last-data-time", this.duration(ch.__opentime))
           .state("data")
           .capture();
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         ch = this.obj(ch);
         ch.prop("status", status)
-          .prop("stop-time", this.timestamp.getTime() - ch.__opentime)
+          .prop("stop-time", this.duration(ch.__opentime))
           .state("finished")
           .capture();
       });
@@ -259,9 +296,6 @@ logan.schema("moz",
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
         this.obj(ptr).state("cancelled").prop("status", status).capture();
-      });
-      module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
-        this.obj(ptr).destroy();
       });
       module.rule("nsHttpChannel::ContinueProcessResponse1 [this=%p, rv=%x]", function(ptr) {
         this.thread.httpchannel_for_auth = this.obj(ptr).capture();
@@ -285,6 +319,23 @@ logan.schema("moz",
           case 0x804b0006: status_string = "STATUS_RECEIVING_FROM"; break;
         }
         this.obj(ch).capture().capture("  " + status + " = " + status_string);
+      });
+      module.rule("HttpBaseChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
+        this.thread.tail_request = this.obj(ch).capture().mention(rc);
+      });
+      module.rule("nsHttpChannel::OnTailUnblock this=%p rv=%x rc=%p", function(ch, rv, rc) {
+        ch = this.obj(ch);
+        let after = this.duration(ch.__blocktime);
+        ch.prop("tail-blocked", false).prop("tail-block-time", after)
+          .capture().capture("  after " + after + "ms").mention(rc);
+      });
+      module.rule("HttpBaseChannel::AddAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
+        this.thread.tail_request =
+          this.obj(ch).prop("tail-blocking", true).capture().mention(rc);
+      });
+      module.rule("HttpBaseChannel::RemoveAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
+        this.thread.tail_request =
+          this.objIf(ch).propIf("tail-blocking", false, () => added === "1").capture().mention(rc);
       });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
