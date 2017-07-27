@@ -59,7 +59,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
 (function() {
 
-  const FILE_SLICE = 20 * 1024 * 1024;
+  const FILE_SLICE = 5 * 1024 * 1024;
   const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
   const USE_RULES_TREE_OPTIMIZATION = true;
 
@@ -78,7 +78,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   }
 
   const printfToRegexpMap = {
-    "%p": "((?:0x)?[A-Fa-f0-9]+)",
+    "%p": "((?:(?:0x)?[A-Fa-f0-9]+)|(?:\\(null\\))|(?:\\(nil\\)))",
     "%d": "([\\d]+)",
     "%u": "([\\d]+)",
     "%s": "((?:,?[^\\s])*)",
