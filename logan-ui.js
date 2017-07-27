@@ -68,6 +68,10 @@
         }
       },
 
+      title: function(title) {
+        document.title = (title + " - Logan");
+      },
+
       setInitialView: function() {
         $("#file_load_section").removeClass().addClass("section").show();
         $("#active_searches").hide();

@@ -532,6 +532,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         this._proc.file = file;
         this._proc.linenumber = 0;
         this._proc.child = isChildFile(file);
+
+        UI.title(file.name);
       }
 
       var blob = file.slice(offset, offset + FILE_SLICE);
