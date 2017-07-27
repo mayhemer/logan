@@ -8,19 +8,19 @@ logan.schema("moz",
 
   (schema) => {
     function convertProgressStatus(status) {
-      let status_string = "?";
       switch (parseInt(status, 16)) {
-        case 0x804B0008: status_string = "STATUS_READING"; break;
-        case 0x804B0009: status_string = "STATUS_WRITING"; break;
-        case 0x804b0003: status_string = "STATUS_RESOLVING"; break;
-        case 0x804b000b: status_string = "STATUS_RESOLVED"; break;
-        case 0x804b0007: status_string = "STATUS_CONNECTING_TO"; break;
-        case 0x804b0004: status_string = "STATUS_CONNECTED_TO"; break;
-        case 0x804B000C: status_string = "STATUS_TLS_HANDSHAKE_STARTING"; break;
-        case 0x804B000D: status_string = "STATUS_TLS_HANDSHAKE_ENDED"; break;
-        case 0x804b0005: status_string = "STATUS_SENDING_TO"; break;
-        case 0x804b000a: status_string = "STATUS_WAITING_FOR"; break;
-        case 0x804b0006: status_string = "STATUS_RECEIVING_FROM"; break;
+        case 0x804B0008: return "STATUS_READING";
+        case 0x804B0009: return "STATUS_WRITING";
+        case 0x804b0003: return "STATUS_RESOLVING";
+        case 0x804b000b: return "STATUS_RESOLVED";
+        case 0x804b0007: return "STATUS_CONNECTING_TO";
+        case 0x804b0004: return "STATUS_CONNECTED_TO";
+        case 0x804B000C: return "STATUS_TLS_HANDSHAKE_STARTING";
+        case 0x804B000D: return "STATUS_TLS_HANDSHAKE_ENDED";
+        case 0x804b0005: return "STATUS_SENDING_TO";
+        case 0x804b000a: return "STATUS_WAITING_FOR";
+        case 0x804b0006: return "STATUS_RECEIVING_FROM";
+        default: return status;  
       }
     }
 
@@ -415,6 +415,12 @@ logan.schema("moz",
       });
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
         this.obj(trans).prop("status", status).state("closed").capture();
+      });
+      module.rule("nsHttpTransaction::WriteSegments %p response throttled", function(trans) {
+        this.obj(trans).state("throttled").prop("ever-throttled", true).capture();
+      });
+      module.rule("nsHttpTransaction::ResumeReading %p", function(trans) {
+        this.obj(trans).state("unthrottled").capture();
       });
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
