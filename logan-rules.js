@@ -467,6 +467,10 @@ logan.schema("moz",
       module.rule("nsHttpConnection::MoveTransactionsToSpdy moves single transaction %p into SpdySession %p", function(tr, session) {
         this.thread.httpspdytransaction = this.obj(tr);
       });
+      module.rule("nsHttpConnection::EnsureNPNComplete %p [%s] negotiated to '%s'", function(conn, entry, proto) {
+        this.obj(conn).prop("npn", proto).capture();
+        this.thread.spdyconnentrykey = entry; // we want the key
+      });
       module.rule("Destroying nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
@@ -475,16 +479,20 @@ logan.schema("moz",
        * Http2Session
        ******************************************************************************/
 
-      module.rule("Http2Session::Http2Session %p serial=%x", function(ptr) {
-        this.obj(ptr).create("Http2Session").grep();
+      module.rule("Http2Session::Http2Session %p serial=%x", function(session) {
+        session = this.obj(session).create("Http2Session").grep();
+        this.thread.on("spdyconnentrykey", ent => {
+          session.prop("key", ent).mention(ent);
+        });
       });
-      module.rule("Http2Session::~Http2Session %p mDownstreamState=%x", function(ptr) {
-        this.obj(ptr).destroy();
+      module.rule("Http2Session::~Http2Session %p mDownstreamState=%x", function(session) {
+        this.obj(session).destroy();
       });
       module.rule("Http2Session::AddStream session=%p stream=%p serial=%u NextID=0x%X (tentative)",
         function(session, stream, serial, id) {
           this.obj(session).class("Http2Session").grep().link(this.obj(stream).prop("id", id));
         });
+      schema.summaryProps("Http2Session", ["key"]);
 
       /******************************************************************************
        * Http2Stream
