@@ -7,7 +7,7 @@ logan.schema("moz",
   },
 
   (schema) => {
-    function convertProgressStatus(status) {
+    convertProgressStatus = (status) => {
       switch (parseInt(status, 16)) {
         case 0x804B0008: return "STATUS_READING";
         case 0x804B0009: return "STATUS_WRITING";
@@ -23,6 +23,73 @@ logan.schema("moz",
         default: return status;  
       }
     }
+
+    schema.module("DocumentLeak", (module) => {
+
+      /******************************************************************************
+       * PressShell
+       ******************************************************************************/
+
+      module.rule("DOCUMENT %p with PressShell %p and DocShell %p", function(doc, presshell, docshell) {
+        this.obj(presshell).create("PresShell").link(docshell).docshell = docshell;
+      });
+    }); // DocumentLeak
+
+    // IMPORTANT:
+    // To enable these, add "textperf" module at 5 as well.
+    // Note: the PressShell instance is tracked by a log rule from DocumentLeak module
+    schema.module("PresShell", (module) => {
+      module.rule("PresShell::Initialize this=%p", function(ps) {
+        this.obj(ps).__init_time = this.timestamp;
+      });
+      module.rule("PresShell::ScheduleBeforeFirstPaint this=%p", function(ps) {
+        ps = this.obj(ps);
+        ps.prop("first-paint-time-ms", this.duration(ps.__init_time)).capture();
+      });
+      module.rule("(presshell) %p load done time-ms: %9.2f [%s]\n", function(ps, time, spec) {
+        this.obj(ps).prop("load-time-ms", time).capture();
+      });
+    }); // PresShell
+
+    schema.module("DocLoader", (module) => {
+
+      /******************************************************************************
+       * nsDocLoader
+       ******************************************************************************/
+
+      module.rule("DocLoader:%p: created.\n", function(docloader) {
+        // This DocLoader is aliased to DocShell
+        this.thread.docloader = docloader;
+      });
+      module.rule("DocLoader:%p: load group %p.\n", function(docloader, lg) {
+        this.objIf(docloader).link(lg);
+      });
+
+    }); // DocLoader
+
+    schema.module("nsDocShellLeak", (module) => {
+
+      /******************************************************************************
+       * nsDocShell
+       ******************************************************************************/
+
+      module.rule("DOCSHELL %p created\n", function(docshell) {
+        docshell = this.obj(docshell).create("nsDocShell");
+        this.thread.on("docloader", dl => {
+          docshell.alias(dl);
+        });
+      });
+      module.rule("DOCSHELL %p destroyed\n", function(docshell) {
+        this.obj(docshell).destroy();
+      });
+      module.rule("nsDocShell[%p]: loading %s with flags 0x%08x", function(docshell, url, flags) {
+        this.obj(docshell).prop("url", url, true).capture();
+      });
+      module.rule("DOCSHELL %p SetCurrentURI %s\n", function(docshell, url) {
+        this.obj(docshell).prop("url", url, true).capture();
+      });
+      
+    }); // nsDocShellLeak
 
     schema.module("RequestContext", (module) => {
 
@@ -100,6 +167,13 @@ logan.schema("moz",
         this.obj(lg).prop("requests", count => ++count).capture();
         this.obj(req).prop("not-found-in-loadgroup", true);
       });
+      module.rule("nsLoadGroup::SetDefaultLoadRequest this=%p default-request=%p", function(lg, req) {
+        // TODO - alias the request?
+        this.obj(lg).capture().link(this.obj(req).class("unknown request"));
+      });
+      module.rule("nsLoadGroup::OnEndPageLoad this=%p default-request=%p", function(lg, dch) {
+        this.obj(lg).capture().mention(dch);
+      });
       schema.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
 
     }); // LoadGroup
@@ -109,6 +183,7 @@ logan.schema("moz",
       /******************************************************************************
        * nsWyciwygChannel
        ******************************************************************************/
+
       module.rule("Creating WyciwygChannelChild @%p\n", function(ptr) {
         this.thread.wyciwigchild = this.obj(ptr).create("WyciwygChannelChild").grep();
       });
@@ -125,6 +200,7 @@ logan.schema("moz",
       /******************************************************************************
        * imgLoader
        ******************************************************************************/
+
       module.rule("%d [this=%p] imgLoader::LoadImage (aURI=\"%s\") {ENTER}", function(now, ptr, uri) {
         this.thread.load_image_uri = uri;
         this.thread.httpchannelchild = null;
@@ -145,6 +221,7 @@ logan.schema("moz",
       /******************************************************************************
        * imgRequest
        ******************************************************************************/
+
       module.rule("%d [this=%p] imgRequest::imgRequest()", function(now, ptr) {
         this.obj(ptr).create("imgRequest")
           .prop("url", this.thread.load_image_uri)
@@ -182,6 +259,7 @@ logan.schema("moz",
       /******************************************************************************
        * imgRequestProxy
        ******************************************************************************/
+      
       module.rule("%d [this=%p] imgRequestProxy::imgRequestProxy", function(now, ptr) {
         this.obj(ptr).create("imgRequestProxy").grep();
       });
@@ -206,6 +284,11 @@ logan.schema("moz",
       module.rule("HttpChannelChild::AsyncOpen [this=%p uri=%s]", function(ptr, uri) {
         this.thread.httpchannelchild = this.obj(ptr).prop("url", uri).state("open").capture();
       });
+      module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u top-win-id=%x", function(ch, gid, winid) {
+        gid = "HttpChannelChild:" + gid;
+        this.obj(ch).prop("top-win-id", winid).alias(gid);
+        this.send(gid);
+      });
       module.rule("HttpChannelChild::DoOnStartRequest [this=%p]", function(ptr) {
         this.obj(ptr).state("started").capture();
       });
@@ -222,7 +305,11 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating HttpChannelParent [this=%p]", function(ptr) {
-        this.thread.httpchannelparent = this.obj(ptr).create("HttpChannelParent").grep();
+        this.thread.httpchannelparent = this.obj(ptr).create("HttpChannelParent").grep()
+          .follow("  gid=%u top-win-id=%x", (ch, gid, winid) => {
+            gid = "HttpChannelChild:" + gid;
+            this.recv(gid, () => this.obj(gid).link(ch));
+          });
       });
       module.rule("Destroying HttpChannelParent [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
@@ -266,10 +353,8 @@ logan.schema("moz",
         this.obj(ch).capture().mention(entry).follow(
           "nsHTTPChannel::OnCacheEntryCheck exit [this=%p doValidation=%d result=%d]", (obj, ptr, doValidation) => {
             obj.capture().prop("revalidates-cache", doValidation);
-            return false;
-          }, (obj) => {
-            return obj.capture();
-          }
+          },
+          obj => obj.capture()
         );
       });
       module.rule("nsHttpChannel::OnCacheEntryAvailable [this=%p entry=%p new=%d appcache=%p status=%x mAppCache=%p mAppCacheForWrite=%p]", function(ch, entry, isnew) {
@@ -323,7 +408,11 @@ logan.schema("moz",
         this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
       });
       module.rule("HttpBaseChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
-        this.thread.tail_request = this.obj(ch).capture().mention(rc);
+        this.thread.tail_request = this.obj(ch).capture().mention(rc).follow("  blocked=%d", (ch, blocked) => {
+          if (blocked === "1") {
+            ch.prop("tail-blocked", true).__blocktime = this.timestamp;
+          }
+        });
       });
       module.rule("nsHttpChannel::OnTailUnblock this=%p rv=%x rc=%p", function(ch, rv, rc) {
         ch = this.obj(ch);
@@ -338,6 +427,12 @@ logan.schema("moz",
       module.rule("HttpBaseChannel::RemoveAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
         this.thread.tail_request =
           this.objIf(ch).propIf("tail-blocking", false, () => added === "1").capture().mention(rc);
+      });
+      module.rule("HttpBaseChannel::EnsureRequestContextID this=%p id=%x", function(ch, rcid) {
+        this.obj(ch).prop("rc-id", rcid).capture();
+      });
+      module.rule("HttpBaseChannel::EnsureRequestContext this=%p rc=%p", function(ch, rc) {
+        this.obj(ch).capture().mention(rc);
       });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
@@ -405,7 +500,7 @@ logan.schema("moz",
         this.obj(trans).state("blocked").capture().mention(rc);
       });
       module.rule("nsHttpTransaction adding blocking transaction %p from request context %p", function(trans, rc) {
-        this.obj(trans).prop("blocking", "true").capture();
+        this.obj(trans).prop("blocking", true).capture();
       });
       module.rule("nsHttpTransaction removing blocking transaction %p from request context %p. %d blockers remain.", function(trans, rc) {
         this.obj(trans).capture().mention(rc);
@@ -620,6 +715,18 @@ logan.schema("moz",
       });
 
     }); // nsSocketTransport
+
+    schema.module("nsHostResolver", (module) => {
+      module.resolver = this.obj("nsHostResolver::singleton");
+      module.rule("Resolving host [%s].\n", function(host) {
+        module.resolver.capture();
+        // TODO - track the triggering object
+      });
+      module.rule("Resolving host [%s] - bypassing cache.\n", function(host) {
+        module.resolver.capture();
+        // TODO - track the triggering object
+      });
+    }); // nsHostResolver
 
     schema.module("cache2", (module) => {
 
