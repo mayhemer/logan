@@ -48,8 +48,11 @@ function Bag(def) {
   }
 }
 
-Bag.prototype.on = function(prop, handler) {
+Bag.prototype.on = function(prop, handler, elseHandler) {
   if (!this[prop]) {
+    if (elseHandler) {
+      elseHandler();
+    }
     return;
   }
   return (this[prop] = handler(this[prop]));
@@ -77,21 +80,25 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return s.replace(/\n$/, "").replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
   }
 
-  const printfToRegexpMap = {
-    "%p": "((?:(?:0x)?[A-Fa-f0-9]+)|(?:\\(null\\))|(?:\\(nil\\)))",
-    "%d": "([\\d]+)",
-    "%u": "([\\d]+)",
-    "%s": "((?:,?[^\\s])*)",
-    "%[xX]": "((?:0x)?[A-Fa-f0-9]+)",
-    "%\\\\\\*\\\\\\$": "(.*$)",
-  };
+  const printfToRegexpMap = [
+    // Use \\\ to escape regexp special characters in the match regexp (left),
+    // we escapeRegexp() the string prior to this conversion which adds
+    // a '\' before each of such chars.
+
+    [/%p/g, "((?:(?:0x)?[A-Fa-f0-9]+)|(?:\\(null\\))|(?:\\(nil\\)))"],
+    [/%d/g, "([\\d]+)"],
+    [/%u/g, "([\\d]+)"],
+    [/%s/g, "((?:,?[^\\s])*)"],
+    [/%\d*[xX]/g, "((?:0x)?[A-Fa-f0-9]+)"],
+    [/%(?:\d+\\\.\d+)?f/g, "((?:[\\d]+)\.(?:[\\d]+))"],
+    [/%\\\*\\\$/g, "(.*$)"]
+  ];
 
   function convertPrintfToRegexp(printf) {
     printf = escapeRegexp(printf);
 
-    for (let source in printfToRegexpMap) {
-      var target = printfToRegexpMap[source];
-      printf = printf.replace(RegExp(source, "g"), target);
+    for (let [source, target] of printfToRegexpMap) {
+      printf = printf.replace(source, target);
     }
 
     return new RegExp('^' + printf + '$');
@@ -256,12 +263,19 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   };
 
   Obj.prototype.alias = function(alias) {
-    this.aliases[alias] = true;
+    if (logan._proc.objs[alias] === this) {
+      return this;
+    }
     logan._proc.objs[alias] = this;
+    this.aliases[alias] = true;
     return this;
   };
 
-  Obj.prototype.destroy = function() {
+  Obj.prototype.destroy = function(ifClassName) {
+    if (ifClassName && this.props.className !== ifClassName) {
+      return this;
+    }
+
     delete logan._proc.objs[this.props.pointer];
     for (let alias in this.aliases) {
       delete logan._proc.objs[alias];
@@ -278,6 +292,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.line = logan._proc.linenumber;
     this.thread = logan._proc.thread.name;
     this.what = what;
+
+    logan._proc._captures[this.id] = this;
   }
 
   Obj.prototype.capture = function(what) {
@@ -383,11 +399,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this;
   };
 
-  Obj.prototype.guid = function(guid) {
-    this.guid = guid;
-    ensure(logan._proc.global, "guids")[guid] = this;
-  };
-
   Obj.prototype.class = function(className) {
     if (this.props.className) {
       // Already created
@@ -414,6 +425,25 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         return obj;
       },
 
+      recv: function(gid, handler) {
+        if (this._ipc && !this._announce[gid]) {
+          ensure(this._sync_ons, gid, []).push(handler);
+        } else {
+          handler();
+        }
+      },
+
+      send: function(gid) {
+        this._announce[gid] = true;
+        let sync_ons = this._sync_ons[gid];
+        if (sync_ons) {
+          for (handler of sync_ons) {
+            handler();
+          }
+          delete this._sync_ons[gid];
+        }
+      },
+
       objIf: function(ptr) {
         if (Obj.prototype.isPrototypeOf(ptr)) {
           return ptr;
@@ -431,10 +461,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
           return undefined;
         }
         return this.timestamp.getTime() - timestamp.getTime();
-      },
-
-      global_obj: function(guid) {
-        return logan._proc.global.guids[guid] || new Obj(null);
       }
     },
 
@@ -475,16 +501,24 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       }
     },
 
-    consumeURL: function(UI, url) {
-      if (this.reader) {
-        this.reader.abort();
-      }
+    initProc: function() {
       this.objects = [];
       this.searchProps = {};
       this._proc.global = {};
       this._proc.captureid = 0;
+      this._proc._captures = [];
+      this._proc._announce = [];
+      this._proc._sync_ons = {};
+      this._proc._ipc = false; // TODO: true on 1 parent and 1+ children
+    },
+
+    consumeURL: function(UI, url) {
+      if (this.reader) {
+        this.reader.abort();
+      }
 
       this.seekId = 0;
+      this.initProc();
 
       fetch(url).then(function(response) {
         return response.blob();
@@ -499,13 +533,10 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       if (this.reader) {
         this.reader.abort();
       }
-      this.objects = [];
-      this.searchProps = {};
-      this._proc.global = {};
-      this._proc.captureid = 0;
 
       this._filesToProcess = Array.from(files);
       this.seekId = 0;
+      this.initProc();
 
       this.consumeFile(UI);
     },
