@@ -717,13 +717,12 @@ logan.schema("moz",
     }); // nsSocketTransport
 
     schema.module("nsHostResolver", (module) => {
-      module.resolver = this.obj("nsHostResolver::singleton");
       module.rule("Resolving host [%s].\n", function(host) {
-        module.resolver.capture();
+        this.obj("nsHostResolver::singleton").class("nsHostResolver").capture();
         // TODO - track the triggering object
       });
       module.rule("Resolving host [%s] - bypassing cache.\n", function(host) {
-        module.resolver.capture();
+        this.obj("nsHostResolver::singleton").class("nsHostResolver").capture();
         // TODO - track the triggering object
       });
     }); // nsHostResolver
