@@ -121,7 +121,7 @@ To access an object a rule consumer function calls `this.obj(identifier)` as des
 
 Obj (an object) methods:
 - `.create("classname")`: called from constructors, this puts the object to a 'created' state and assigns its class name; such a created object lives until .destroy() is called on it; if called on an already created object, it's first destroyed and then created as a new object, a warning is shown in the web console that an object's been recreated
-- `.destroy()`: called from destructors, this sets the state of the object to 'released' and removes the object from the processing state; it means that a following call to `this.obj()` with the same identifier value will return a new blank instance
+- `.destroy(["classname"])`: called from destructors, this sets the state of the object to 'released' and removes the object from the processing state; it means that a following call to `this.obj()` with the same identifier value will return a new blank instance; if "classname" is provided, the object is destroyed only when the object's class name is identical to it
 - `.capture("string" or no argument)`: this adds a line to the object so that it then appears in the results when the object is revealed in the results view; when there is no argument passed, the currently processed line is automatically added
 - `.alias("alias")`: an object can be identified by multiple values sometimes thanks static_cast pointer shifts, wrapping helper classes ("handlers"), or simply by a unique key instead of a pointer; this method allows you to define such an alias so that calls to `this.obj("alias")` will resolve to this object
 - `.grep()`: this conveniently instructs the object to capture all lines that contain the object's pointer or any of its aliases
@@ -138,26 +138,29 @@ Obj (an object) methods:
 - `.propIf("name", value, cond, merge)`: sets the property only when `cond` evaluates to `true`; the `cond` function is called with the object as the only argument
 - `.props`: property Bag - a simple object - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
-- `.follow("format", consumer[, failure])`: use this to process lines following the current line on the same thread; the follow is engaged as long as no other rule matches on the same thread and as long as the the consumer's or failure's (if provided) result is evaluating to `true`
+- `.expect("format", consumer[, unmatch])`: use this to process lines following the current line on the same thread; `consumer` and optional `unmatch` handlers will be called as long as their results evaluate to `true`
 
   `consumer` is called only when a line matches the format string, the arguments are: 
   * this: the processing state
   * `obj`: the object this follow has been initiated for
   * found values: passed the same way as for a rule consumer (see **A simple rule** section)
-  * `proc`: the processing state as described above
+  * `proc`: the processing state
   * result: *true* to continue the follow, *false* to stop it
   
-  the optional `failure` is called when a line doesn't match the format with following arguments
+  the optional `unmatch` handler is called when a line doesn't match the format with following arguments
   * this: the processing state
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
   * result: *true* to continue the follow, *false* to stop it
+- `.follow("format", consumer[, unmatch])`: the same as `.expect()` but stops when any rule matches a line on the same thread where this follow has been started, this is convenient for cases one doesn't know if the line matching "format" will or will not follow the currently processed line
 - `.follow(consumer)`: similar to the above form of `.follow()` but without a rule-like formating; the `consumer` function is called as long as no other rule matches on the same thread and as long as the the consumer's result is evaluating to `true` (note that the consumer function can do anything it wants, not just capturing) ; the arguments are:
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
-- `.follow(n)`: this will simply capture *n* following lines, the follow will stop sooner if a rule matches on the same thread
+- `.follow(n)`: this will simply capture *n* following lines on this thread, the follow will stop sooner if a rule matches on the thread
+- `.send("class", "global-id")`: TODO
+- `.recv("class", "global-id", handler)`: TODO, handler(receiver, sender)
 - `.class("name")`: gives a class name to objects that are not tracked (no rules defined for them) or are partial in the log which has been started later during the session; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for, state is set to "partial" and "missing-constructor" property is set to `true` ; calling this on an object that has been `create()`ed doesn't do anything
 - `.on("object_property", handler)`: see **this.thread.on** above for details, note this is working with JS properties you may have set directly on the *Obj* instance and not what has been set with the *.prop()* method!
 

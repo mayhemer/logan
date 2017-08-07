@@ -95,6 +95,11 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   ];
 
   function convertPrintfToRegexp(printf) {
+    if (RegExp.prototype.isPrototypeOf(printf)) {
+      // already converted
+      return printf;
+    }
+
     printf = escapeRegexp(printf);
 
     for (let [source, target] of printfToRegexpMap) {
@@ -171,13 +176,13 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     builder(ensure(this.modules, name, new Module(name)));
   }
 
-  Schema.prototype.plainIf = function(condition, consumer = function(ptr) { this.obj(ptr).capture(); }) {
+  Schema.prototype.plainIf = function(condition, consumer) {
     let rule = { cond: condition, consumer: consumer, id: ++IF_RULE_INDEXER };
     this.unmatch.push(rule);
     return rule;
   };
 
-  Schema.prototype.ruleIf = function(exp, condition, consumer = function(ptr) { this.obj(ptr).capture(); }) {
+  Schema.prototype.ruleIf = function(exp, condition, consumer) {
     let rule = { regexp: convertPrintfToRegexp(exp), cond: condition, consumer: consumer, id: ++IF_RULE_INDEXER };
     this.unmatch.push(rule);
     return rule;
@@ -308,6 +313,28 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this;
   };
 
+  Obj.prototype.expect = function(format, consumer, error = () => true) {
+    let match = convertPrintfToRegexp(format);
+    let obj = this;
+    let thread = logan._proc.thread;
+    let rule = logan._schema.plainIf(proc => {
+      if (proc.thread !== thread) {
+        return false;
+      }
+
+      if (!logan.parse(proc.line, match, function() {
+        return consumer.apply(this, [obj].concat(Array.from(arguments)).concat([this]));
+      }, line => {
+        return error(obj, line);
+      })) {
+        logan._schema.removeIf(rule);
+      }
+      return false;
+    }, () => { throw "Obj.expect() handler should never be called"; });
+
+    return this;
+  };
+
   Obj.prototype.follow = function(cond, consumer, error = () => true) {
     let capture = {
       obj: this,
@@ -323,7 +350,9 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       capture.follow = (obj, line, proc) => {
         return logan.parse(line, cond, function() {
           return consumer.apply(this, [obj].concat(Array.from(arguments)).concat([this]));
-        }, (line) => error(obj, line));
+        }, line => {
+          return error(obj, line);
+        });
       };
     } else if (typeof cond === "function") {
       capture.follow = cond;
@@ -407,6 +436,44 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this.create(className).state("partial").prop("missing-constructor", true);
   };
 
+  Obj.prototype.send = function(className, gid) {
+    let id = className + "::" + gid;
+    let sync = logan._proc._sync[id];
+    delete logan._proc._sync[id];
+
+    if (!sync) {
+      logan._proc._sync[id] = {
+        sender: this
+      };
+    } else {
+      // TODO - must temporarily revert some of the logan._proc object state
+      sync.func(sync.receiver, this);
+    }
+  },
+  
+  Obj.prototype.recv = function(className, gid, func) {
+    if (!func) {
+      throw "recv() must define an async handler";
+    }
+
+    if (!logan._proc._ipc) {
+      return;
+    }
+
+    let id = className + "::" + gid;
+    let sync = logan._proc._sync[id];
+    delete logan._proc._sync[id];
+
+    if (!sync) {
+      logan._proc._sync[id] = {
+        func: func,
+        receiver: this
+      };
+    } else {
+      func(this, sync.sender);
+    }
+  },
+  
 
   // export
   logan = {
@@ -423,25 +490,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         }
         obj.__most_recent_accessor = ptr;
         return obj;
-      },
-
-      recv: function(gid, handler) {
-        if (this._ipc && !this._announce[gid]) {
-          ensure(this._sync_ons, gid, []).push(handler);
-        } else {
-          handler();
-        }
-      },
-
-      send: function(gid) {
-        this._announce[gid] = true;
-        let sync_ons = this._sync_ons[gid];
-        if (sync_ons) {
-          for (handler of sync_ons) {
-            handler();
-          }
-          delete this._sync_ons[gid];
-        }
       },
 
       objIf: function(ptr) {
@@ -476,9 +524,14 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       this._schema = this._schemes[name];
     },
 
-    parse: function(line, printf, consumer, failedConsumer) {
-      return this.processRule(line, convertPrintfToRegexp(printf), consumer) ||
-        (failedConsumer && failedConsumer.call(this._proc, line));
+    parse: function(line, printf, consumer, unmatch) {
+      let result;
+      if (!this.processRule(line, convertPrintfToRegexp(printf), function() {
+        result = consumer.apply(this, arguments);
+      })) {
+        return (unmatch && unmatch.call(this._proc, line));
+      }
+      return result;
     },
 
 
@@ -507,8 +560,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       this._proc.global = {};
       this._proc.captureid = 0;
       this._proc._captures = [];
-      this._proc._announce = [];
-      this._proc._sync_ons = {};
+      this._proc._sync = {};
       this._proc._ipc = false; // TODO: true on 1 parent and 1+ children
     },
 

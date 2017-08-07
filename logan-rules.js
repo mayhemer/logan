@@ -285,9 +285,7 @@ logan.schema("moz",
         this.thread.httpchannelchild = this.obj(ptr).prop("url", uri).state("open").capture();
       });
       module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u top-win-id=%x", function(ch, gid, winid) {
-        gid = "HttpChannelChild:" + gid;
-        this.obj(ch).prop("top-win-id", winid).alias(gid);
-        this.send(gid);
+        this.obj(ch).prop("top-win-id", winid).send("HttpChannel", gid);
       });
       module.rule("HttpChannelChild::DoOnStartRequest [this=%p]", function(ptr) {
         this.obj(ptr).state("started").capture();
@@ -306,9 +304,10 @@ logan.schema("moz",
 
       module.rule("Creating HttpChannelParent [this=%p]", function(ptr) {
         this.thread.httpchannelparent = this.obj(ptr).create("HttpChannelParent").grep()
-          .follow("  gid=%u top-win-id=%x", (ch, gid, winid) => {
-            gid = "HttpChannelChild:" + gid;
-            this.recv(gid, () => this.obj(gid).link(ch));
+          .follow("  gid=%u top-win-id=%x", (parent, gid, winid) => {
+            parent.recv("HttpChannel", gid, (parent, child) => {
+              child.link(parent);
+            });
           });
       });
       module.rule("Destroying HttpChannelParent [this=%p]", function(ptr) {
@@ -320,7 +319,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating nsHttpChannel [this=%p]", function(ptr) {
-        let httpchannel = this.obj(ptr).create("nsHttpChannel").grep().follow("uri=%s", (ch, uri) => {
+        let httpchannel = this.obj(ptr).create("nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
           ch.prop("url", uri);
         });
         this.thread.on("httpchannelparent", parent => {
@@ -669,7 +668,7 @@ logan.schema("moz",
         this.obj(ci).capture().follow("  %p", (ci, trans) => {
           return ci.mention(trans);
         }, (ci, line) => {
-          ci.capture(line);
+          ci.capture();
           return line !== "]";
         });
       });
@@ -677,9 +676,8 @@ logan.schema("moz",
                   "[trans=%p halfOpen=%p conn=%p ci=%p ci=%s caps=%x tunnelprovider=%p " +
                   "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
           this.thread.httptransaction = this.obj(trans).capture("Attempt to dispatch on " + ci_key).mention(ci_key);
-          this.thread.conn_info = this.obj(ci_key).capture().follow((ci, line) => {
+          this.thread.conn_info = this.obj(ci_key).capture().expect("   %*$", (ci) => {
             ci.capture();
-            return line.match(/^\s\s/);
           }).mention(trans).mention(conn);
         });
       schema.ruleIf("Spdy Dispatch Transaction via Activate(). Transaction host = %s, Connection host = %s",
