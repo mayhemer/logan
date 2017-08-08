@@ -443,10 +443,14 @@ logan.schema("moz",
         proc => proc.thread.httpchannel_for_auth, function(ptr, ch, code, sslcon, auth_ch)
       {
         this.thread.httpchannel_for_auth = null;
-        this.obj(ptr).class("nsHttpChannelAuthProvider").grep()._channel = auth_ch.alias(ch).capture().link(ptr);
+        let provider = this.obj(ptr).class("nsHttpChannelAuthProvider").grep().follow(1);
+        provider._channel = auth_ch.alias(ch).capture().link(ptr);
       });
       module.rule("nsHttpChannelAuthProvider::PromptForIdentity [this=%p channel=%p]", function(ptr, ch) {
         this.obj(ptr).capture().on("_channel", ch => ch.prop("asked-credentials", true));
+      });
+      module.rule("nsHttpChannelAuthProvider::AddAuthorizationHeaders? [this=%p channel=%p]\n", function(ptr, ch) {
+        this.obj(ptr).capture().follow(2);
       });
 
       /******************************************************************************
