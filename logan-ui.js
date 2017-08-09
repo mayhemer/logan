@@ -476,7 +476,7 @@
         }
 
         let time = capture.time.toISOString().replace(/[TZ]/g, " ").trim();
-        let line = time + " \u2502 " + capture.thread + " \u2502 " + capture.what;
+        let line = time + " \u2502 " + capture.thread.name + " \u2502 " + capture.what;
         let element = $("<div>")
           .addClass("log_line expanded obj-" + obj.id)
           .append($("<span>").addClass("pre").html(this.highlight(escapeHtml(line))))

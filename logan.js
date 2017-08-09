@@ -238,6 +238,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.file = logan._proc.file;
     this.aliases = {};
     this._grep = false;
+    this._dispatches = {};
 
     // This is used for placing the summary of the object (to generate
     // the unique ordered position, see UI.position.)
@@ -295,15 +296,22 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.id = ++logan._proc.captureid;
     this.time = logan._proc.timestamp;
     this.line = logan._proc.linenumber;
-    this.thread = logan._proc.thread.name;
+    this.thread = logan._proc.thread;
     this.what = what;
 
     logan._proc._captures[this.id] = this;
   }
 
-  Obj.prototype.capture = function(what) {
+  Obj.prototype.capture = function(what, info = null) {
     what = what || logan._proc.line;
     let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(what);
+
+    if (info) {
+      info.capture = capture;
+      info.source = this;
+      info.index = this.captures.length;
+    }
+
     this.captures.push(capture);
     return this;
   };
@@ -436,6 +444,33 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this.create(className).state("partial").prop("missing-constructor", true);
   };
 
+  Obj.prototype.dispatch = function(target, name) {
+    if (name === undefined) {
+      target = this;
+      name = target;
+    }
+
+    target = logan._proc.obj(target);
+
+    let dispatch = {};
+    this.capture({ dispatch: true }, dispatch);
+
+    ensure(target._dispatches, name, []).push(dispatch);
+  },
+
+  Obj.prototype.run = function(name) {
+    let origin = this._dispatches[name];
+    if (!origin) {
+      return this;
+    }
+
+    let dispatch = origin.shift();
+    if (!origin.length) {
+      delete this._dispatches[name];
+    }
+    return this.capture({ run: dispatch }); // dispatch = { capture, source, index }
+  },
+
   Obj.prototype.ipcid = function(id) {
     if (id === undefined) {
       return this.ipc_id;
@@ -444,7 +479,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this;
   },
 
-  Obj.prototype.send = function(className) {
+  Obj.prototype.send = function(message) {
     if (!logan._proc._ipc) {
       return this;
     }
@@ -452,24 +487,33 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       return this;
     }
 
-    let id = className + "::" + this.ipc_id;
-
-    let sync = logan._proc._sync[id];
-    if (!sync) {
-      logan._proc._sync[id] = {
+    let create = () => {
+      let origin = {};
+      this.capture({ dispatch: true }, origin);
+      return {
         sender: this,
-        count: 1
+        origin: origin
       };
+    };
+
+    let id = message + "::" + this.ipc_id;
+    let sync = logan._proc._sync[id];
+
+    if (!sync) {
+      logan._proc._sync[id] = create();
       return this;
     }
 
     if (sync.sender) {
-      sync.count++;
+      while (sync.next) {
+        sync = sync.next;
+      }
+      sync.next = create();
       return this;
     }
 
     delete logan._proc._sync[id];
-    
+
     let proc = logan._proc.swap(sync.proc);
     logan._proc.file.__recv_wait = false;
     sync.func(sync.receiver, this);
@@ -478,7 +522,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this;
   },
 
-  Obj.prototype.recv = function(className, func = () => {}) {
+  Obj.prototype.recv = function(message, func = () => {}) {
     if (!logan._proc._ipc) {
       return this;
     }
@@ -487,10 +531,13 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       return this;
     }
 
-    let id = className + "::" + this.ipc_id;
+    let id = message + "::" + this.ipc_id;
 
     let sync = logan._proc._sync[id];
     if (!sync) {
+      // There was no send() call for this ipcid and message, hence
+      // we have to wait.  Store the recv() info and proccessing state
+      // and stop parsing this file.
       logan._proc._sync[id] = {
         func: func,
         receiver: this,
@@ -500,12 +547,14 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       return this;
     }
 
-    sync.count--;
-    func(this, sync.sender);
-
-    if (!sync.count) {
+    if (sync.next) {
+      logan._proc._sync[id] = sync.next;
+    } else {
       delete logan._proc._sync[id];
     }
+
+    this.capture({ run: sync.origin });
+    func(this, sync.sender);
 
     return this;
   },
