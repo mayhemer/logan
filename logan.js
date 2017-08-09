@@ -63,7 +63,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 (function() {
 
   const FILE_SLICE = 5 * 1024 * 1024;
-  const EPOCH_2015 = (new Date("2015-01-01")).valueOf();
+  const EPOCH_1970 = new Date("1970-01-01");
   const USE_RULES_TREE_OPTIMIZATION = true;
 
   let IF_RULE_INDEXER = 0;
@@ -286,7 +286,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       delete logan._proc.objs[alias];
     }
     this.prop("state", "released");
-    delete this["_references"];
+    delete this._references;
 
     return this.capture();
   };
@@ -436,49 +436,84 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     return this.create(className).state("partial").prop("missing-constructor", true);
   };
 
-  Obj.prototype.send = function(className, gid) {
-    let id = className + "::" + gid;
-    let sync = logan._proc._sync[id];
-    delete logan._proc._sync[id];
+  Obj.prototype.ipcid = function(id) {
+    if (id === undefined) {
+      return this.ipc_id;
+    }
+    this.ipc_id = id;
+    return this;
+  },
 
+  Obj.prototype.send = function(className) {
+    if (!logan._proc._ipc) {
+      return this;
+    }
+    if (this.ipc_id === undefined) {
+      return this;
+    }
+
+    let id = className + "::" + this.ipc_id;
+
+    let sync = logan._proc._sync[id];
     if (!sync) {
       logan._proc._sync[id] = {
-        sender: this
+        sender: this,
+        count: 1
       };
-    } else {
-      // TODO - must temporarily revert some of the logan._proc object state
-      sync.func(sync.receiver, this);
-    }
-  },
-  
-  Obj.prototype.recv = function(className, gid, func) {
-    if (!func) {
-      throw "recv() must define an async handler";
+      return this;
     }
 
-    if (!logan._proc._ipc) {
-      return;
+    if (sync.sender) {
+      sync.count++;
+      return this;
     }
 
-    let id = className + "::" + gid;
-    let sync = logan._proc._sync[id];
     delete logan._proc._sync[id];
+    
+    let proc = logan._proc.swap(sync.proc);
+    logan._proc.file.__recv_wait = false;
+    sync.func(sync.receiver, this);
+    logan._proc.restore(proc);
 
+    return this;
+  },
+
+  Obj.prototype.recv = function(className, func = () => {}) {
+    if (!logan._proc._ipc) {
+      return this;
+    }
+
+    if (this.ipc_id === undefined) {
+      return this;
+    }
+
+    let id = className + "::" + this.ipc_id;
+
+    let sync = logan._proc._sync[id];
     if (!sync) {
       logan._proc._sync[id] = {
         func: func,
-        receiver: this
+        receiver: this,
+        proc: logan._proc.save()
       };
-    } else {
-      func(this, sync.sender);
+      logan._proc.file.__recv_wait = true;
+      return this;
     }
+
+    sync.count--;
+    func(this, sync.sender);
+
+    if (!sync.count) {
+      delete logan._proc._sync[id];
+    }
+
+    return this;
   },
-  
+
 
   // export
   logan = {
     // processing state sub-object, passed to rule consumers
-    // initialized in consumeFile(s)
     _proc: {
       obj: function(ptr) {
         if (Obj.prototype.isPrototypeOf(ptr)) {
@@ -509,6 +544,23 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
           return undefined;
         }
         return this.timestamp.getTime() - timestamp.getTime();
+      },
+
+      save: function() {
+        return ["timestamp", "thread", "line", "file"].reduce(
+          (result, prop) => (result[prop] = this[prop], result), {});
+      },
+
+      restore: function(from) {
+        for (let property in from) {
+          this[property] = from[property];
+        }
+      },
+
+      swap: function(through) {
+        let result = this.save();
+        this.restore(through);
+        return result;
       }
     },
 
@@ -516,7 +568,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     _schema: null,
 
     schema: function(name, lineRegexp, linePreparer, builder) {
-      this._schema = ensure(this._schemes, name, new Schema(name, lineRegexp, linePreparer));
+      this._schema = ensure(this._schemes, name, () => new Schema(name, lineRegexp, linePreparer));
       builder(this._schema);
     },
 
@@ -546,7 +598,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       return exception;
     },
 
-    _filesToProcess: [],
+    files: [],
 
     init: function() {
       for (let schema of Object.values(this._schemes)) {
@@ -561,7 +613,22 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       this._proc.captureid = 0;
       this._proc._captures = [];
       this._proc._sync = {};
-      this._proc._ipc = false; // TODO: true on 1 parent and 1+ children
+
+      let parents = 0;
+      let children = 0;
+      for (let file of this.files) {
+        // TODO - rotated logs...
+        if (isChildFile(file)) {
+          file.__is_child = true;
+          ++children;
+        } else {
+          ++parents;
+        }
+      }
+
+      this._proc._ipc = (parents == 1 && children > 0);
+      this._proc.threads = {};
+      this._proc.objs = {};
     },
 
     consumeURL: function(UI, url) {
@@ -575,9 +642,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       fetch(url).then(function(response) {
         return response.blob();
       }).then(function(blob) {
-        this._filesToProcess = [blob];
         blob.name = "_net_"
-        this.consumeFile(UI);
+        this.consumeFiles(UI, [blob]);
       }.bind(this));
     },
 
@@ -586,81 +652,130 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         this.reader.abort();
       }
 
-      this._filesToProcess = Array.from(files);
+      this.files = Array.from(files);
       this.seekId = 0;
       this.initProc();
 
-      this.consumeFile(UI);
+      UI.resetProgress();
+
+      files = [];
+      for (let file of this.files) {
+        if (!file.__is_child) {
+          UI.title(file.name);
+        }
+        files.push(this.readFile(UI, file));
+      }
+
+      Promise.all(files).then((files) => {
+        this.consumeParallel(UI, files);
+      }).catch((error) => {
+        window.onerror(error);
+      });
     },
 
-    consumeFile: function(UI, file = null, offset = 0, previousLine = "") {
-      if (!file) {
-        if (!this._filesToProcess.length) {
-          this.reader = null;
-          this.processEOS(UI);
-          return;
-        }
+    readFile: function(UI, file) {
+      UI.addToMaxProgress(file.size);
 
-        // a new file to process
-        this.__metric_process_start = new Date();
-        this.__metric_rules_match_count = 0;
-
-        file = this._filesToProcess.shift();
-        this.eollength = 1;
-        this.filename = file.name;
-        this.fileoffset = 0;
-
-        this._proc.threads = {};
-        this._proc.objs = {};
-        this._proc.file = file;
-        this._proc.linenumber = 0;
-        this._proc.child = isChildFile(file);
-
-        UI.title(file.name);
-      }
-
-      var blob = file.slice(offset, offset + FILE_SLICE);
-      if (blob.size == 0) {
-        if (previousLine) {
-          this.consumeLine(UI, file, previousLine);
-        }
-        this.processEOF(UI);
-        this._proc.file = null;
-        this.consumeFile(UI);
-        return;
-      }
-
-      this.reader = new FileReader();
-      this.reader.onloadend = function(event) {
-        if (event.target.readyState == FileReader.DONE && event.target.result) {
-          if (offset === 0 && event.target.result.match('\r\n')) {
-            this.eollength = 2;
+      let previousLine = "";
+      let slice = (segment) => {
+        return new Promise((resolve, reject) => {
+          let blob = file.slice(segment * FILE_SLICE, (segment + 1) * FILE_SLICE);
+          if (blob.size == 0) {
+            resolve({
+              file: file,
+              lines: [previousLine]
+            });
+            return;
           }
 
-          var lines = event.target.result.split(/[\r\n]+/);
+          let reader = new FileReader();
+          reader.onloadend = (event) => {
+            if (event.target.readyState == FileReader.DONE && event.target.result) {
+              UI.addToLoadProgress(blob.size);
 
-          // This simple code assumes that a single line can't be longer than FILE_SLICE
-          previousLine += lines.shift();
-          this.consumeLine(UI, file, previousLine);
+              let lines = event.target.result.split(/[\r\n]+/);
 
-          previousLine = lines.pop();
-          for (let line of lines) {
-            this.consumeLine(UI, file, line);
+              // This simple code assumes that a single line can't be longer than FILE_SLICE
+              lines[0] = previousLine + lines[0];
+              previousLine = lines.pop();
+
+              resolve({
+                file: file,
+                lines: lines,
+                read_more: () => slice(segment + 1)
+              });
+            }
+          };
+
+          reader.onerror = (event) => {
+            reader.abort();
+            reject(event.type);
+          };
+
+          reader.readAsBinaryString(blob);
+        });
+      };
+
+      return slice(0);
+    },
+
+    consumeParallel: async function(UI, files) {
+      while (files.length) {
+        // Make sure that the first line on each of the files is prepared
+        // Preparation means to determine timestamp, thread name, module, if found,
+        // or derived from the last prepared line
+        for (let file of Array.from(files)) {
+          if (file.prepared) {
+            continue;
           }
 
-          UI.loadProgress(this.fileoffset, file.size);
+          if (!file.lines.length) {
+            files.remove((item) => file === item);
 
-          this.consumeFile(UI, file, offset + FILE_SLICE, previousLine);
+            if (!file.read_more) {
+              continue;
+            }
+
+            file = await file.read_more();
+            files.push(file);
+          }
+
+          file.prepared = this.prepareLine(file.lines.shift(), file.prepared);
         }
-      }.bind(this);
 
-      this.reader.onerror = function(event) {
-        this.reader.abort();
-        this.reader = null;
-        throw event.type;
-      }.bind(this);
+        if (!files.length) {
+          break;
+        }
 
-      this.reader.readAsBinaryString(blob);
+        // Make sure the file with the earliest timestamp line is the first,
+        // we then consume files[0].
+        files.sort((a, b) => {
+          return a.prepared.timestamp.getTime() - b.prepared.timestamp.getTime();
+        });
+
+        let consume = files.find(file => !file.file.__recv_wait);
+        if (!consume) {
+          throw this.exceptionParse("All files are blocked on recv()");
+        }
+
+        this.consumeLine(UI, consume.file, consume.prepared);
+        delete consume.prepared;
+      }
+
+      this.processEOS(UI);
+    },
+
+    prepareLine: function(line, previous) {
+      previous = previous || {};
+
+      let match = line.match(this._schema.lineRegexp);
+      if (!match) {
+        previous.text = line;
+        previous.timestamp = previous.timestamp || EPOCH_1970;
+        return previous;
+      }
+
+      return this._schema.linePreparer.apply(null, match);
     },
 
     consumeLine: function(UI, file, line) {
@@ -668,31 +783,25 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         return;
       }
 
-      // Note that this._proc.line is set to |text| from linePreparer in processLine()
-      // which has definitely been called for this consumed line at this point.
       let autoCapture = this._proc.thread._auto_capture;
-      if (autoCapture && !autoCapture.follow(autoCapture.obj, this._proc.line, this._proc)) {
+      if (autoCapture && !autoCapture.follow(autoCapture.obj, line.text, this._proc)) {
         this._proc.thread._auto_capture = null;
       }
     },
 
     consumeLineByRules: function(UI, file, line) {
-      ++this._proc.linenumber;
-      this._proc.lineBinaryOffset = this.fileoffset;
-      this.fileoffset += line.length + this.eollength;
+      this._proc.file = file;
+      this._proc.timestamp = line.timestamp;
+      this._proc.line = line.text;
+      this._proc.thread = ensure(this._proc.threads,
+        file.name + "|" + line.threadname,
+        () => new Bag({ name: line.threadname }));
 
-      let match = line.match(this._schema.lineRegexp);
-      if (!match) {
-        return this.processLine(this._schema.unmatch, file, line);
-      }
-
-      let [module, text] = this._schema.linePreparer.apply(null, [this._proc].concat(match));
-
-      module = this._schema.modules[module];
-      if (module && this.processLine(module.get_rules(text), file, text)) {
+      let module = this._schema.modules[line.module];
+      if (module && this.processLine(module.get_rules(line.text), file, line.text)) {
         return true;
       }
-      if (this.processLine(this._schema.unmatch, file, text)) {
+      if (this.processLine(this._schema.unmatch, file, line.text)) {
         return true;
       }
 
@@ -750,8 +859,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     },
 
     processRule: function(line, regexp, consumer) {
-      this.__metric_rules_match_count++;
-
       let match = line.match(regexp);
       if (!match) {
         return false;
@@ -763,13 +870,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         throw this.exceptionParse(exception);
       }
       return true;
-    },
-
-    processEOF: function(UI) {
-      let fileProcessTime = (new Date()).getTime() - this.__metric_process_start.getTime();
-      LOG("consumed file in " + (fileProcessTime / 1000) + "s");
-      LOG("rules matched " + Math.floor(this.__metric_rules_match_count / 1000) + "k");
-      LOG("efficiency " + Math.floor((this.fileoffset >> 10) / (fileProcessTime / 1000)) + " kbytes/sec");
     },
 
     processEOS: function(UI) {

@@ -59,10 +59,27 @@
       dynamicStyle: {},
       activeRevealeres: 0,
       objColors: {},
+      maxProgress: 0,
+      currentProgress: 0,
 
-      loadProgress: function(prog, max = 1) {
-        if (prog) {
-          $("#load_progress").show().css("width", (prog * 100.0 / max) + "%");
+      resetProgress: function() {
+        this.maxProgress = 0;
+        this.currentProgress = 0;
+        this.loadProgress(0);
+      },
+
+      addToMaxProgress: function(size) {
+        this.maxProgress += size;
+      },
+
+      addToLoadProgress: function(size) {
+        this.currentProgress += size;
+        this.loadProgress(this.currentProgress);
+      },
+
+      loadProgress: function(prog) {
+        if (prog && this.maxProgress) {
+          $("#load_progress").show().css("width", (prog * 100.0 / this.maxProgress) + "%");
         } else {
           $("#load_progress").hide();
         }

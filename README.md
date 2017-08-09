@@ -16,7 +16,6 @@ logan is in an early development stage.
 - parsing rules written for networking objects (nsHttpChannel, nsHttpTransaction, nsHttpConnection and few others around.)
 
 ### Missing functionality
-- interleaving and synchronization of parent and child logs #3
 - processing of rotated logs #19
 - revealing additional lines not captured on objects on demand in the UI #17
 - way to easily customize the rules when using a life-staged instance #7
@@ -159,8 +158,19 @@ Obj (an object) methods:
   * `proc`: the processing state as described above
   * result: *true* to continue the follow, *false* to stop it
 - `.follow(n)`: this will simply capture *n* following lines on this thread, the follow will stop sooner if a rule matches on the thread
-- `.send("class", "global-id")`: TODO
-- `.recv("class", "global-id", handler)`: TODO, handler(receiver, sender)
+- `.ipcid(id)`: this sets a globally unique interprocess identifier on the object so that `.send()` and `.recv()` synchronization will then work between parent and child process log files on different objects with the same ipcid
+- `.ipcid()`: returns the assigned id, if any
+- `.send("message")`: sends a message (unblocks corresponding recv()) from one log file to another, has an effect only when all of:
+  * `ipcid` has been assigned on the object 
+  * there are parent and child log files loaded in logan
+- `.recv("message", handler)`: used for synchronization between child and parent logs, the `handler` is called only when all of:
+  * `ipcid` has been assigned on the object 
+  * there are parent and child log files loaded in logan
+  * the corresponding `.send("message")` has been called; correspondence here means the sender has the same ipcid as the receiver and the message string is identical
+
+  In case we hit a line with a .recv() call sooner than the corresponding .send() line in another log file (because of tight or non-synchronous timestamps) recv() stops parsing of this log file until the corresponding .send() is hit in one of the other log files.  Only then the `handler` is called with two arguments: `receiver` and `sender` where `receiver` is the object recv() has been called on and `sender` is the object that called the corresponding send().
+
+  In case the corresponding send() has already been hit, the `handler` is called immediately.
 - `.class("name")`: gives a class name to objects that are not tracked (no rules defined for them) or are partial in the log which has been started later during the session; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for, state is set to "partial" and "missing-constructor" property is set to `true` ; calling this on an object that has been `create()`ed doesn't do anything
 - `.on("object_property", handler)`: see **this.thread.on** above for details, note this is working with JS properties you may have set directly on the *Obj* instance and not what has been set with the *.prop()* method!
 

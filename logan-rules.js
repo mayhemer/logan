@@ -1,9 +1,12 @@
 logan.schema("moz",
   /^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/,
-  (proc, all, date, time, thread, level, module, text) => {
-    proc.timestamp = new Date(date + "T" + time + "Z");
-    proc.thread = ensure(proc.threads, proc.file.name + "|" + thread, () => new Bag({ name: thread }));
-    return [module, text];
+  (all, date, time, thread, level, module, text) => {
+    return {
+      text: text,
+      timestamp: new Date(date + "T" + time + "Z"),
+      threadname: thread,
+      module: module,
+    };
   },
 
   (schema) => {
@@ -284,17 +287,23 @@ logan.schema("moz",
       module.rule("HttpChannelChild::AsyncOpen [this=%p uri=%s]", function(ptr, uri) {
         this.thread.httpchannelchild = this.obj(ptr).prop("url", uri).state("open").capture();
       });
-      module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u top-win-id=%x", function(ch, gid, winid) {
-        this.obj(ch).prop("top-win-id", winid).send("HttpChannel", gid);
+      module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u topwinid=%x", function(ch, gid, winid) {
+        this.obj(ch).prop("top-win-id", winid).ipcid(gid).send("HttpChannel");
       });
       module.rule("HttpChannelChild::DoOnStartRequest [this=%p]", function(ptr) {
-        this.obj(ptr).state("started").capture();
+        this.obj(ptr).recv("HttpChanne::Start", ch => {
+          ch.state("started").capture();
+        });
       });
       module.rule("HttpChannelChild::OnTransportAndData [this=%p]", function(ptr) {
-        this.obj(ptr).state("data").capture();
+        this.obj(ptr).recv("HttpChanne::Data", ch => {
+          ch.state("data").capture();
+        });
       });
       module.rule("HttpChannelChild::OnStopRequest [this=%p]", function(ptr) {
-        this.obj(ptr).state("finished").capture();
+        this.obj(ptr).recv("HttpChanne::Data", ch => {
+          ch.state("finished").capture();
+        });
       });
       schema.summaryProps("HttpChannelChild", ["url", "status"]);
 
@@ -303,12 +312,12 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("Creating HttpChannelParent [this=%p]", function(ptr) {
-        this.thread.httpchannelparent = this.obj(ptr).create("HttpChannelParent").grep()
-          .follow("  gid=%u top-win-id=%x", (parent, gid, winid) => {
-            parent.recv("HttpChannel", gid, (parent, child) => {
-              child.link(parent);
-            });
-          });
+        this.thread.httpchannelparent = this.obj(ptr).create("HttpChannelParent").grep();
+      });
+      module.rule("HttpChannelParent RecvAsyncOpen [this=%p uri=%s, gid=%u topwinid=%x]\n", function(parent, uri, gid, winid) {
+        this.obj(parent).capture().ipcid(gid).recv("HttpChannel", (parent, child) => {
+          child.link(parent);
+        });
       });
       module.rule("Destroying HttpChannelParent [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
@@ -318,12 +327,12 @@ logan.schema("moz",
        * nsHttpChannel
        ******************************************************************************/
 
-      module.rule("Creating nsHttpChannel [this=%p]", function(ptr) {
-        let httpchannel = this.obj(ptr).create("nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
+      module.rule("Creating nsHttpChannel [this=%p]", function(ch) {
+        ch = this.obj(ch).create("nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
           ch.prop("url", uri);
         });
         this.thread.on("httpchannelparent", parent => {
-          parent.link(httpchannel);
+          parent.link(ch.ipcid(parent.ipcid()));
         });
       });
       module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
@@ -372,21 +381,24 @@ logan.schema("moz",
         ch = this.obj(ch);
         ch.prop("start-time", this.duration(ch.__opentime))
           .state("started")
-          .capture();
+          .capture()
+          .send("HttpChannel::Start");
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
         ch = this.obj(ch);
         ch.propIfNull("first-data-time", this.duration(ch.__opentime))
           .prop("last-data-time", this.duration(ch.__opentime))
           .state("data")
-          .capture();
+          .capture()
+          .send("HttpChannel::Data");
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         ch = this.obj(ch);
         ch.prop("status", status)
           .prop("stop-time", this.duration(ch.__opentime))
           .state("finished")
-          .capture();
+          .capture()
+          .send("HttpChannel::Stop");
       });
       module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ptr) {
         this.obj(ptr).prop("suspendcount", suspendcount => ++suspendcount).capture();
