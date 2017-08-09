@@ -490,6 +490,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     let create = () => {
       let origin = {};
       this.capture({ dispatch: true }, origin);
+      LOG(" storing send() " + logan._proc.line + " ipcid=" + this.ipc_id);
       return {
         sender: this,
         origin: origin
@@ -513,6 +514,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     }
 
     delete logan._proc._sync[id];
+
+    LOG(" send() calling on stored recv() " + logan._proc.line + " ipcid=" + this.ipc_id);
 
     let proc = logan._proc.swap(sync.proc);
     logan._proc.file.__recv_wait = false;
@@ -544,6 +547,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         proc: logan._proc.save()
       };
       logan._proc.file.__recv_wait = true;
+
+      LOG(" blocking and storing recv() " + logan._proc.line + " ipcid=" + this.ipc_id + " file=" + logan._proc.file.name);
       return this;
     }
 
@@ -552,6 +557,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     } else {
       delete logan._proc._sync[id];
     }
+
+    LOG(" recv() taking stored send() " + logan._proc.line + " ipcid=" + this.ipc_id);
 
     this.capture({ run: sync.origin });
     func(this, sync.sender);

@@ -291,17 +291,17 @@ logan.schema("moz",
         this.obj(ch).prop("top-win-id", winid).ipcid(gid).send("HttpChannel");
       });
       module.rule("HttpChannelChild::DoOnStartRequest [this=%p]", function(ptr) {
-        this.obj(ptr).recv("HttpChanne::Start", ch => {
+        this.obj(ptr).recv("HttpChannel::Start", ch => {
           ch.state("started").capture();
         });
       });
       module.rule("HttpChannelChild::OnTransportAndData [this=%p]", function(ptr) {
-        this.obj(ptr).recv("HttpChanne::Data", ch => {
+        this.obj(ptr).recv("HttpChannel::Data", ch => {
           ch.state("data").capture();
         });
       });
       module.rule("HttpChannelChild::OnStopRequest [this=%p]", function(ptr) {
-        this.obj(ptr).recv("HttpChanne::Data", ch => {
+        this.obj(ptr).recv("HttpChannel::Stop", ch => {
           ch.state("finished").capture();
         });
       });
