@@ -36,7 +36,7 @@ var netdiagUI = null;
       if (cos === undefined) {
         return false;
       }
-      return (cos & this.Leader) && !(cos & (this.UrgentStart | this.Leader | this.Unblocked));      
+      return (cos & this.Tail) && !(cos & (this.UrgentStart | this.Leader | this.Unblocked));      
     }
   };
 
@@ -105,6 +105,9 @@ var netdiagUI = null;
     },
     channelCreatesTrans: function(channel, trans) {
       this.capture(channel, { ch_trans: trans });
+    },
+    channelRecognizedTracker: function(channel) {
+      this.capture(channel, { ch_tracker_recon: true });
     },
     channelSuspend: function(channel) {
       this.capture(channel, { ch_suspend: true });
@@ -263,7 +266,7 @@ var netdiagUI = null;
 
           if (net.ch_prio !== undefined) {
             let target = results.set(obj);
-            if (target.transaction_time) {
+            if (target.transaction_cid) {
               ensure(target, "lateprio", []).push(net.ch_prio);
             } else {
               target.prio = net.ch_prio;
@@ -273,7 +276,7 @@ var netdiagUI = null;
 
           if (net.ch_cos !== undefined) {
             let target = results.set(obj);
-            if (target.transaction_time) {
+            if (target.transaction_cid) {
               ensure(target, "latecos", []).push(net.ch_cos);
             } else {
               target.cos = net.ch_cos;
@@ -307,6 +310,14 @@ var netdiagUI = null;
             results.set(obj, {
               transaction_time: now,
               transaction_cid: cid,
+            });
+            continue;
+          }
+
+          if (net.ch_tracker_recon) {
+            results.set(obj, {
+              tracker_time: now,
+              tracker_cid: cid,
             });
             continue;
           }
@@ -477,7 +488,7 @@ var netdiagUI = null;
         let tailable_active_before_active = this.addResultSection("Tail-eligible active before ChoI activation");
         let tailed_active_before_active = this.addResultSection("Have been untailed before ChoI activation");
         let tailed_before_active = this.addResultSection("Still being tailed during ChoI activation");
-        let never_tailed_trackers = this.addResultSection("Never tailed trackers (those not on local block list) before ChoI activation");
+        let never_tailed_trackers_after_DCL = this.addResultSection("Never tailed trackers finished after DOMContentLoaded");
 
         this.addHttpChannelResult(UI, interest, channel, true);
         results.allbut(channel, (result) => {
@@ -572,7 +583,7 @@ var netdiagUI = null;
             this.addHttpChannelResult(UI, trackers_active_before_active, result).warn();
           }
           if (ClassOfServiceFlags.isTailable(result.cos) &&
-              interval(result.activate_time, channel.activate_time) < 0)
+              result.activate_cid < channel.activate_cid)
           {
             this.addHttpChannelResult(UI, tailable_active_before_active, result).warn();
           }
@@ -586,8 +597,9 @@ var netdiagUI = null;
             (!result.activate_cid || result.activate_cid > channel.activate_cid)) {
             this.addHttpChannelResult(UI, tailed_before_active, result).emph();
           }
-          if (!result.tail_start_time && this.isTracker(result.obj) && result.activate_cid < channel.activate_cid) {
-            this.addHttpChannelResult(UI, never_tailed_trackers, result).warn();
+          if (!result.tail_start_time && this.isTracker(result.obj) &&
+              result.recv_done_cid > this.DOMContentLoaded_cid) {
+            this.addHttpChannelResult(UI, never_tailed_trackers_after_DCL, result).warn();
           }
         });
 
@@ -638,7 +650,7 @@ var netdiagUI = null;
         node.append($("<input>")
             .attr("type", "button")
             .addClass("button")
-            .val("search this")
+            .val("add to search results")
             .click(function() {
               UI.setResultsView();
               UI.addSearch({
@@ -682,10 +694,14 @@ var netdiagUI = null;
         add("not on local block list");
       }
       if (result.tail_start_time) {
-        add("tailed for", interval_t(result.tail_end_time, result.tail_start_time)).css({ color: "red" });
+        add("tailed for", interval_t(result.tail_end_time, result.tail_start_time)).css({ color: "green" });
       }
       add("opened since document load", interval_t(result.open_time, this.begintime));
       add("time to create transaction", interval_t(result.transaction_time, result.open_time));
+      if (result.tracker_time) {
+        add("tracker recognition time relative to transaction creation time", interval_t(result.tracker_time, result.transaction_time));
+        add("tracker recognition before transaction", result.tracker_cid < result.transaction_cid);
+      }
       add("transaction activated after", interval_t(result.activate_time, result.transaction_time));
       add("sending request done in", interval_t(result.send_done_time, result.activate_time));
       add("sent amount", result.tx);

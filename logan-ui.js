@@ -187,7 +187,7 @@
         }
         let select = $("#search_By");
         select.empty();
-        for (let prop in props) {
+        for (let prop of Object.keys(props).sort()) {
           select.append($("<option>").attr("value", prop).text(prop));
         }
       },

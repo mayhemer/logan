@@ -149,13 +149,14 @@ logan.schema("moz",
           (nontails === "0") ? this.timestamp : undefined;
       });
       module.rule("RequestContext::ProcessTailQueue this=%p, queued=%u, rv=%x", function(rc, queued, rv) {
-        rc = this.obj(rc);
-        rc.on("__unblocktime", (time) => {
-          let duration = this.duration(time)
-          rc.prop("unblock-duration", duration, true)
-            .capture("  after " + duration + "ms");
-        });
-        rc.capture();
+        this.obj(rc)
+          .capture()
+          .follow("  untailing %p", (rc, req) => rc.mention(req))
+          .on("__unblocktime", (time, rc) => {
+            let duration = this.duration(time)
+            rc.prop("unblock-duration", duration, true)
+              .capture("  after " + duration + "ms");
+          });
       });
       module.rule("RequestContext::RemoveNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
         rc = this.obj(rc).capture();
@@ -514,7 +515,8 @@ logan.schema("moz",
         this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
       });
       module.rule("HttpBaseChannel::SetIsTrackingResource %p", function(ch) {
-        this.obj(ch).prop("tracker", true).capture();
+        ch = this.obj(ch).prop("tracker", true).capture();
+        netdiag.channelRecognizedTracker(ch);
       });
       module.rule("nsHttpChannel %p on-local-blacklist=%d", function(ch, lcb) {
         this.obj(ch).prop("local-block-list", lcb === "1").capture();

@@ -228,7 +228,7 @@ div.flow_root.searches {
 }
 
 div#active_searches:empty:before {
-  content: 'no search';
+  content: 'no search performed';
   padding-left: .5em;
 }
 div#active_searches:empty {

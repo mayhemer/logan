@@ -55,7 +55,7 @@ Bag.prototype.on = function(prop, handler, elseHandler) {
     }
     return;
   }
-  let val = handler(this[prop]);
+  let val = handler(this[prop], this);
   if (val) {
     return (this[prop] = val);
   }
