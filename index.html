@@ -4,11 +4,13 @@
 <title>Mozilla Log Analyzer</title>
 <meta charset="utf-8" />
 <link rel="stylesheet" type="text/css" href="logan.css" />
-<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.20.0/vis.min.css" />
-<script defer src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.20.0/vis.min.js"></script>
+<link rel="stylesheet" type="text/css" href="vis.min.css" />
+<script defer src="jquery-3.2.1.slim.min.js"></script>
+<script defer src="jquery.collapse.js"></script>
+<script defer src="vis.min.js"></script>
 <script defer src="logan.js"></script>
 <script defer src="logan-ui.js"></script>
+<script defer src="logan-netdiag.js"></script>
 <script defer src="logan-rules.js"></script>
 <style id="dynamic_style"></style>
 </head>
@@ -30,6 +32,7 @@
   </span>
   <h2>select log files</h2>
   <input type="file" id="files" multiple />
+  <span id="warnings"></span>
   <div id="load_progress" class="load_progress"></div>
 </div>
 
@@ -69,6 +72,8 @@
     <input id="search_button" class="big button" type="button" value="Search" />
   </div>
 </div>
+
+<div id="netdiag_section"></div>
 
 <div class="flow_root searches">
   <div id="active_searches"></div>

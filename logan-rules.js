@@ -30,27 +30,50 @@ logan.schema("moz",
     schema.module("DocumentLeak", (module) => {
 
       /******************************************************************************
-       * PressShell
+       * nsDocument
        ******************************************************************************/
 
-      module.rule("DOCUMENT %p with PressShell %p and DocShell %p", function(doc, presshell, docshell) {
-        this.obj(presshell).create("PresShell").link(docshell).docshell = docshell;
+      module.rule("DOCUMENT %p created", function(doc) {
+        this.obj(doc).create("nsDocument");
       });
+      module.rule("DOCUMENT %p destroyed", function(doc) {
+        this.obj(doc).destroy();
+      });
+      module.rule("DOCUMENT %p UnblockDOMContentLoaded", function(doc) {
+        doc = this.obj(doc).capture();
+        netdiag.DOMContentLoaded(doc.docshell);
+      });
+      module.rule("DOCUMENT %p with PressShell %p and DocShell %p", function(doc, presshell, docshell) {
+        this.thread.on("docshell", ds => {
+          docshell = ds.alias(docshell);
+        }, () => {
+          docshell = this.obj(docshell);
+        });
+        this.obj(presshell).link(docshell).docshell = docshell;
+        this.obj(doc).link(docshell).docshell = docshell;
+      });
+
     }); // DocumentLeak
 
-    // IMPORTANT:
-    // To enable these, add "textperf" module at 5 as well.
-    // Note: the PressShell instance is tracked by a log rule from DocumentLeak module
     schema.module("PresShell", (module) => {
+
+      /******************************************************************************
+       * PresShell
+       ******************************************************************************/
+
+      module.rule("PresShell::PresShell this=%p", function(ps) {
+        this.obj(ps).create("PresShell");
+      });
+      module.rule("PresShell::~PresShell this=%p", function(ps) {
+        this.obj(ps).destroy();
+      });
       module.rule("PresShell::Initialize this=%p", function(ps) {
         this.obj(ps).__init_time = this.timestamp;
       });
       module.rule("PresShell::ScheduleBeforeFirstPaint this=%p", function(ps) {
         ps = this.obj(ps);
         ps.prop("first-paint-time-ms", this.duration(ps.__init_time)).capture();
-      });
-      module.rule("(presshell) %p load done time-ms: %9.2f [%s]\n", function(ps, time, spec) {
-        this.obj(ps).prop("load-time-ms", time).capture();
+        netdiag.FirstPaint(ps.docshell);
       });
     }); // PresShell
 
@@ -64,8 +87,11 @@ logan.schema("moz",
         // This DocLoader is aliased to DocShell
         this.thread.docloader = docloader;
       });
-      module.rule("DocLoader:%p: load group %p.\n", function(docloader, lg) {
-        this.objIf(docloader).link(lg);
+      module.rule("DocLoader:%p: load group %p.\n", function(docloader, loadgroup) {
+        docloader = this.objIf(docloader).capture().link(loadgroup);
+        loadgroup = this.obj(loadgroup);
+        docloader.loadgroup = loadgroup;
+        loadgroup.docshell = docloader;
       });
 
     }); // DocLoader
@@ -86,11 +112,13 @@ logan.schema("moz",
         this.obj(docshell).destroy();
       });
       module.rule("nsDocShell[%p]: loading %s with flags 0x%08x", function(docshell, url, flags) {
-        this.obj(docshell).prop("url", url, true).capture();
+        docshell = this.obj(docshell).prop("url", url, true).capture();
+        netdiag.topload(docshell, url);
       });
       module.rule("DOCSHELL %p SetCurrentURI %s\n", function(docshell, url) {
-        this.obj(docshell).prop("url", url, true).capture();
+        this.thread.docshell = this.obj(docshell).capture();
       });
+      schema.summaryProps("nsDocShell", ["url"]);
       
     }); // nsDocShellLeak
 
@@ -102,6 +130,9 @@ logan.schema("moz",
 
       module.rule("RequestContext::RequestContext this=%p id=%x", function(ptr, id) {
         this.obj(ptr).create("RequestContext").prop("id", id).grep();
+        this.thread.on("loadgroup", (lg) => {
+          lg.prop("rc-id", id);
+        });
       });
       module.rule("RequestContext::~RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
@@ -109,6 +140,7 @@ logan.schema("moz",
       module.rule("RequestContext::IsContextTailBlocked request blocked this=%p, requst=%p, queued=%u", function(rc, req, queued) {
         this.thread.on("tail_request", (tail) => {
           tail.alias(req).prop("tail-blocked", true).__blocktime = this.timestamp;
+          netdiag.channelTailing(tail);
         });
         this.obj(rc).capture().mention(req);
       });
@@ -127,7 +159,7 @@ logan.schema("moz",
       });
       module.rule("RequestContext::RemoveNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
         rc = this.obj(rc).capture();
-        this.thread.on("tail_request", (ch) => rc.mention(ch));
+        this.thread.on("tail_request", (ch) => (rc.mention(ch), ch));
       });
       module.rule("RequestContext::AddNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
         rc = this.obj(rc).capture().follow("  timer canceled", rc => {
@@ -137,7 +169,7 @@ logan.schema("moz",
               .capture("  after " + duration + "ms");
           });
         });
-        this.thread.on("tail_request", (ch) => rc.mention(ch));
+        this.thread.on("tail_request", (ch) => (rc.mention(ch), ch));
       });
       schema.summaryProps("RequestContext", ["cancelled-unblock-duration"]);
 
@@ -150,7 +182,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("LOADGROUP [%p]: Created.\n", function(ptr) {
-        this.obj(ptr).create("nsLoadGroup").prop("requests", 0).prop("foreground-requests", 0).grep();
+        this.thread.loadgroup = this.obj(ptr).create("nsLoadGroup").prop("requests", 0).prop("foreground-requests", 0).grep();
       });
       module.rule("LOADGROUP [%p]: Destroyed.\n", function(ptr) {
         this.obj(ptr).destroy();
@@ -172,10 +204,11 @@ logan.schema("moz",
       });
       module.rule("nsLoadGroup::SetDefaultLoadRequest this=%p default-request=%p", function(lg, req) {
         // TODO - alias the request?
-        this.obj(lg).capture().link(this.obj(req).class("unknown request"));
+        this.obj(lg).capture().link(this.obj(req).class("unknown default request"));
       });
       module.rule("nsLoadGroup::OnEndPageLoad this=%p default-request=%p", function(lg, dch) {
-        this.obj(lg).capture().mention(dch);
+        lg = this.obj(lg).capture().mention(dch);
+        netdiag.EndPageLoad(lg);
       });
       schema.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
 
@@ -206,10 +239,10 @@ logan.schema("moz",
 
       module.rule("%d [this=%p] imgLoader::LoadImage (aURI=\"%s\") {ENTER}", function(now, ptr, uri) {
         this.thread.load_image_uri = uri;
-        this.thread.httpchannelchild = null;
+        delete this.thread.httpchannelchild;
       });
       module.rule("%d [this=%p] imgLoader::LoadImage {EXIT}", function(now, ptr) {
-        this.thread.load_image_uri = undefined;
+        delete this.thread.load_image_uri;
       });
       module.rule("%d [this=%p] imgLoader::LoadImage |cache hit| (request=\"%p\")", function(now, ptr, request) {
         this.obj(request).prop("cache-hit", true).capture();
@@ -272,6 +305,21 @@ logan.schema("moz",
 
     }); // imageRequest
 
+    schema.module("nsChannelClassifier", (module) => {
+
+      /******************************************************************************
+       * nsChannelClassifier
+       ******************************************************************************/
+
+      module.rule("nsChannelClassifier::nsChannelClassifier %p", function(clas) {
+        this.obj(clas).create("nsChannelClassifier").grep();
+      });
+      module.rule("nsChannelClassifier::~nsChannelClassifier %p", function(clas) {
+        this.obj(clas).destroy();
+      });
+      
+    });
+
     schema.module("nsHttp", (module) => {
 
       /******************************************************************************
@@ -290,6 +338,9 @@ logan.schema("moz",
       module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u topwinid=%x", function(ch, gid, winid) {
         this.obj(ch).prop("top-win-id", winid).ipcid(gid).send("HttpChannel");
       });
+      module.rule("HttpChannelChild::ConnectParent [this=%p, id=%u]\n", function(ch, id) {
+        this.obj(ch).capture().ipcid(id).send("HttpChannel::ConnectParent");
+      });
       module.rule("HttpChannelChild::DoOnStartRequest [this=%p]", function(ptr) {
         this.obj(ptr).recv("HttpChannel::Start", ch => {
           ch.state("started").capture();
@@ -305,6 +356,14 @@ logan.schema("moz",
           ch.state("finished").capture();
         });
       });
+      module.rule("HttpChannelChild %p ClassOfService=%u", function(ch, cos) {
+        ch = this.obj(ch).capture();
+        netdiag.channelCOS(ch, parseInt(cos));
+      });
+      module.rule("HttpChannelChild::SetPriority %p p=%d", function(ch, prio) {
+        ch = this.obj(ch).capture();
+        netdiag.channelPrio(ch, parseInt(prio));
+      });
       schema.summaryProps("HttpChannelChild", ["url", "status"]);
 
       /******************************************************************************
@@ -316,7 +375,15 @@ logan.schema("moz",
       });
       module.rule("HttpChannelParent RecvAsyncOpen [this=%p uri=%s, gid=%u topwinid=%x]\n", function(parent, uri, gid, winid) {
         this.obj(parent).capture().ipcid(gid).recv("HttpChannel", (parent, child) => {
-          child.link(parent);
+          parent.httpchannelchild = child.link(parent);
+        });
+      });
+      module.rule("HttpChannelParent::ConnectChannel: Looking for a registered channel [this=%p, id=%u]", function(ch, id) {
+        this.obj(ch).ipcid(id).recv("HttpChannel::ConnectParent", (parent, child) => {
+          parent.capture().follow("  and it is nsHttpChannel %p", function(parent, httpch) {
+            parent.link(this.obj(httpch).ipcid(parent.ipcid()));
+          });
+          parent.httpchannelchild = child.link(parent);
         });
       });
       module.rule("Destroying HttpChannelParent [this=%p]", function(ptr) {
@@ -333,6 +400,7 @@ logan.schema("moz",
         });
         this.thread.on("httpchannelparent", parent => {
           parent.link(ch.ipcid(parent.ipcid()));
+          ch.httpparentchannel = parent;
         });
       });
       module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
@@ -344,12 +412,17 @@ logan.schema("moz",
       schema.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
         proc => proc.thread.httpchannel_init,
         function(oldch, newch, presmethod, channel) {
-          this.thread.httpchannel_init = null;
+          delete this.thread.httpchannel_init;
           channel.alias(newch);
           this.obj(oldch).capture().link(newch);
         });
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
-        this.obj(ptr).state("open").capture().__opentime = this.timestamp;
+        let channel = this.obj(ptr).state("open").capture();
+        channel.__opentime = this.timestamp;
+        netdiag.channelAsyncOpen(channel);
+      });
+      module.rule("nsHttpChannel [%p] created nsChannelClassifier [%p]", function(ch, clas) {
+        this.obj(ch).link(clas).capture();
       });
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
@@ -368,8 +441,15 @@ logan.schema("moz",
       module.rule("nsHttpChannel::OnCacheEntryAvailable [this=%p entry=%p new=%d appcache=%p status=%x mAppCache=%p mAppCacheForWrite=%p]", function(ch, entry, isnew) {
         this.obj(ch).capture().link(entry);
       });
+      module.rule("nsHttpChannel::SetupTransaction [this=%p, cos=%u, prio=%d]\n", function(ch, cos, prio) {
+        ch = this.obj(ch).prop("cos-before-trans-open", cos).prop("priority-before-trans-open", prio).capture();
+        netdiag.channelCOS(ch, parseInt(cos));
+        netdiag.channelPrio(ch, parseInt(prio));
+      });
       module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(ch, tr) {
-        this.obj(ch).capture().link(this.obj(tr).prop("url", this.obj(ch).props["url"]));
+        ch = this.obj(ch).capture().link(tr = this.obj(tr).prop("url", this.obj(ch).props["url"]));
+        tr.httpchannel = ch;
+        netdiag.channelCreatesTrans(ch, tr);
       });
       module.rule("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]", function(cl, ch) {
         this.obj(ch).capture().link(this.obj(cl).class("nsChannelClassifier"));
@@ -379,14 +459,24 @@ logan.schema("moz",
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         ch = this.obj(ch);
-        ch.prop("start-time", this.duration(ch.__opentime))
+        ch.run("start")
+          .prop("start-time", this.duration(ch.__opentime))
           .state("started")
-          .capture()
-          .send("HttpChannel::Start");
+          .capture();
+      });
+      module.rule("  calling mListener->OnStartRequest by ScopeExit [this=%p, listener=%p]\n", function(ch) {
+        this.obj(ch).capture().send("HttpChannel::Start");
+      });
+      module.rule("  calling mListener->OnStartRequest [this=%p, listener=%p]\n", function(ch) {
+        this.obj(ch).capture().send("HttpChannel::Start");
+      });
+      module.rule("HttpBaseChannel::DoNotifyListener this=%p", function(ch) {
+        this.obj(ch).capture().send("HttpChannel::Start");
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
         ch = this.obj(ch);
-        ch.propIfNull("first-data-time", this.duration(ch.__opentime))
+        ch.run("data")
+          .propIfNull("first-data-time", this.duration(ch.__opentime))
           .prop("last-data-time", this.duration(ch.__opentime))
           .state("data")
           .capture()
@@ -394,17 +484,22 @@ logan.schema("moz",
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         ch = this.obj(ch);
-        ch.prop("status", status)
+        ch.run("stop")
+          .prop("status", status, true)
           .prop("stop-time", this.duration(ch.__opentime))
-          .state("finished")
-          .capture()
-          .send("HttpChannel::Stop");
+          .capture();
       });
-      module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ptr) {
-        this.obj(ptr).prop("suspendcount", suspendcount => ++suspendcount).capture();
+      module.rule("nsHttpChannel %p calling OnStopRequest\n", function(ch) {
+        ch = this.obj(ch).state("finished").capture().send("HttpChannel::Stop");
+        netdiag.channelDone(ch);
       });
-      module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ptr) {
-        this.obj(ptr).prop("suspendcount", suspendcount => --suspendcount).capture();
+      module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ch) {
+        ch = this.obj(ch).prop("suspendcount", suspendcount => ++suspendcount).capture();
+        netdiag.channelSuspend(ch);
+      });
+      module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ch) {
+        ch = this.obj(ch).run("resume").prop("suspendcount", suspendcount => --suspendcount).capture();
+        netdiag.channelResume(ch);
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
         this.obj(ptr).state("cancelled").prop("status", status).capture();
@@ -418,10 +513,17 @@ logan.schema("moz",
       module.rule("sending progress notification [this=%p status=%x progress=%d/%d]", function(ch, status) {
         this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
       });
+      module.rule("HttpBaseChannel::SetIsTrackingResource %p", function(ch) {
+        this.obj(ch).prop("tracker", true).capture();
+      });
+      module.rule("nsHttpChannel %p on-local-blacklist=%d", function(ch, lcb) {
+        this.obj(ch).prop("local-block-list", lcb === "1").capture();
+      });
       module.rule("HttpBaseChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
         this.thread.tail_request = this.obj(ch).capture().mention(rc).follow("  blocked=%d", (ch, blocked) => {
           if (blocked === "1") {
             ch.prop("tail-blocked", true).__blocktime = this.timestamp;
+            netdiag.channelTailing(ch);
           }
         });
       });
@@ -430,6 +532,7 @@ logan.schema("moz",
         let after = this.duration(ch.__blocktime);
         ch.prop("tail-blocked", false).prop("tail-block-time", after)
           .capture().capture("  after " + after + "ms").mention(rc);
+        netdiag.channelUntailing(ch);
       });
       module.rule("HttpBaseChannel::AddAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
         this.thread.tail_request =
@@ -445,6 +548,14 @@ logan.schema("moz",
       module.rule("HttpBaseChannel::EnsureRequestContext this=%p rc=%p", function(ch, rc) {
         this.obj(ch).capture().mention(rc);
       });
+      module.rule("nsHttpChannel::OnClassOfServiceUpdated this=%p, cos=%u", function(ch, cos) {
+        ch = this.obj(ch).capture();
+        netdiag.channelCOS(ch, parseInt(cos));
+      });
+      module.rule("nsHttpChannel::SetPriority %p p=%d", function(ch, prio) {
+        ch = this.obj(ch).capture();
+        netdiag.channelPrio(ch, parseInt(prio));
+      });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
       /******************************************************************************
@@ -454,7 +565,7 @@ logan.schema("moz",
       schema.ruleIf("nsHttpChannelAuthProvider::ProcessAuthentication [this=%p channel=%p code=%u SSLConnectFailed=%d]",
         proc => proc.thread.httpchannel_for_auth, function(ptr, ch, code, sslcon, auth_ch)
       {
-        this.thread.httpchannel_for_auth = null;
+        delete this.thread.httpchannel_for_auth;
         let provider = this.obj(ptr).class("nsHttpChannelAuthProvider").grep().follow(1);
         provider._channel = auth_ch.alias(ch).capture().link(ptr);
       });
@@ -469,8 +580,8 @@ logan.schema("moz",
        * nsHttpTransaction
        ******************************************************************************/
 
-      module.rule("Creating nsHttpTransaction @%p", function(ptr) {
-        this.thread.httptransaction = this.obj(ptr).create("nsHttpTransaction").grep();
+      module.rule("Creating nsHttpTransaction @%p", function(trans) {
+        this.thread.httptransaction = (trans = this.obj(trans).create("nsHttpTransaction").grep());
       });
       module.rule("nsHttpTransaction::Init [this=%p caps=%x]", function(trans) {
         this.obj(trans).capture().follow("  window-id = %x", function(trans, id) {
@@ -478,7 +589,7 @@ logan.schema("moz",
         });
       });
       schema.ruleIf("http request [", proc => proc.thread.httptransaction, function(trans) {
-        this.thread.httptransaction = null;
+        delete this.thread.httptransaction;
         trans.capture().follow((trans, line) => {
           trans.capture(line);
           return line !== "]";
@@ -489,7 +600,7 @@ logan.schema("moz",
           trans.capture().mention(ci);
         });
       schema.ruleIf("AtActiveConnectionLimit result: %s", proc => proc.thread.httptransaction, function(atlimit, trans) {
-        this.thread.httptransaction = null;
+        delete this.thread.httptransaction;
         trans.capture();
       });
       module.rule("  adding transaction to pending queue [trans=%p pending-count=%d]", function(trans, pc) {
@@ -499,10 +610,12 @@ logan.schema("moz",
         });
       });
       module.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
-        this.thread.httptransaction = this.obj(trans);
+        trans = this.obj(trans);
+        trans.dispatch(trans.httpchannel, "start");
+        this.thread.httptransaction = trans;
       });
       schema.ruleIf("http response [", proc => proc.thread.httptransaction, function(trans) {
-        this.thread.httptransaction = null;
+        delete this.thread.httptransaction;
         trans.capture().follow((trans, line) => {
           trans.capture(line);
           return line !== "]";
@@ -524,13 +637,29 @@ logan.schema("moz",
         this.obj(trans).capture().mention(rc);
       });
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
-        this.obj(trans).prop("status", status).state("closed").capture();
+        trans = this.obj(trans).prop("status", status).state("closed").capture();
+        trans.dispatch(trans.httpchannel, "stop");
+        netdiag.transactionDone(trans);
+      });
+      module.rule("nsHttpTransaction::WritePipeSegment %p written=%u", function(trans, count) {
+        trans = this.obj(trans).capture().dispatch(trans.httpchannel, "data");
+        netdiag.transactionReceived(trans, parseInt(count));
+      });
+      module.rule("nsHttpTransaction::ReadRequestSegment %p read=%u", function(trans, count) {
+        trans = this.obj(trans).capture();
+        netdiag.transactionSended(trans, parseInt(count));
+      });
+      module.rule("nsHttpTransaction::ShouldStopReading entry pressure this=%p", function(trans) {
+        trans = this.obj(trans).prop("throttling-under-pressure", true).capture();
+        netdiag.transactionThrottlePressure(trans);
       });
       module.rule("nsHttpTransaction::WriteSegments %p response throttled", function(trans) {
-        this.obj(trans).state("throttled").prop("ever-throttled", true).capture();
+        trans = this.obj(trans).state("throttled").prop("ever-throttled", true).capture();
+        netdiag.transactionThrottled(trans);
       });
       module.rule("nsHttpTransaction::ResumeReading %p", function(trans) {
         this.obj(trans).state("unthrottled").capture();
+        netdiag.transactionUnthrottled(trans);
       });
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
@@ -544,9 +673,15 @@ logan.schema("moz",
       module.rule("Creating nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).create("nsHttpConnection").grep();
       });
+      module.rule("nsHttpConnection::Init this=%p sockettransport=%p", function(conn, sock) {
+        conn = this.obj(conn).capture().link(sock);
+        conn.networksocket = this.obj(sock);
+      });
       module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%x]", function(conn, trans, caps) {
-        this.obj(conn).capture();
-        this.obj(trans).state("active").capture().link(conn);
+        conn = this.obj(conn).capture();
+        trans = this.obj(trans).state("active").capture().link(conn);
+        trans.httpconnection = conn;
+        netdiag.transactionActive(trans);
       });
       module.rule("nsHttpConnection::OnSocketWritable %p ReadSegments returned [rv=%d read=%d sock-cond=%x again=%d]", function(conn, rv, read, cond, again) {
         conn = this.obj(conn).class("nsHttpConnection").capture().grep();
@@ -600,8 +735,12 @@ logan.schema("moz",
       });
       module.rule("Http2Session::AddStream session=%p stream=%p serial=%u NextID=0x%X (tentative)",
         function(session, stream, serial, id) {
-          this.obj(session).class("Http2Session").grep().link(this.obj(stream).prop("id", id));
+          stream = this.obj(stream).prop("id", id);
+          session = this.obj(session).class("Http2Session").grep().link(stream);
         });
+      module.rule("Http2Session::LogIO %p stream=%p id=%x [%*s]", function(session, stream, id, what) {
+        this.obj(session).class("Http2Session").capture().mention(stream);
+      });
       schema.summaryProps("Http2Session", ["key"]);
 
       /******************************************************************************
@@ -613,6 +752,7 @@ logan.schema("moz",
         this.thread.on("httpspdytransaction", tr => {
           tr.link(stream);
           stream.prop("url", tr.props["url"]);
+          stream.httptransaction = tr;
         });
       });
       module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
@@ -637,6 +777,19 @@ logan.schema("moz",
       module.rule("Start Processing Data Frame. Session=%p Stream ID %X Stream Ptr %p Fin=%d Len=%d", function(sess, streamid, stream, fin, len) {
         this.obj(stream).state("data").capture();
       });
+      module.rule("Http2Stream::WriteSegments %p Buffered %X %d\n", function(stream, id, count) {
+        stream = this.obj(stream).capture();
+        // This only buffers the data, but it's an actual read from the socket, hence we
+        // want it to be marked.  The rule for "read from flow control buffer" just below
+        // will negate this so that the report from the transaction will balance.
+        netdiag.transactionReceived(stream.httptransaction, parseInt(count));
+      });
+      module.rule("Http2Stream::OnWriteSegment read from flow control buffer %p %x %d\n", function(stream, id, count) {
+        stream = this.obj(stream).capture();
+        // This is buffered data read and has already been reported on the transaction in the just above rule,
+        // hence, make it negative to be ignored, since the transaction will report it again
+        netdiag.transactionReceived(stream.httptransaction, -parseInt(count));
+      });
       module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
         this.obj(stream).state("closed").prop("status", result).capture();
       });
@@ -646,20 +799,27 @@ logan.schema("moz",
        * nsHalfOpenSocket
        ******************************************************************************/
 
-      module.rule("Creating nsHalfOpenSocket [this=%p trans=%p ent=%s key=%s]", function(ptr, trans, ent, host) {
-        this.obj(ptr).create("nsHalfOpenSocket").grep();
+      module.rule("Creating nsHalfOpenSocket [this=%p trans=%p ent=%s key=%s]", function(ho, trans, ent, key) {
+        this.thread.halfopen = this.obj(ho).create("nsHalfOpenSocket").prop("key", key).grep();
       });
-      module.rule("nsHalfOpenSocket::OnOutputStreamReady [this=%p ent=%s %s]", function(ptr, end, streamtype) {
-        this.thread.halfopen = this.obj(ptr).capture();
+      module.rule("nsHalfOpenSocket::OnOutputStreamReady [this=%p ent=%s %s]", function(ho, end, streamtype) {
+        this.thread.halfopen = this.obj(ho).capture();
+      });
+      module.rule("nsHalfOpenSocket::StartFastOpen [this=%p]", function(ho) {
+        this.thread.halfopen = this.obj(ho).capture();
       });
       schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn, ho) {
-        this.thread.halfopen = null;
-        this.thread.on("sockettransport", st => { this.obj(conn).link(st); });
+        delete this.thread.halfopen;
+        this.thread.on("sockettransport", st => {
+          conn = this.obj(conn).link(st);
+          conn.networksocket = st;
+        });
         ho.link(conn).capture();
       });
       module.rule("Destroying nsHalfOpenSocket [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
+      schema.summaryProps("nsHalfOpenSocket", ["key"]);
 
       /******************************************************************************
        * connection manager
@@ -709,20 +869,39 @@ logan.schema("moz",
       /******************************************************************************
        * nsSocketTransport
        ******************************************************************************/
-      module.rule("creating nsSocketTransport @%p", function(ptr) {
-        this.obj(ptr).create("nsSocketTransport").grep();
+      module.rule("creating nsSocketTransport @%p", function(sock) {
+        sock = this.obj(sock).create("nsSocketTransport").grep();
+        netdiag.newSocket(sock);
+      });
+      module.rule("nsSocketTransport::Init [this=%p host=%s:%hu origin=%s:%d proxy=%s:%hu]\n", function(sock, host, hp, origin, op, proxy, pp) {
+        this.obj(sock).prop("host", host + ":" + hp).prop("origin", origin + ":" + op).capture();
+      });
+      module.rule("nsSocketTransport::InitiateSocket TCP Fast Open started [this=%p]", function(sock) {
+        this.thread.sockettransport = this.obj(sock).prop("attempt-TFO", true).capture();
       });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
         this.thread.sockettransport = this.obj(ptr).class("nsSocketTransport").prop("last-poll-flags", flgs).capture();
+        netdiag.socketReady(this.thread.sockettransport);
       });
-      module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(tr, st) {
-        this.obj(tr).class("nsSocketTransport").prop("last-status", convertProgressStatus(st));
+      module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
+        sock = this.obj(sock).class("nsSocketTransport").prop("last-status", convertProgressStatus(st));
+        netdiag.socketStatus(sock, convertProgressStatus(st));
       });
       module.rule("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
         this.thread.on("sockettransport", st => st.alias(ptr).prop("output-cond", cond).capture());
       });
       module.rule("nsSocketInputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
         this.thread.on("sockettransport", st => st.alias(ptr).prop("input-cond", cond).capture());
+      });
+      module.rule("nsSocketOutputStream::Write [this=%p count=%u]\n", function(ptr, count) {
+        this.obj(ptr).capture().follow("  PR_Write returned [n=%d]\n", (sock, written) => {
+          sock.capture();
+        }, sock => sock.capture());
+      });
+      module.rule("nsSocketInputStream::Read [this=%p count=%u]\n", function(ptr, count) {
+        this.obj(ptr).capture().follow("  PR_Read returned [n=%d]\n", (sock, read) => {
+          sock.capture();
+        }, sock => sock.capture());
       });
       module.rule("destroying nsSocketTransport @%p", function(ptr) {
         this.obj(ptr).destroy();
@@ -731,13 +910,12 @@ logan.schema("moz",
     }); // nsSocketTransport
 
     schema.module("nsHostResolver", (module) => {
+      module.resolver = (proc) => proc.obj("nsHostResolver::singleton").class("nsHostResolver");
       module.rule("Resolving host [%s].\n", function(host) {
-        this.obj("nsHostResolver::singleton").class("nsHostResolver").capture();
-        // TODO - track the triggering object
+        module.resolver(this).capture();
       });
       module.rule("Resolving host [%s] - bypassing cache.\n", function(host) {
-        this.obj("nsHostResolver::singleton").class("nsHostResolver").capture();
-        // TODO - track the triggering object
+        module.resolver(this).capture();
       });
     }); // nsHostResolver
 
@@ -751,7 +929,7 @@ logan.schema("moz",
         this.thread.httpcacheentry = this.obj(ptr).create("CacheEntry").grep();
       });
       schema.ruleIf("  new entry %p for %*$", proc => proc.thread.httpcacheentry, function(ptr, key, entry) {
-        this.thread.httpcacheentry = null;
+        delete this.thread.httpcacheentry;
         entry.prop("key", key);
       });
       module.rule("New CacheEntryHandle %p for entry %p", function(handle, entry) {

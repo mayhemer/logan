@@ -55,16 +55,23 @@ Bag.prototype.on = function(prop, handler, elseHandler) {
     }
     return;
   }
-  return (this[prop] = handler(this[prop]));
+  let val = handler(this[prop]);
+  if (val) {
+    return (this[prop] = val);
+  }
+  delete this[prop];
 };
 
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
+const POINTER_REGEXP = /^0*([0-9A-Fa-f]+)$/;
+const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
 
 (function() {
 
   const FILE_SLICE = 5 * 1024 * 1024;
-  const EPOCH_1970 = new Date("1970-01-01");
   const USE_RULES_TREE_OPTIMIZATION = true;
+
+  const EPOCH_1970 = new Date("1970-01-01");
 
   let IF_RULE_INDEXER = 0;
 
@@ -81,14 +88,15 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   }
 
   const printfToRegexpMap = [
+    // IMPORTANT!!!
     // Use \\\ to escape regexp special characters in the match regexp (left),
     // we escapeRegexp() the string prior to this conversion which adds
     // a '\' before each of such chars.
-
     [/%p/g, "((?:(?:0x)?[A-Fa-f0-9]+)|(?:\\(null\\))|(?:\\(nil\\)))"],
-    [/%d/g, "([\\d]+)"],
-    [/%u/g, "([\\d]+)"],
-    [/%s/g, "((?:,?[^\\s])*)"],
+    [/%d/g, "(-?[\\d]+)"],
+    [/%h?u/g, "([\\d]+)"],
+    [/%s/g, "([^\\s]*)"],
+    [/%\\\*s/g, "(.*)"],
     [/%\d*[xX]/g, "((?:0x)?[A-Fa-f0-9]+)"],
     [/%(?:\d+\\\.\d+)?f/g, "((?:[\\d]+)\.(?:[\\d]+))"],
     [/%\\\*\\\$/g, "(.*$)"]
@@ -107,6 +115,21 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     }
 
     return new RegExp('^' + printf + '$');
+  }
+
+  // Windows sometimes writes %p as upper-case-padded and sometimes as lower-case-unpadded
+  // 000001500B043028 -> 1500b043000
+  function pointerTrim(ptr) {
+    if (!ptr) {
+      return "0";
+    }
+    
+    let pointer = ptr.match(POINTER_REGEXP);
+    if (pointer) {
+      return pointer[1].toLowerCase();
+    }
+
+    return ptr;
   }
 
   function ruleMappingGrade1(input) {
@@ -128,8 +151,6 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     let grade2 = input.substring(grade1.length);
     return { grade1, grade2 };
   }
-
-  const NULLPTR_REGEXP = /^0+$/;
 
   function Schema(namespace, lineRegexp, linePreparer) {
     this.namespace = namespace;
@@ -162,7 +183,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
             return;
           }
           for (let ptr of pointers) {
-            let obj = state.objs[ptr];
+            let obj = state.objs[pointerTrim(ptr)];
             if (obj && obj._grep) {
               obj.capture();
             }
@@ -233,7 +254,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
   function Obj(ptr) {
     this.id = logan.objects.length;
-    this.props = new Bag({ pointer: ptr, className: null });
+    // NOTE: when this list is enhanced, UI.summary has to be updated the "collect properties manually" section
+    this.props = new Bag({ pointer: ptr, className: null, logid: this.id });
     this.captures = [];
     this.file = logan._proc.file;
     this.aliases = {};
@@ -261,7 +283,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       return logan._proc.obj(this.__most_recent_accessor).create(className);
     }
 
-    ensure(logan.searchProps, className, { pointer: true, state: true });
+    ensure(logan.searchProps, className, { pointer: true, state: true, logid: true });
 
     this.props.className = className;
     this.prop("state", "created");
@@ -272,6 +294,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     if (logan._proc.objs[alias] === this) {
       return this;
     }
+
+    alias = pointerTrim(alias);
     logan._proc.objs[alias] = this;
     this.aliases[alias] = true;
     return this;
@@ -346,6 +370,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   Obj.prototype.follow = function(cond, consumer, error = () => true) {
     let capture = {
       obj: this,
+      module: logan._proc.module,
+      thread: logan._proc.thread,
     };
 
     if (typeof cond === "number") {
@@ -365,10 +391,10 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     } else if (typeof cond === "function") {
       capture.follow = cond;
     } else {
-      throw "Internal error: follow 'cond' argument unexpected type '" + typeof cond + "'";
+      throw logan.exceptionParse("follow() 'cond' argument unexpected type '" + typeof cond + "'");
     }
 
-    logan._proc.thread._follow = capture;
+    logan._proc._pending_follow = capture;
     return this;
   }
 
@@ -456,6 +482,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     this.capture({ dispatch: true }, dispatch);
 
     ensure(target._dispatches, name, []).push(dispatch);
+    return this;
   },
 
   Obj.prototype.run = function(name) {
@@ -476,7 +503,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       return this.ipc_id;
     }
     this.ipc_id = id;
-    return this;
+    return this.prop("ipc-id", id);
   },
 
   Obj.prototype.send = function(message) {
@@ -544,9 +571,13 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       logan._proc._sync[id] = {
         func: func,
         receiver: this,
-        proc: logan._proc.save()
+        proc: logan._proc.save(),
       };
-      logan._proc.file.__recv_wait = true;
+
+      logan._proc.file.__recv_wait = { // storing only for debugging purposes!
+        message,
+        ipc_id: this.ipc_id,
+      };
 
       LOG(" blocking and storing recv() " + logan._proc.line + " ipcid=" + this.ipc_id + " file=" + logan._proc.file.name);
       return this;
@@ -571,28 +602,34 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
   logan = {
     // processing state sub-object, passed to rule consumers
     _proc: {
-      obj: function(ptr) {
+      _obj: function(ptr, store) {
         if (Obj.prototype.isPrototypeOf(ptr)) {
           return ptr;
         }
-        var obj = this.objs[ptr];
-        if (!obj) {
-          this.objs[ptr] = (obj = new Obj(ptr));
+
+        ptr = pointerTrim(ptr);
+        if (ptr === "0") {
+          store = false;
         }
+
+        let obj = this.objs[ptr];
+        if (!obj) {
+          obj = new Obj(ptr);
+          if (store) {
+            this.objs[ptr] = obj;
+          }
+        }
+
         obj.__most_recent_accessor = ptr;
         return obj;
       },
 
       objIf: function(ptr) {
-        if (Obj.prototype.isPrototypeOf(ptr)) {
-          return ptr;
-        }
-        var obj = this.objs[ptr];
-        if (!obj) {
-          return new Obj(ptr); // temporary, but never put to the tracking array
-        }
-        obj.__most_recent_accessor = ptr;
-        return obj;
+        return this._obj(ptr, false);
+      },
+
+      obj: function(ptr) {
+        return this._obj(ptr, true);
       },
 
       duration: function(timestamp) {
@@ -602,8 +639,10 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         return this.timestamp.getTime() - timestamp.getTime();
       },
 
+      // private
+
       save: function() {
-        return ["timestamp", "thread", "line", "file"].reduce(
+        return ["timestamp", "thread", "line", "file", "module"].reduce(
           (result, prop) => (result[prop] = this[prop], result), {});
       },
 
@@ -649,9 +688,9 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       if (typeof exception === "object") {
         exception = "'" + exception.message + "' at " + exception.fileName + ":" + exception.lineNumber
       }
-      exception += "\nwhile processing '" + this._proc.line +
-                   "'\nat " + this._proc.file.name + ":" + this._proc.linenumber;
-      return exception;
+      exception += "\nwhile processing '" + this._proc.raw +
+                   "'\nat " + this._proc.file.name + ":" + this._proc.linenumber + " (line#s are inaccurate)";
+      return new Error(exception);
     },
 
     files: [],
@@ -685,6 +724,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       this._proc._ipc = (parents == 1 && children > 0);
       this._proc.threads = {};
       this._proc.objs = {};
+
+      netdiag.reset();
     },
 
     consumeURL: function(UI, url) {
@@ -732,6 +773,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     readFile: function(UI, file) {
       UI.addToMaxProgress(file.size);
 
+      file.__line_number = 0;
+
       let previousLine = "";
       let slice = (segment) => {
         return new Promise((resolve, reject) => {
@@ -776,6 +819,9 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     },
 
     consumeParallel: async function(UI, files) {
+      let all_blocked = false;
+      let first_blocked = false;
+
       while (files.length) {
         // Make sure that the first line on each of the files is prepared
         // Preparation means to determine timestamp, thread name, module, if found,
@@ -796,7 +842,8 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
             files.push(file);
           }
 
-          file.prepared = this.prepareLine(file.lines.shift(), file.prepared);
+          file.prepared = this.prepareLine(file.lines.shift(), file.previous);
+          file.file.__line_number++;
         }
 
         if (!files.length) {
@@ -811,10 +858,25 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
         let consume = files.find(file => !file.file.__recv_wait);
         if (!consume) {
-          throw this.exceptionParse("All files are blocked on recv()");
+          if (!all_blocked) {
+            console.warn("All files are blocked on recv() IPC synchronization, ignoring it and using only timestamp to interleave");
+            for (file of files) {
+              console.log(`file ${file.file.name}:${file.file.__line_number} '${file.prepared.raw}', awaiting message ${file.file.__recv_wait.message} from id ${file.file.__recv_wait.ipc_id}`);
+            }
+            all_blocked = true;
+
+            if (!first_blocked) {
+              first_blocked = true;
+              UI.warn("Missing some IPC synchronization points fulfillment, data may be incomplete");
+            }
+          }
+          consume = files[0];
+        } else {
+          all_blocked = false;
         }
 
         this.consumeLine(UI, consume.file, consume.prepared);
+        consume.previous = consume.prepared;
         delete consume.prepared;
       }
 
@@ -826,12 +888,16 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 
       let match = line.match(this._schema.lineRegexp);
       if (!match) {
+        previous.module = null;
+        previous.raw = line;
         previous.text = line;
         previous.timestamp = previous.timestamp || EPOCH_1970;
         return previous;
       }
 
-      return this._schema.linePreparer.apply(null, match);
+      previous = this._schema.linePreparer.apply(null, match);
+      previous.raw = line;
+      return previous;
     },
 
     consumeLine: function(UI, file, line) {
@@ -839,25 +905,28 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
         return;
       }
 
-      let autoCapture = this._proc.thread._auto_capture;
-      if (autoCapture && !autoCapture.follow(autoCapture.obj, line.text, this._proc)) {
-        this._proc.thread._auto_capture = null;
+      let follow = this._proc.thread._engaged_follow;
+      if (follow && !follow.follow(follow.obj, line.text, this._proc)) {
+        this._proc.thread._engaged_follow = null;
       }
     },
 
-    consumeLineByRules: function(UI, file, line) {
+    consumeLineByRules: function(UI, file, prepared) {
       this._proc.file = file;
-      this._proc.timestamp = line.timestamp;
-      this._proc.line = line.text;
+      this._proc.timestamp = prepared.timestamp;
+      this._proc.line = prepared.text;
+      this._proc.raw = prepared.raw;
+      this._proc.module = prepared.module;
+      this._proc.linenumber = file.__line_number;
       this._proc.thread = ensure(this._proc.threads,
-        file.name + "|" + line.threadname,
-        () => new Bag({ name: line.threadname }));
-
-      let module = this._schema.modules[line.module];
-      if (module && this.processLine(module.get_rules(line.text), file, line.text)) {
+        file.name + "|" + prepared.threadname,
+        () => new Bag({ name: prepared.threadname }));
+      
+      let module = this._schema.modules[prepared.module];
+      if (module && this.processLine(module.get_rules(prepared.text), file, prepared.text)) {
         return true;
       }
-      if (this.processLine(this._schema.unmatch, file, line.text)) {
+      if (this.processLine(this._schema.unmatch, file, prepared.text)) {
         return true;
       }
 
@@ -865,10 +934,19 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
     },
 
     processLine: function(rules, file, line) {
-      this._proc.thread._follow = null;
+      this._proc._pending_follow = null;
 
       if (this.processLineByRules(rules, file, line)) {
-        this._proc.thread._auto_capture = this._proc.thread._follow;
+        if (this._proc._pending_follow) {
+          // a rule matched and called follow(), make sure the right thread is set
+          // this follow.
+          this._proc._pending_follow.thread._engaged_follow = this._proc._pending_follow;
+        } else if (this._proc.thread._engaged_follow &&
+                   this._proc.thread._engaged_follow.module === this._proc.module) {
+          // a rule on the same module where the last follow() has been setup has
+          // matched, what is the signal to remove that follow.
+          this._proc.thread._engaged_follow = null;
+        }
         return true;
       }
 
@@ -939,7 +1017,11 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       propToString = (prop) => (prop === undefined ? "" : prop.toString());
       switch (match) {
         case "==": {
-          matchFunc = prop => matchValue == propToString(prop);
+          if (propName === "pointer") {
+            matchFunc = prop => pointerTrim(matchValue) == prop;
+          } else {
+            matchFunc = prop => matchValue == propToString(prop);
+          }
           break;
         }
         case "!!": {
@@ -983,7 +1065,7 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
       }
 
       for (let obj of this.objects) {
-        if (className != obj.props.className) {
+        if (className !== '*' && className != obj.props.className) {
           continue;
         }
         if (seekId && obj.captures[0].id > seekId) {

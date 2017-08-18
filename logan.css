@@ -41,6 +41,13 @@ span#introduction {
   margin-top: 0;
 }
 
+#warnings {
+  font-size-adjust: 0.4;
+  padding: 0.2em;
+  background-color: #f2f25a;
+  display: none;
+}
+
 div.load_progress {
   background-color: #008CBA;
   display: block;
@@ -130,6 +137,9 @@ div.log_line > span {
 span.pre {
   white-space: pre;
 }
+span.bold {
+  font-weight: bold;
+}
 
 div.topbar {
   display: none;
@@ -153,11 +163,13 @@ div.button_container {
 
 input.button {
   cursor: pointer;
+  z-index: 100;
 }
 input.button.close {
   position: absolute;
   top: 0.5em;
   right: 0;
+  color: red;
 }
 input.button.big {
   background-color: #008CBA;
@@ -239,8 +251,7 @@ div.search {
   padding: 0 0 .125em .5em;
 }
 
-div.search > input,
-div.breadcrumb_details > input {
+.red {
   color: red;
 }
 
@@ -316,4 +327,44 @@ div.breadcrumb_details {
 
 div.vis-network {
   position: absolute !important;
+}
+
+div#netdiag_section {
+  width: 100%;
+  position: relative;
+}
+
+div.netd-socket {
+  position: relative;
+  background-color: lightblue;
+}
+
+div.netd-result {
+  padding: 1em;
+  border-bottom: solid 1px;
+}
+
+div[data-collapse='accordion'] h3 a {
+  color: black;
+  text-decoration: none;
+}
+div[data-collapse='accordion'] h3 {
+  padding: 0.5em;
+  font-size: 12px;
+  background-color: whitesmoke;
+  margin: 0;
+}
+
+div[data-collapse='accordion'] h3.open a:before {
+  content: ' \ff0d ';
+}
+div[data-collapse='accordion'] h3.close a:before {
+  content: ' \ff0b ';
+}
+div.netd-result > div {
+  font-size: 12px;
+}
+
+#netdiag_section h3 > a > span {
+  color: blue;
 }

@@ -151,7 +151,7 @@ Obj (an object) methods:
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
   * result: *true* to continue the follow, *false* to stop it
-- `.follow("format", consumer[, unmatch])`: the same as `.expect()` but stops when any rule matches a line on the same thread where this follow has been started, this is convenient for cases one doesn't know if the line matching "format" will or will not follow the currently processed line
+- `.follow("format", consumer[, unmatch])`: the same as `.expect()` but stops when any rule from the same module matches a line on the same thread where this follow has been started, this is convenient for cases one doesn't know if the line matching "format" will or will not follow the currently processed line
 - `.follow(consumer)`: similar to the above form of `.follow()` but without a rule-like formating; the `consumer` function is called as long as no other rule matches on the same thread and as long as the the consumer's result is evaluating to `true` (note that the consumer function can do anything it wants, not just capturing) ; the arguments are:
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
@@ -160,11 +160,11 @@ Obj (an object) methods:
 - `.follow(n)`: this will simply capture *n* following lines on this thread, the follow will stop sooner if a rule matches on the thread
 - `.ipcid(id)`: this sets a globally unique interprocess identifier on the object so that `.send()` and `.recv()` synchronization will then work between parent and child process log files on different objects with the same ipcid
 - `.ipcid()`: returns the assigned id, if any
-- `.send("message")`: sends a message (unblocks corresponding recv()) from one log file to another, has an effect only when all of:
-  * `ipcid` has been assigned on the object 
+- `.send("message")`: sends a message (unblocks corresponding `recv()`) from one log file to another, has an effect only when all of:
+  * `ipcid` has been assigned on this object 
   * there are parent and child log files loaded in logan
 - `.recv("message", handler)`: used for synchronization between child and parent logs, the `handler` is called only when all of:
-  * `ipcid` has been assigned on the object 
+  * `ipcid` has been assigned on this object 
   * there are parent and child log files loaded in logan
   * the corresponding `.send("message")` has been called; correspondence here means the sender has the same ipcid as the receiver and the message string is identical
 
@@ -193,7 +193,7 @@ An example of a conditional rule definition:
 
 ```javascript
 schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url, channel) {
-  this.thread.httpchannel = null; // we only want to hit this once
+  delete this.thread.httpchannel; // we only want to hit this once
   channel.prop("url", url);
 });
 ```

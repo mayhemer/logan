@@ -24,12 +24,6 @@
     '=': '&#x3D;'
   };
 
-  function escapeHtml(string) {
-    return String(string).replace(/[&<>"'`=\/]/g, function(s) {
-      return entityMap[s];
-    });
-  }
-
   const CLOSE_CROSS = "\uD83D\uDDD9";
 
   let HIGHLIGHTSET = ['#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f', '#8dd3c7'];
@@ -62,6 +56,12 @@
       maxProgress: 0,
       currentProgress: 0,
 
+      escapeHtml: function(string) {
+        return String(string).replace(/[&<>"'`=\/]/g, function(s) {
+          return entityMap[s];
+        });
+      },
+
       resetProgress: function() {
         this.maxProgress = 0;
         this.currentProgress = 0;
@@ -89,11 +89,16 @@
         document.title = (title + " - Logan");
       },
 
+      warn: function(message) {
+        $("#warnings").show().text(message);
+      },
+
       setInitialView: function() {
         $("#file_load_section").removeClass().addClass("section").show();
         $("#active_searches").hide();
         $("#error_section").empty().hide();
         $("#search_section").hide();
+        $("#netdiag_section").hide();
         $("#seek").hide();
         $("#breadcrumbs").hide();
       },
@@ -103,6 +108,7 @@
         $("#active_searches").hide();
         $("#error_section").empty().hide();
         $("#search_section").show();
+        $("#netdiag_section").hide();
         $("#seek").hide();
         $("#breadcrumbs").hide();
         if (reset) {
@@ -119,12 +125,24 @@
         $("#active_searches").show();
         $("#error_section").hide();
         $("#results_section").show();
+        $("#netdiag_section").hide();
         $("#seek").show();
         $("#breadcrumbs").show();
         $("#search_By").change();
       },
 
+      setDiagnoseView: function() {
+        $("#search_section").hide();
+        $("#active_searches").hide();
+        $("#error_section").hide();
+        $("#results_section").hide();
+        $("#netdiag_section").show();
+        $("#seek").hide();
+        $("#breadcrumbs").hide();
+      },
+
       clearResultsView: function() {
+        $("#warnings").hide().empty();
         $("#results_section").empty();
         this.display = {};
         $("#active_searches").empty();
@@ -138,6 +156,7 @@
 
         this.activeRevealeres = 0;
         this.inFocus = null;
+        netdiagUI.reset();
       },
 
       seekTo: function(seekId) {
@@ -159,6 +178,7 @@
             select.append($("<option>").attr("value", className).text(className));
           }
         }
+        select.append($("<option>").attr("value", '*').text('*'));
       },
 
       fillSearchBy: function(props) {
@@ -204,7 +224,7 @@
           .append($("<input>")
             .attr("type", "button")
             .val(CLOSE_CROSS)
-            .addClass("button icon")
+            .addClass("button icon red")
             .click(function() { this.removeSearch(search); }.bind(this))
           );
         $("#active_searches").append(element);
@@ -312,6 +332,7 @@
           props: {
             className: obj.props.className,
             pointer: obj.props.pointer,
+            logid: obj.props.logid,
           },
           placement: obj.placement,
         };
@@ -479,7 +500,7 @@
         let line = time + " \u2502 " + capture.thread.name + " \u2502 " + capture.what;
         let element = $("<div>")
           .addClass("log_line expanded obj-" + obj.id)
-          .append($("<span>").addClass("pre").html(this.highlight(escapeHtml(line))))
+          .append($("<span>").addClass("pre").html(this.highlight(this.escapeHtml(line))))
           ;
 
         return this.place(capture, element);
@@ -550,12 +571,23 @@
               let element = $("<div>")
                 .addClass("breadcrumb_details")
                 .css("background-color", withAlpha(this.objColor(obj), 0.4))
-                .append(
-                $("<input>").attr("type", "button").addClass("button icon close").val(CLOSE_CROSS).click(function() {
-                  if (this.bc_details) {
-                    this.bc_details.remove();
-                  }
-                }.bind(this))
+                .append($("<input>")
+                  .attr("type", "button")
+                  .addClass("button icon close")
+                  .val(CLOSE_CROSS)
+                  .click(function() {
+                    if (this.bc_details) {
+                      this.bc_details.remove();
+                    }
+                  }.bind(this))
+                )
+                .append($("<input>")
+                  .attr("type", "button")
+                  .addClass("button")
+                  .val("diagnose")
+                  .click(function() {
+                    netdiagUI.diagnose(this, obj);
+                  }.bind(this))
                 );
               this.summary(obj, Object.keys, (obj, props) => {
                 element.append($("<div>")
@@ -664,8 +696,8 @@
   $(() => {
     logan.init();
 
-    window.onerror = function(msg) {
-      $("#error_section").show().text(msg);
+    window.onerror = function(err) {
+      $("#error_section").show().text(err.message || err);
     };
 
     $("#tools_button").click((event) => {
@@ -686,7 +718,7 @@
     }).change();
 
     $("#search_className").on("change", (event) => {
-      let props = logan.searchProps[event.target.value] || {};
+      let props = logan.searchProps[event.target.value] || { logid: true };
       UI.fillSearchBy(props);
     });
 
@@ -759,6 +791,7 @@
     } else {
       UI.setInitialView();
     }
+
   });
 
 })();
