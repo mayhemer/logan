@@ -313,8 +313,8 @@
       summary: function(obj, propKeys = this.summaryProps, generate = (source, props) => {
         var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
         for (let prop of props) {
-          if (summary) summary += " \u2502 ";
-          summary += source.props[prop] || "-";
+          if (summary) summary += " \u2043 ";
+          summary += source.props[prop] || "n/a";
         }
         return summary;
       }) {
