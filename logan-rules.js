@@ -514,6 +514,9 @@ logan.schema("moz",
       module.rule("sending progress notification [this=%p status=%x progress=%d/%d]", function(ch, status) {
         this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
       });
+      module.rule("sending progress and status notification [this=%p status=%x progress=%u/%d]", function(ch, status) {
+        this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
+      });
       module.rule("HttpBaseChannel::SetIsTrackingResource %p", function(ch) {
         ch = this.obj(ch).prop("tracker", true).capture();
         netdiag.channelRecognizedTracker(ch);
