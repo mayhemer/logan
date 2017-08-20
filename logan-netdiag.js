@@ -344,7 +344,8 @@ var netdiagUI = null;
           if (net.trans_send) {
             assert(obj === net.trans_send.httpchannel);
             let target = results.set(obj, {
-              send_done_time: now // rewrite
+              send_done_time: now, // rewrite
+              send_done_cid: cid, // rewrite
             });
 
             if (obj === channel) {
@@ -392,6 +393,7 @@ var netdiagUI = null;
               target.sending = false;
               target.receiving = true;
               target.recv_start_time = now;
+              target.recv_start_cid = cid;
               target.rx = 0;
               target.recv = [];
             }
@@ -496,49 +498,49 @@ var netdiagUI = null;
             return;
           }
 
-          if (interval(result.recv_done_time, channel.open_time) < 0)
+          if (result.recv_done_cid < channel.open_cid)
           {
             this.addHttpChannelResult(UI, before_opened, result);
           }
 
-          if (interval(result.activate_time, channel.activate_time) < 0 &&
+          if (result.activate_cid < channel.activate_cid &&
               result.prio > channel.prio) {
             this.addHttpChannelResult(UI, active_lower_prio_before_active, result).warn();
           }
 
-          if (interval(result.activate_time, channel.recv_done_time) &&
+          if (result.activate_cid < channel.recv_done_cid &&
             result.prio > channel.prio) {
             this.addHttpChannelResult(UI, active_lower_prio_before_done, result).warn();
           }
 
-          if (interval(result.activate_time, channel.recv_done_time) &&
+          if (result.activate_cid < channel.recv_done_cid &&
               result.prio > channel.prio &&
               !ClassOfServiceFlags.isLeaderOrUrgent(result.cos))
           {
             this.addHttpChannelResult(UI, active_lower_prio_non_leader_before_done, result).warn();
           }
 
-          if (interval(result.open_time, channel.open_time) < 0 &&
+          if (result.open_cid < channel.open_cid &&
               result.prio > channel.prio &&
               !ClassOfServiceFlags.isLeaderOrUrgent(result.cos))
           {
             this.addHttpChannelResult(UI, open_lower_prio_non_leader_before_open, result).warn();
           }
 
-          if (ClassOfServiceFlags.isLeader(result.cos) && interval(result.recv_done_time, channel.open_time) < 0) {
+          if (ClassOfServiceFlags.isLeader(result.cos) && result.recv_done_cid < channel.open_cid) {
             this.addHttpChannelResult(UI, leaders_blocking, result);
           }
 
-          if (interval(result.activate_time, channel.open_time) > 0 &&
-              interval(result.activate_time, channel.activate_time) < 0)
+          if (result.activate_cid > channel.open_cid &&
+              result.activate_cid < channel.activate_cid)
           {
             this.addHttpChannelResult(UI, between_open_and_activation, result);
           }
 
           let h2 = false;
           if ((result.rx !== undefined || result.tx !== undefined) && // received something during the period and
-              interval(result.recv_done_time, channel.activate_time) > 0 && // done after the channel activation time
-              interval(result.activate_time, channel.recv_done_time) < 0) // and activated before the channel is done
+              result.recv_done_cid > channel.activate_cid && // done after the channel activation time
+              result.activate_cid < channel.recv_done_cid) // and activated before the channel is done
           {
             if (channel.socket !== result.socket) {
               this.addHttpChannelResult(UI, h1_concurrent, result);
@@ -549,8 +551,8 @@ var netdiagUI = null;
           }
 
           if (!h2 && result.socket == channel.socket &&
-            interval(result.recv_done_time, channel.open_time) > 0 &&
-            interval(result.recv_done_time, channel.recv_start_time) < 0) {
+            result.recv_done_cid > channel.open_cid &&
+            result.recv_done_cid < channel.recv_start_cid) {
             this.addHttpChannelResult(UI, blocking_socket, result).warnIf(result.throttle_intervals);
           }
 
@@ -567,7 +569,7 @@ var netdiagUI = null;
             this.addHttpChannelResult(UI, recvs_during_response, result);
           }
 
-          if (interval(result.recv_done_time, this.FirstPaint_time) < 0 &&
+          if (result.recv_done_cid < this.FirstPaint_cid &&
               !ClassOfServiceFlags.isLeaderOrUrgent(result.cos))
           {
             this.addHttpChannelResult(UI, non_leaders_before_first_paint, result).warn();
@@ -578,7 +580,7 @@ var netdiagUI = null;
           }
 
           if (this.isTracker(result.obj) &&
-              interval(result.activate_time, channel.activate_time) < 0)
+              result.activate_cid < channel.activate_cid)
           {
             this.addHttpChannelResult(UI, trackers_active_before_active, result).warn();
           }
@@ -588,7 +590,7 @@ var netdiagUI = null;
             this.addHttpChannelResult(UI, tailable_active_before_active, result).warn();
           }
           if (result.tail_start_time &&
-              interval(result.activate_time, channel.activate_time) < 0)
+              result.activate_cid < channel.activate_cid)
           {
             this.addHttpChannelResult(UI, tailed_active_before_active, result).warn();
           }
