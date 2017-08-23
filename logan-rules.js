@@ -137,42 +137,24 @@ logan.schema("moz",
       module.rule("RequestContext::~RequestContext this=%p blockers=%u", function(ptr) {
         this.obj(ptr).destroy();
       });
-      module.rule("RequestContext::IsContextTailBlocked request blocked this=%p, requst=%p, queued=%u", function(rc, req, queued) {
+      module.rule("RequestContext::IsContextTailBlocked this=%p, request=%p, queued=%u", function(rc, req, queued) {
         this.thread.on("tail_request", (tail) => {
-          tail.alias(req).prop("tail-blocked", true).__blocktime = this.timestamp;
-          netdiag.channelTailing(tail);
+          tail.alias(req);
         });
+        this.obj(rc).capture().mention(req).follow(1);
+      });
+      module.rule("RequestContext::CancelTailedRequest %p req=%p removed=%d", function(rc, req) {
         this.obj(rc).capture().mention(req);
-      });
-      module.rule("RequestContext::ScheduleUnblock this=%p non-tails=%d", function(rc, nontails) {
-        this.obj(rc).capture().__unblocktime =
-          (nontails === "0") ? this.timestamp : undefined;
-      });
-      module.rule("RequestContext::ProcessTailQueue this=%p, queued=%u, rv=%x", function(rc, queued, rv) {
-        this.obj(rc)
-          .capture()
-          .follow("  untailing %p", (rc, req) => rc.mention(req))
-          .on("__unblocktime", (time, rc) => {
-            let duration = this.duration(time)
-            rc.prop("unblock-duration", duration, true)
-              .capture("  after " + duration + "ms");
-          });
       });
       module.rule("RequestContext::RemoveNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
         rc = this.obj(rc).capture();
         this.thread.on("tail_request", (ch) => (rc.mention(ch), ch));
       });
       module.rule("RequestContext::AddNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
-        rc = this.obj(rc).capture().follow("  timer canceled", rc => {
-          rc.capture().on("__unblocktime", (time) => {
-            let duration = this.duration(time)
-            rc.prop("cancelled-unblock-duration", duration, true)
-              .capture("  after " + duration + "ms");
-          });
-        });
+        rc = this.obj(rc).capture();
         this.thread.on("tail_request", (ch) => (rc.mention(ch), ch));
       });
-      schema.summaryProps("RequestContext", ["cancelled-unblock-duration"]);
+      schema.summaryProps("RequestContext", []);
 
     }); // RequestContext
 
@@ -337,7 +319,7 @@ logan.schema("moz",
         this.thread.httpchannelchild = this.obj(ptr).prop("url", uri).state("open").capture();
       });
       module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u topwinid=%x", function(ch, gid, winid) {
-        this.obj(ch).prop("top-win-id", winid).ipcid(gid).send("HttpChannel");
+        this.obj(ch).prop("top-win-id", winid).capture().ipcid(gid).send("HttpChannel");
       });
       module.rule("HttpChannelChild::ConnectParent [this=%p, id=%u]\n", function(ch, id) {
         this.obj(ch).capture().ipcid(id).send("HttpChannel::ConnectParent");
@@ -353,6 +335,11 @@ logan.schema("moz",
         });
       });
       module.rule("HttpChannelChild::OnStopRequest [this=%p]", function(ptr) {
+        this.obj(ptr).recv("HttpChannel::Stop", ch => {
+          ch.state("finished").capture();
+        });
+      });
+      module.rule("HttpChannelChild::DoOnStopRequest [this=%p]", function(ptr) {
         this.obj(ptr).recv("HttpChannel::Stop", ch => {
           ch.state("finished").capture();
         });
@@ -524,10 +511,10 @@ logan.schema("moz",
       module.rule("nsHttpChannel %p on-local-blacklist=%d", function(ch, lcb) {
         this.obj(ch).prop("local-block-list", lcb === "1").capture();
       });
-      module.rule("HttpBaseChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
+      module.rule("nsHttpChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
         this.thread.tail_request = this.obj(ch).capture().mention(rc).follow("  blocked=%d", (ch, blocked) => {
           if (blocked === "1") {
-            ch.prop("tail-blocked", true).__blocktime = this.timestamp;
+            ch.prop("tail-blocked", true).capture().__blocktime = this.timestamp;
             netdiag.channelTailing(ch);
           }
         });
