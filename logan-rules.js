@@ -374,6 +374,9 @@ logan.schema("moz",
           parent.httpchannelchild = child.link(parent);
         });
       });
+      module.rule("HttpChannelParent::OnStopRequest: [this=%p aRequest=%p status=%x]", function(parent, req) {
+        this.obj(parent).capture().send("HttpChannel::Stop");
+      });
       module.rule("Destroying HttpChannelParent [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
@@ -478,7 +481,7 @@ logan.schema("moz",
           .capture();
       });
       module.rule("nsHttpChannel %p calling OnStopRequest\n", function(ch) {
-        ch = this.obj(ch).state("finished").capture().send("HttpChannel::Stop");
+        ch = this.obj(ch).state("finished").capture();
         netdiag.channelDone(ch);
       });
       module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ch) {

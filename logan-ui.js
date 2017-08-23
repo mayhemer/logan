@@ -48,6 +48,7 @@
       searches: [],
       breadcrumbs: [],
       expandedElement: null,
+      warnings: {},
       display: {},
       map: {},
       dynamicStyle: {},
@@ -90,7 +91,11 @@
       },
 
       warn: function(message) {
-        $("#warnings").show().text(message);
+        if (message in this.warnings) {
+          return;
+        }
+        this.warnings[message] = true;
+        $("#warnings").show().text(Object.keys(this.warnings).join(" | "));
       },
 
       setInitialView: function() {
@@ -156,6 +161,7 @@
 
         this.activeRevealeres = 0;
         this.inFocus = null;
+        this.warnings = {};
         netdiagUI.reset();
       },
 

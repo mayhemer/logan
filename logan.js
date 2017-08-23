@@ -123,7 +123,7 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
     if (!ptr) {
       return "0";
     }
-    
+
     let pointer = ptr.match(POINTER_REGEXP);
     if (pointer) {
       return pointer[1].toLowerCase();
@@ -574,10 +574,7 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
         proc: logan._proc.save(),
       };
 
-      logan._proc.file.__recv_wait = { // storing only for debugging purposes!
-        message,
-        ipc_id: this.ipc_id,
-      };
+      logan._proc.file.__recv_wait = true;
 
       LOG(" blocking and storing recv() " + logan._proc.line + " ipcid=" + this.ipc_id + " file=" + logan._proc.file.name);
       return this;
@@ -642,7 +639,7 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
       // private
 
       save: function() {
-        return ["timestamp", "thread", "line", "file", "module"].reduce(
+        return ["timestamp", "thread", "line", "file", "module", "raw"].reduce(
           (result, prop) => (result[prop] = this[prop], result), {});
       },
 
@@ -819,9 +816,6 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
     },
 
     consumeParallel: async function(UI, files) {
-      let all_blocked = false;
-      let first_blocked = false;
-
       while (files.length) {
         // Make sure that the first line on each of the files is prepared
         // Preparation means to determine timestamp, thread name, module, if found,
@@ -858,21 +852,10 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
 
         let consume = files.find(file => !file.file.__recv_wait);
         if (!consume) {
-          if (!all_blocked) {
-            console.warn("All files are blocked on recv() IPC synchronization, ignoring it and using only timestamp to interleave");
-            for (file of files) {
-              console.log(`file ${file.file.name}:${file.file.__line_number} '${file.prepared.raw}', awaiting message ${file.file.__recv_wait.message} from id ${file.file.__recv_wait.ipc_id}`);
-            }
-            all_blocked = true;
-
-            if (!first_blocked) {
-              first_blocked = true;
-              UI.warn("Missing some IPC synchronization points fulfillment, data may be incomplete");
-            }
-          }
+          // All files are blocked probably because of large timestamp shift
+          // Let's just unblock parsing, in most cases we will satisfy recv()
+          // soon after.
           consume = files[0];
-        } else {
-          all_blocked = false;
         }
 
         this.consumeLine(UI, consume.file, consume.prepared);
@@ -921,7 +904,7 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
       this._proc.thread = ensure(this._proc.threads,
         file.name + "|" + prepared.threadname,
         () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
-      
+
       let module = this._schema.modules[prepared.module];
       if (module && this.processLine(module.get_rules(prepared.text), file, prepared)) {
         return true;
@@ -1010,6 +993,14 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
     },
 
     processEOS: function(UI) {
+      for (let sync_id in this._proc._sync) {
+        let sync = this._proc._sync[sync_id];
+        if (sync.receiver) {
+          UI.warn("Missing some IPC synchronization points fulfillment, check web console");
+          console.log(`file ${sync.proc.file.name} '${sync.proc.raw}', never received '${sync_id}'`);
+        }
+      }
+
       UI.loadProgress(0);
       UI.fillClassNames(this.searchProps);
       UI.fillSearchBy();
