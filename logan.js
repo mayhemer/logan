@@ -888,7 +888,7 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
 
       let match = line.match(this._schema.lineRegexp);
       if (!match) {
-        previous.module = null;
+        previous.module = 0;
         previous.raw = line;
         previous.text = line;
         previous.timestamp = previous.timestamp || EPOCH_1970;
@@ -900,14 +900,14 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
       return previous;
     },
 
-    consumeLine: function(UI, file, line) {
-      if (this.consumeLineByRules(UI, file, line)) {
+    consumeLine: function(UI, file, prepared) {
+      if (this.consumeLineByRules(UI, file, prepared)) {
         return;
       }
 
-      let follow = this._proc.thread._engaged_follow;
-      if (follow && !follow.follow(follow.obj, line.text, this._proc)) {
-        this._proc.thread._engaged_follow = null;
+      let follow = this._proc.thread._engaged_follows[prepared.module];
+      if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
+        delete this._proc.thread._engaged_follows[prepared.module];
       }
     },
 
@@ -920,32 +920,35 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
       this._proc.linenumber = file.__line_number;
       this._proc.thread = ensure(this._proc.threads,
         file.name + "|" + prepared.threadname,
-        () => new Bag({ name: prepared.threadname }));
+        () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
       
       let module = this._schema.modules[prepared.module];
-      if (module && this.processLine(module.get_rules(prepared.text), file, prepared.text)) {
+      if (module && this.processLine(module.get_rules(prepared.text), file, prepared)) {
         return true;
       }
-      if (this.processLine(this._schema.unmatch, file, prepared.text)) {
+      if (this.processLine(this._schema.unmatch, file, prepared)) {
         return true;
       }
 
       return false;
     },
 
-    processLine: function(rules, file, line) {
+    processLine: function(rules, file, prepared) {
       this._proc._pending_follow = null;
 
-      if (this.processLineByRules(rules, file, line)) {
+      if (this.processLineByRules(rules, file, prepared.text)) {
         if (this._proc._pending_follow) {
           // a rule matched and called follow(), make sure the right thread is set
           // this follow.
-          this._proc._pending_follow.thread._engaged_follow = this._proc._pending_follow;
-        } else if (this._proc.thread._engaged_follow &&
-                   this._proc.thread._engaged_follow.module === this._proc.module) {
-          // a rule on the same module where the last follow() has been setup has
+          let module = this._proc._pending_follow.module;
+          this._proc._pending_follow.thread._engaged_follows[module] = this._proc._pending_follow;
+          // for lines w/o a module use the most recent follow
+          this._proc._pending_follow.thread._engaged_follows[0] = this._proc._pending_follow;
+        } else {
+          // a rule on the module where the last follow() has been setup has
           // matched, what is the signal to remove that follow.
-          this._proc.thread._engaged_follow = null;
+          delete this._proc.thread._engaged_follows[prepared.module];
+          delete this._proc.thread._engaged_follows[0];
         }
         return true;
       }
