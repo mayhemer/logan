@@ -678,12 +678,12 @@ var netdiagUI = null;
       add("URL", result.obj.props.url);
       add("class-of-service", cosString(result.cos));
       if (result.latecos) {
-        add("class-of-service after creating transaction", result.latecos.map(cos => cosString(cos)).join("|"));
+        add("class-of-service after creating transaction", result.latecos.map(cos => cosString(cos)).join("|")).css({ color: "red" });
         ctrl.warn();
       }
       add("priority", result.prio);
       if (result.lateprio) {
-        add("priority after creating transaction", result.lateprio.join("|"));
+        add("priority after creating transaction", result.lateprio.join("|")).css({ color: "red" });
       }
       if (this.isTracker(result.obj)) {
         add("is a tracker").css({ color: "red" });
