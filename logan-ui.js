@@ -611,7 +611,8 @@
         this.breadcrumbs.push(expand);
 
         if (this.breadcrumbs.length) {
-          $("#show_map").show();
+          // The graph is broken and incomplete, never used that before.  Keep hidden until fixed.
+          // $("#show_map").show();
         }
         this.map.data.nodes.add({
           id: expand.obj.id,
