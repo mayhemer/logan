@@ -266,7 +266,7 @@ var netdiagUI = null;
 
           if (net.ch_prio !== undefined) {
             let target = results.set(obj);
-            if (target.transaction_cid) {
+            if (target.activate_cid) {
               ensure(target, "lateprio", []).push(net.ch_prio);
             } else {
               target.prio = net.ch_prio;
@@ -276,7 +276,7 @@ var netdiagUI = null;
 
           if (net.ch_cos !== undefined) {
             let target = results.set(obj);
-            if (target.transaction_cid) {
+            if (target.activate_cid) {
               ensure(target, "latecos", []).push(net.ch_cos);
             } else {
               target.cos = net.ch_cos;
@@ -654,6 +654,7 @@ var netdiagUI = null;
             .addClass("button")
             .val("add to search results")
             .click(function() {
+              this.channel_history = [];
               UI.setResultsView();
               UI.addSearch({
                 className: result.obj.props.className,
@@ -678,12 +679,12 @@ var netdiagUI = null;
       add("URL", result.obj.props.url);
       add("class-of-service", cosString(result.cos));
       if (result.latecos) {
-        add("class-of-service after creating transaction", result.latecos.map(cos => cosString(cos)).join("|")).css({ color: "red" });
+        add("class-of-service after activating transaction", result.latecos.map(cos => cosString(cos)).join("|")).css({ color: "red" });
         ctrl.warn();
       }
       add("priority", result.prio);
       if (result.lateprio) {
-        add("priority after creating transaction", result.lateprio.join("|")).css({ color: "red" });
+        add("priority after activating transaction", result.lateprio.join("|")).css({ color: "red" });
       }
       if (this.isTracker(result.obj)) {
         add("is a tracker").css({ color: "red" });
