@@ -65,6 +65,7 @@ Bag.prototype.on = function(prop, handler, elseHandler) {
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 const POINTER_REGEXP = /^0*([0-9A-Fa-f]+)$/;
 const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
+const CAPTURED_LINE_LABEL = "a log line";
 
 (function() {
 
@@ -1065,24 +1066,36 @@ const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
         if (seekId && obj.captures[0].id > seekId) {
           continue;
         }
-        if (seekId && obj.captures.last().id >= seekId) {
-          // The object lives around the cutting point, find the prop value
-          var prop = "";
-          let capture = obj.captures.find(capture => {
-            if (capture.id > seekId) {
-              return true;
+
+        if (propName === CAPTURED_LINE_LABEL) {
+          if (!obj.captures.find(capture => {
+            if (seekId && capture.id > seekId) {
+              return false;
             }
-            if (typeof capture.what === "object" &&
-                capture.what.prop == propName) {
-              prop = capture.what.value;
-            }
-            return false;
-          }, this);
+            return typeof capture.what === "string" && matchFunc(capture.what);
+          })) {
+            continue;
+          }
         } else {
-          var prop = obj.props[propName];
-        }
-        if (!matchFunc(prop)) {
-          continue;
+          if (seekId && obj.captures.last().id >= seekId) {
+            // The object lives around the cutting point, find the prop value
+            var prop = "";
+            let capture = obj.captures.find(capture => {
+              if (capture.id > seekId) {
+                return true;
+              }
+              if (typeof capture.what === "object" &&
+                capture.what.prop == propName) {
+                prop = capture.what.value;
+              }
+              return false;
+            }, this);
+          } else {
+            var prop = obj.props[propName];
+          }
+          if (!matchFunc(prop)) {
+            continue;
+          }
         }
         UI.addResult(obj).addClass("result").css("color", coloring);
       }

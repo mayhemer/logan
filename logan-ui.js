@@ -193,7 +193,7 @@
         }
         let select = $("#search_By");
         select.empty();
-        for (let prop of Object.keys(props).sort()) {
+        for (let prop of Object.keys(props).sort().concat([CAPTURED_LINE_LABEL])) {
           select.append($("<option>").attr("value", prop).text(prop));
         }
       },
