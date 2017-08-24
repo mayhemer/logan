@@ -48,6 +48,7 @@
       searches: [],
       breadcrumbs: [],
       expandedElement: null,
+      expandedObjs: {},
       warnings: {},
       display: {},
       map: {},
@@ -148,7 +149,9 @@
 
       clearResultsView: function() {
         $("#warnings").hide().empty();
+        this.warnings = {};
         $("#results_section").empty();
+        this.expandedObjs = {};
         this.display = {};
         $("#active_searches").empty();
         this.searches = [];
@@ -161,7 +164,6 @@
 
         this.activeRevealeres = 0;
         this.inFocus = null;
-        this.warnings = {};
         netdiagUI.reset();
       },
 
@@ -414,33 +416,48 @@
         let element = $("<div>")
           .addClass("log_line")
           .addClass(() => includeSummary ? "" : "summary")
-          .append($("<input type='checkbox'>")
-            .on("change", function(event) {
-              let fromTop = element.offset().top - $(window).scrollTop();
-
-              // Must call in this order, since onExpansion wants to get the same color
-              this.objColor(obj);
-              this.objHighlighter(obj, obj, event.target.checked)();
-              this.onExpansion(obj, relation, element, placement, event.target.checked);
-              if (event.target.checked) {
-                if (includeSummary && obj.props.className) {
-                  this.addSummary(obj);
-                }
-                element.addClass("checked");
-                for (let capture of obj.captures) {
-                  this.addCapture(obj, capture);
-                }
-              } else {
-                if (includeSummary && obj.props.className) {
-                  this.removeLine(this.position(obj.placement));
-                }
-                element.removeClass("checked");
-                for (let capture of obj.captures) {
-                  this.removeLine(this.position(capture));
-                }
+          .append($("<span>").attr("objid", obj.id).addClass("checker")
+            .click(function(event) {
+              let expander = this.expandedObjs[obj.id];
+              if (expander) {
+                expander(false);
+                delete this.expandedObjs[obj.id];
+                return;
               }
 
-              $(window).scrollTop(element.offset().top - fromTop);
+              expander = (expand) => {
+                let fromTop = element.offset().top - $(window).scrollTop();
+               
+                // Must call in this order, since onExpansion wants to get the same color
+                this.objColor(obj);
+                this.objHighlighter(obj, obj, expand)();
+                this.onExpansion(obj, relation, element, placement, expand);
+                let spanselector = "span[objid='" + obj.id + "'";
+                if (expand) {
+                  $(spanselector).addClass("expanded");
+                  if (includeSummary && obj.props.className) {
+                    this.addSummary(obj);
+                  }
+                  element.addClass("checked");
+                  for (let capture of obj.captures) {
+                    this.addCapture(obj, capture);
+                  }
+                } else {
+                  $(spanselector).removeClass("expanded");
+                  if (includeSummary && obj.props.className) {
+                    this.removeLine(this.position(obj.placement));
+                  }
+                  element.removeClass("checked");
+                  for (let capture of obj.captures) {
+                    this.removeLine(this.position(capture));
+                  }
+                }
+
+                $(window).scrollTop(element.offset().top - fromTop);
+              }
+
+              this.expandedObjs[obj.id] = expander;
+              expander(true);              
             }.bind(this))
           );
 
@@ -570,6 +587,15 @@
             .addClass("branch").addClass(() => (relation.to === obj) ? "child" : "parent")
             .css("background-color", this.objColor(obj))
             .html(this.quick(obj))
+            .append($("<input>").attr("type", "button").addClass("button icon red").val(CLOSE_CROSS)
+              .click(function(event) {
+                let expander = this.expandedObjs[obj.id];
+                if (expander) {
+                  expander(false);
+                  delete this.expandedObjs[obj.id];
+                }
+              }.bind(this))
+            )
             .click(function(event) {
               if (this.bc_details) {
                 this.bc_details.remove();
@@ -577,20 +603,14 @@
               let element = $("<div>")
                 .addClass("breadcrumb_details")
                 .css("background-color", withAlpha(this.objColor(obj), 0.4))
-                .append($("<input>")
-                  .attr("type", "button")
-                  .addClass("button icon close")
-                  .val(CLOSE_CROSS)
+                .append($("<input>").attr("type", "button").addClass("button icon close").val(CLOSE_CROSS)
                   .click(function() {
                     if (this.bc_details) {
                       this.bc_details.remove();
                     }
                   }.bind(this))
                 )
-                .append($("<input>")
-                  .attr("type", "button")
-                  .addClass("button")
-                  .val("diagnose")
+                .append($("<input>").attr("type", "button").addClass("button").val("diagnose")
                   .click(function() {
                     netdiagUI.diagnose(this, obj);
                   }.bind(this))

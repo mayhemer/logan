@@ -94,7 +94,7 @@ div.results:empty {
 }
 
 div.log_line {
-  padding: 0 0 0 1em;
+  padding: 0;
 }
 div.log_line:hover:not(.expanded) {
   font-weight: bold;
@@ -130,8 +130,28 @@ div.log_line input[type="checkbox"] {
   position: absolute;
   margin: 0;
 }
-div.log_line > span {
-  margin-left: 2em;
+
+span.checker:before {
+  color: black !important;
+  content: '\2610';
+  /* content: '\26AA'; */
+  font-weight: normal !important;
+  font-style: normal !important;
+  font-size: 20px;
+  position: absolute;
+  margin: -7px 0 0 0.5em;
+  cursor: pointer;
+}
+span.checker.expanded:before {
+  content: '\2611';
+  /* content: '\26AB'; */
+}
+
+div.log_line > span:not(.checker) {
+  margin-left: 3em;
+}
+span.branch > span:not(.checker) {
+  margin-left: .5em;
 }
 
 span.pre {
@@ -169,7 +189,7 @@ input.button.close {
   position: absolute;
   top: 0.5em;
   right: 0;
-  color: red;
+  color: rgb(194, 0, 0);
 }
 input.button.big {
   background-color: #008CBA;
@@ -252,7 +272,7 @@ div.search {
 }
 
 .red {
-  color: red;
+  color: rgb(194, 0, 0);
 }
 
 div#seek {
@@ -263,7 +283,7 @@ div#seek {
 
 input#seek_to_tail {
   display: none;
-  color: red;
+  color: rgb(194, 0, 0);
   font-weight: bold;
 }
 
@@ -285,7 +305,7 @@ div#breadcrumbs:has(.breadcrumb_details) {
 
 #breadcrumbs span.branch {
   display: inline-block;
-  padding: 0 0.5em;
+  padding: 0 0 0 0.5em;
   border-bottom: solid 1px;
   border-right: solid 1px;
   margin: 0.3em;
