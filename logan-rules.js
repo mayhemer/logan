@@ -879,7 +879,8 @@ logan.schema("moz",
         netdiag.socketReady(this.thread.sockettransport);
       });
       module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
-        sock = this.obj(sock).class("nsSocketTransport").prop("last-status", convertProgressStatus(st));
+        sock = this.obj(sock).class("nsSocketTransport").capture()
+          .capture(`  ${st} = ${convertProgressStatus(st)}`).prop("last-status", convertProgressStatus(st));
         netdiag.socketStatus(sock, convertProgressStatus(st));
       });
       module.rule("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
