@@ -126,6 +126,11 @@
         }
       },
 
+      searchingEnabled: function(enabled) {
+        $("#search_button").prop('disabled', !enabled);
+        $("#files").prop('disabled', !enabled);
+      },
+
       setResultsView: function() {
         $("#search_section").removeClass().addClass("topbar").show();
         $("#active_searches").show();

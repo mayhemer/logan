@@ -724,10 +724,6 @@ const CAPTURED_LINE_LABEL = "a log line";
     },
 
     consumeURL: function(UI, url) {
-      if (this.reader) {
-        this.reader.abort();
-      }
-
       this.seekId = 0;
       this.initProc();
 
@@ -740,9 +736,7 @@ const CAPTURED_LINE_LABEL = "a log line";
     },
 
     consumeFiles: function(UI, files) {
-      if (this.reader) {
-        this.reader.abort();
-      }
+      UI.searchingEnabled(false);
 
       this.files = Array.from(files);
       this.seekId = 0;
@@ -1002,6 +996,7 @@ const CAPTURED_LINE_LABEL = "a log line";
       UI.loadProgress(0);
       UI.fillClassNames(this.searchProps);
       UI.fillSearchBy();
+      UI.searchingEnabled(true);
     },
 
     search: function(UI, className, propName, matchValue, match, seekId, coloring) {
