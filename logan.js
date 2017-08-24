@@ -136,11 +136,8 @@ const CAPTURED_LINE_LABEL = "a log line";
   function ruleMappingGrade1(input) {
     let splitter = /(\W)/;
     let grade1 = input.split(splitter, 1)[0];
-    if (!grade1) {
-      grade1 = input.split(splitter, 3).join('');
-    }
-    if (grade1 && grade1.match(/%/)) {
-      // grade1 contains a dynamic part, use the whole input as mapping
+    if (!grade1 || grade1.match(/%/g)) {
+      // grade1 contains a dynamic part or is empty, use the whole input as mapping
       // this is specially handled in module.set_rule
       return input;
     }

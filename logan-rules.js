@@ -669,8 +669,8 @@ logan.schema("moz",
         this.obj(ptr).create("nsHttpConnection").grep();
       });
       module.rule("nsHttpConnection::Init this=%p sockettransport=%p", function(conn, sock) {
-        conn = this.obj(conn).capture().link(sock);
-        conn.networksocket = this.obj(sock);
+        conn = this.obj(conn).capture();
+        // The socket link is added as part of the halfopen connection creation
       });
       module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%x]", function(conn, trans, caps) {
         conn = this.obj(conn).capture();
@@ -864,12 +864,20 @@ logan.schema("moz",
       /******************************************************************************
        * nsSocketTransport
        ******************************************************************************/
+
       module.rule("creating nsSocketTransport @%p", function(sock) {
         sock = this.obj(sock).create("nsSocketTransport").grep();
         netdiag.newSocket(sock);
       });
       module.rule("nsSocketTransport::Init [this=%p host=%s:%hu origin=%s:%d proxy=%s:%hu]\n", function(sock, host, hp, origin, op, proxy, pp) {
         this.obj(sock).prop("host", host + ":" + hp).prop("origin", origin + ":" + op).capture();
+      });
+      module.rule("nsSocketTransport::BuildSocket [this=%p]\n", function(sock) {
+        this.obj(sock).capture().follow("  [secinfo=%p callbacks=%p]\n", (sock) => {
+          this.thread.on("sslsocket", ssl => {
+            sock.link(ssl).sslsocket = ssl;
+          });
+        });
       });
       module.rule("nsSocketTransport::InitiateSocket TCP Fast Open started [this=%p]", function(sock) {
         this.thread.sockettransport = this.obj(sock).prop("attempt-TFO", true).capture();
@@ -902,10 +910,30 @@ logan.schema("moz",
       module.rule("destroying nsSocketTransport @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
+      schema.summaryProps("nsSocketTransport", ["origin"]);
 
     }); // nsSocketTransport
 
+    schema.module("pipnss", (module) => {
+
+      /******************************************************************************
+       * nsSSLIOLayer / SSLSocket
+       ******************************************************************************/
+
+      module.rule("[%p] Socket set up\n", function(fd) {
+        this.thread.sslsocket = this.obj(fd).create("SSLSocket").grep();
+      });
+      module.rule("[%p] Shutting down socket\n", function(fd) {
+        this.obj(fd).destroy();
+      });
+    }); // pipnss
+
     schema.module("nsHostResolver", (module) => {
+
+      /******************************************************************************
+       * nsHostResolver
+       ******************************************************************************/
+
       module.resolver = (proc) => proc.obj("nsHostResolver::singleton").class("nsHostResolver");
       module.rule("Resolving host [%s].\n", function(host) {
         module.resolver(this).capture();
