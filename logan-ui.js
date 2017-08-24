@@ -420,7 +420,7 @@
             .click(function(event) {
               let expander = this.expandedObjs[obj.id];
               if (expander) {
-                expander(false);
+                expander.expander(false);
                 delete this.expandedObjs[obj.id];
                 return;
               }
@@ -434,13 +434,19 @@
                 this.onExpansion(obj, relation, element, placement, expand);
                 let spanselector = "span[objid='" + obj.id + "'";
                 if (expand) {
-                  $(spanselector).addClass("expanded");
                   if (includeSummary && obj.props.className) {
                     this.addSummary(obj);
                   }
                   element.addClass("checked");
                   for (let capture of obj.captures) {
                     this.addCapture(obj, capture);
+                  }
+
+                  // Makes sure any newly added expanders on already expanded objects are checked
+                  $(spanselector).addClass("expanded");
+                  for (let existing of Object.values(this.expandedObjs)) {
+                    spanselector = "span[objid='" + existing.id + "'";
+                    $(spanselector).addClass("expanded");
                   }
                 } else {
                   $(spanselector).removeClass("expanded");
@@ -456,7 +462,7 @@
                 $(window).scrollTop(element.offset().top - fromTop);
               }
 
-              this.expandedObjs[obj.id] = expander;
+              this.expandedObjs[obj.id] = { expander, id: obj.id };
               expander(true);              
             }.bind(this))
           );
@@ -591,7 +597,7 @@
               .click(function(event) {
                 let expander = this.expandedObjs[obj.id];
                 if (expander) {
-                  expander(false);
+                  expander.expander(false);
                   delete this.expandedObjs[obj.id];
                 }
               }.bind(this))
