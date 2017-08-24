@@ -48,7 +48,7 @@
       searches: [],
       breadcrumbs: [],
       expandedElement: null,
-      expandedObjs: {},
+      expanders: {},
       warnings: {},
       display: {},
       map: {},
@@ -156,7 +156,7 @@
         $("#warnings").hide().empty();
         this.warnings = {};
         $("#results_section").empty();
-        this.expandedObjs = {};
+        this.expanders = {};
         this.display = {};
         $("#active_searches").empty();
         this.searches = [];
@@ -423,10 +423,10 @@
           .addClass(() => includeSummary ? "" : "summary")
           .append($("<span>").attr("objid", obj.id).addClass("checker")
             .click(function(event) {
-              let expander = this.expandedObjs[obj.id];
+              let expander = this.expanders[obj.id];
               if (expander) {
-                expander.expander(false);
-                delete this.expandedObjs[obj.id];
+                expander(false);
+                delete this.expanders[obj.id];
                 return;
               }
 
@@ -449,8 +449,8 @@
 
                   // Makes sure any newly added expanders on already expanded objects are checked
                   $(spanselector).addClass("expanded");
-                  for (let existing of Object.values(this.expandedObjs)) {
-                    spanselector = "span[objid='" + existing.id + "'";
+                  for (let objid in this.expanders) {
+                    spanselector = "span[objid='" + objid + "'";
                     $(spanselector).addClass("expanded");
                   }
                 } else {
@@ -467,7 +467,7 @@
                 $(window).scrollTop(element.offset().top - fromTop);
               }
 
-              this.expandedObjs[obj.id] = { expander, id: obj.id };
+              this.expanders[obj.id] = expander;
               expander(true);              
             }.bind(this))
           );
@@ -600,10 +600,10 @@
             .html(this.quick(obj))
             .append($("<input>").attr("type", "button").addClass("button icon red").val(CLOSE_CROSS)
               .click(function(event) {
-                let expander = this.expandedObjs[obj.id];
+                let expander = this.expanders[obj.id];
                 if (expander) {
-                  expander.expander(false);
-                  delete this.expandedObjs[obj.id];
+                  expander(false);
+                  delete this.expanders[obj.id];
                 }
               }.bind(this))
             )
