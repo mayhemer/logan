@@ -133,13 +133,15 @@ div.log_line input[type="checkbox"] {
 
 span.checker:before {
   color: black !important;
-  content: '\2610';
-  /* content: '\26AA'; */
   font-weight: normal !important;
   font-style: normal !important;
-  font-size: 20px;
+  
+  content: '\2610';
+  /* content: '\26AA'; */
+  margin: 0;
+  padding: 0 1em;
+
   position: absolute;
-  margin: -7px 0 0 0.5em;
   cursor: pointer;
 }
 span.checker.expanded:before {
