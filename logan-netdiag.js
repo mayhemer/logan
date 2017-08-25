@@ -489,7 +489,8 @@ var netdiagUI = null;
         let trackers_active_before_active = this.addResultSection("Trackers active before ChoI activation");
         let tailable_active_before_active = this.addResultSection("Tail-eligible active before ChoI activation");
         let tailed_active_before_active = this.addResultSection("Have been untailed before ChoI activation");
-        let tailed_before_active = this.addResultSection("Still being tailed during ChoI activation");
+        let tailed_before_active = this.addResultSection("Still being tailed before ChoI activation");
+        let tailed_before_done = this.addResultSection("Still being tailed before ChoI done");
         let never_tailed_trackers_after_DCL = this.addResultSection("Never tailed trackers finished after DOMContentLoaded");
 
         this.addHttpChannelResult(UI, interest, channel, true);
@@ -599,6 +600,11 @@ var netdiagUI = null;
             (!result.activate_cid || result.activate_cid > channel.activate_cid)) {
             this.addHttpChannelResult(UI, tailed_before_active, result).emph();
           }
+          if (result.tail_start_time &&
+            result.open_cid < channel.recv_done_cid &&
+            (!result.activate_cid || result.activate_cid > channel.recv_done_cid)) {
+            this.addHttpChannelResult(UI, tailed_before_done, result).emph();
+          }
           if (!result.tail_start_time && this.isTracker(result.obj) &&
               result.recv_done_cid > this.DOMContentLoaded_cid) {
             this.addHttpChannelResult(UI, never_tailed_trackers_after_DCL, result).warn();
@@ -655,6 +661,7 @@ var netdiagUI = null;
             .val("add to search results")
             .click(function() {
               this.channel_history = [];
+              UI.closeDetails();
               UI.setResultsView();
               UI.addSearch({
                 className: result.obj.props.className,

@@ -205,6 +205,13 @@
         }
       },
 
+      closeDetails: function() {
+        if (this.bc_details) {
+          this.bc_details.remove();
+        }
+        this.bc_details = null;
+      },
+
       addSearch: function(search) {
         search.id = ++SEARCH_INDEXER;
         this.searches.push(search);
