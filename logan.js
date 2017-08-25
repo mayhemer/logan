@@ -293,6 +293,10 @@ const CAPTURED_LINE_LABEL = "a log line";
       return this;
     }
 
+    if (alias.match(NULLPTR_REGEXP)) {
+      return this;
+    }
+
     alias = pointerTrim(alias);
     logan._proc.objs[alias] = this;
     this.aliases[alias] = true;
@@ -1076,8 +1080,7 @@ const CAPTURED_LINE_LABEL = "a log line";
               if (capture.id > seekId) {
                 return true;
               }
-              if (typeof capture.what === "object" &&
-                capture.what.prop == propName) {
+              if (typeof capture.what === "object" && capture.what.prop == propName) {
                 prop = capture.what.value;
               }
               return false;
