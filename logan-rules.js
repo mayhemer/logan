@@ -173,6 +173,7 @@ logan.schema("moz",
       module.rule("LOADGROUP [%p]: Adding request %p %s (count=%d).\n", function(lg, req, name, count) {
         this.thread.on("httpchannelchild", ch => { ch.alias(req); });
         this.thread.on("wyciwigchild", ch => { ch.alias(req); });
+        this.thread.on("imagerequestproxy", ch => { ch.alias(req); });
 
         this.obj(lg).prop("requests", count => ++count).prop("foreground-requests", parseInt(count) + 1).capture().link(req);
         this.obj(req).class("unknown request").prop("in-load-group", lg, true);
@@ -280,13 +281,38 @@ logan.schema("moz",
        ******************************************************************************/
       
       module.rule("%d [this=%p] imgRequestProxy::imgRequestProxy", function(now, ptr) {
-        this.obj(ptr).create("imgRequestProxy").grep();
+        this.thread.imagerequestproxy = this.obj(ptr).create("imgRequestProxy").grep();
       });
       module.rule("%d [this=%p] imgRequestProxy::~imgRequestProxy", function(now, ptr) {
         this.obj(ptr).destroy();
       });
 
     }); // imageRequest
+
+    schema.module("ScriptLoader", (module) => {
+      
+      /******************************************************************************
+       * ScriptLoader / ScriptLoadRequest
+       ******************************************************************************/
+      
+      module.rule("ScriptLoader::ScriptLoader %p", function(loader) {
+        this.obj(loader).create("ScriptLoader").grep();
+      });
+      module.rule("ScriptLoader::~ScriptLoader %p", function(loader) {
+        this.obj(loader).destroy();
+      });
+      module.rule("ScriptLoader %p creates ScriptLoadRequest %p", function(loader, request) {
+        this.obj(loader).capture().link(this.obj(request).create("ScriptLoadRequest").grep());
+      });      
+      module.rule("ScriptLoadRequest (%p): Start Load (url = %s)", function(request, url) {
+        this.obj(request).capture().prop("url", url);
+      });      
+      module.rule("ScriptLoadRequest (%p): async=%d defer=% tracking=%d", function(request, async, defer, tracking) {
+        this.obj(request).capture().prop("async", async).prop("defer", defer).prop("tracking", tracking);
+      });      
+      schema.summaryProps("ScriptLoadRequest", ["url"]);
+
+    }); // ScriptLoader
 
     schema.module("nsChannelClassifier", (module) => {
 
