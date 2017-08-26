@@ -69,7 +69,7 @@ div.section {
 div#tools {
   position: absolute;
   top: 2px;
-  right: 2px;
+  right: .5em;
 }
 
 div#error_section {
@@ -253,6 +253,10 @@ div.flow_root {
 }
 div.flow_root.searches {
   font-size-adjust: 0.5;
+}
+
+div#searches {
+  display: none;
 }
 
 div#active_searches:empty:before {

@@ -101,7 +101,7 @@
 
       setInitialView: function() {
         $("#file_load_section").removeClass().addClass("section").show();
-        $("#active_searches").hide();
+        $("#searches").hide();
         $("#error_section").empty().hide();
         $("#search_section").hide();
         $("#netdiag_section").hide();
@@ -111,7 +111,7 @@
 
       setSearchView: function(reset) {
         $("#file_load_section").removeClass().addClass("topbar").show();
-        $("#active_searches").hide();
+        $("#searches").hide();
         $("#error_section").empty().hide();
         $("#search_section").show();
         $("#netdiag_section").hide();
@@ -133,7 +133,7 @@
 
       setResultsView: function() {
         $("#search_section").removeClass().addClass("topbar").show();
-        $("#active_searches").show();
+        $("#searches").show();
         $("#error_section").hide();
         $("#results_section").show();
         $("#netdiag_section").hide();
@@ -144,7 +144,7 @@
 
       setDiagnoseView: function() {
         $("#search_section").hide();
-        $("#active_searches").hide();
+        $("#searches").hide();
         $("#error_section").hide();
         $("#results_section").hide();
         $("#netdiag_section").show();
@@ -746,8 +746,8 @@
     };
 
     $("#tools_button").click((event) => {
-      alert("That's a nice settings icon, isn't? :D");
     });
+
     $("#files").on("change", (event) => {
       UI.clearResultsView();
       UI.setSearchView(true);
