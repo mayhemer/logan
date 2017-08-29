@@ -10,6 +10,34 @@ logan.schema("moz",
   },
 
   (schema) => {
+    schema.ClassOfServiceFlags = {
+      Leader: 1 << 0,
+      Follower: 1 << 1,
+      Speculative: 1 << 2,
+      Background: 1 << 3,
+      Unblocked: 1 << 4,
+      Throttleable: 1 << 5,
+      UrgentStart: 1 << 6,
+      DontThrottle: 1 << 7,
+      Tail: 1 << 8,
+      TailAllowed: 1 << 9,
+      TailForbidden: 1 << 10,
+
+      stringify: function(cos) {
+        let result = "";
+        for (let flag in this) {
+          if (typeof this[flag] !== "number") {
+            continue;
+          }
+          if (cos & this[flag]) {
+            if (result) result += ", ";
+            result += flag;
+          }
+        }
+        return result || "0";
+      }
+    };    
+
     convertProgressStatus = (status) => {
       switch (parseInt(status, 16)) {
         case 0x804B0008: return "STATUS_READING";
@@ -570,7 +598,7 @@ logan.schema("moz",
         this.obj(ch).capture().mention(rc);
       });
       module.rule("nsHttpChannel::OnClassOfServiceUpdated this=%p, cos=%u", function(ch, cos) {
-        ch = this.obj(ch).capture();
+        ch = this.obj(ch).capture().capture("  cos = " + schema.ClassOfServiceFlags.stringify(cos));
         netdiag.channelCOS(ch, parseInt(cos));
       });
       module.rule("nsHttpChannel::SetPriority %p p=%d", function(ch, prio) {
@@ -650,6 +678,7 @@ logan.schema("moz",
       });
       module.rule("nsHttpTransaction adding blocking transaction %p from request context %p", function(trans, rc) {
         this.obj(trans).prop("blocking", true).capture();
+        this.obj(rc).capture().mention(trans);
       });
       module.rule("nsHttpTransaction removing blocking transaction %p from request context %p. %d blockers remain.", function(trans, rc) {
         this.obj(trans).capture().mention(rc);

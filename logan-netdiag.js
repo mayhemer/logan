@@ -8,48 +8,28 @@ var netdiagUI = null;
   interval = (a, b) => a && b ? (a.getTime() - b.getTime()) : undefined
   interval_t = (a, b) => interval(a, b) + " ms";
   assert = (cond, msg) => { if (!cond) throw new Error(msg || "assertion failure"); }
+  COS = () => logan._schemes.moz.ClassOfServiceFlags;
 
   const ClassOfServiceFlags = {
-    Leader: 1 << 0,
-    Follower: 1 << 1,
-    Speculative: 1 << 2,
-    Background: 1 << 3,
-    Unblocked: 1 << 4,
-    Throttleable: 1 << 5,
-    UrgentStart: 1 << 6,
-    DontThrottle: 1 << 7,
-    Tail: 1 << 8,
-
     isLeaderOrUrgent: function(cos) {
       if (cos === undefined) {
         return false;
       }
-      return cos & (this.Leader | this.UrgentStart);
+      return cos & (COS().Leader | COS().UrgentStart);
     },
     isLeader: function(cos) {
       if (cos === undefined) {
         return false;
       }
-      return cos & (this.Leader);
+      return cos & (COS().Leader);
     },
     isTailable: function(cos) {
       if (cos === undefined) {
         return false;
       }
-      return (cos & this.Tail) && !(cos & (this.UrgentStart | this.Leader | this.Unblocked));      
+      return (cos & COS().Tail) && !(cos & (COS().UrgentStart | COS().Leader | COS().Unblocked));      
     }
   };
-
-  cosString = (cos) => {
-    let result = "";
-    for (let flag in ClassOfServiceFlags) {
-      if (cos & ClassOfServiceFlags[flag]) {
-        if (result) result += ", ";
-        result += flag;
-      }
-    }
-    return result || "0";
-  }
 
   netdiag = {
     enabled: true,
@@ -392,6 +372,7 @@ var netdiagUI = null;
             if (!target.receiving) {
               target.sending = false;
               target.receiving = true;
+              ensure(target, "concur_BW", { wait_rx: 0, wait_tx: 0, recv_rx: 0, recv_tx: 0 });
               target.recv_start_time = now;
               target.recv_start_cid = cid;
               target.rx = 0;
@@ -684,9 +665,9 @@ var netdiagUI = null;
       };
 
       add("URL", result.obj.props.url);
-      add("class-of-service", cosString(result.cos));
+      add("class-of-service", COS().stringify(result.cos));
       if (result.latecos) {
-        add("class-of-service after activating transaction", result.latecos.map(cos => cosString(cos)).join("|")).css({ color: "red" });
+        add("class-of-service after activating transaction", result.latecos.map(cos => COS().stringify(cos)).join("|")).css({ color: "red" });
         ctrl.warn();
       }
       add("priority", result.prio);
