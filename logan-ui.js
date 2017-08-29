@@ -628,11 +628,11 @@
                     }
                   }.bind(this))
                 )
-                .append($("<input>").attr("type", "button").addClass("button").val("diagnose")
+                .append($("<input>").attr("type", "button").addClass("button").val("diagnose").css("margin-bottom", "1em")
                   .click(function() {
                     netdiagUI.diagnose(this, obj);
                   }.bind(this))
-                );
+                )
               this.summary(obj, Object.keys, (obj, props) => {
                 element.append($("<div>")
                   .html(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
