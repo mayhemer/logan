@@ -174,7 +174,7 @@ var netdiagUI = null;
 
       $("#netdiag_section").empty().append($("<input type='button'>")
         .val("\uD83E\uDC70")
-        .addClass("button icon close")
+        .addClass("button icon red")
         .click(() => {
           this.channel_history.pop();
           let previous = this.channel_history.pop();
