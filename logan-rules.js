@@ -738,14 +738,14 @@ logan.schema("moz",
         if (parseInt(read) > 0) {
           conn.state("sent");
         }
-        this.thread.on("sockettransport", st => {
+        this.thread.on("networksocket", st => {
           conn.mention(st);
           return st;
         });
       });
       module.rule("nsHttpConnection::OnSocketReadable [this=%p]", function(conn) {
         conn = this.obj(conn).class("nsHttpConnection").state("recv").capture().grep();
-        this.thread.on("sockettransport", st => {
+        this.thread.on("networksocket", st => {
           conn.mention(st);
           return st;
         });
@@ -852,6 +852,18 @@ logan.schema("moz",
       module.rule("Creating nsHalfOpenSocket [this=%p trans=%p ent=%s key=%s]", function(ho, trans, ent, key) {
         this.thread.halfopen = this.obj(ho).create("nsHalfOpenSocket").prop("key", key).grep();
       });
+      module.rule("nsHalfOpenSocket::SetupPrimaryStream [this=%p ent=%s rv=%x]", function(ho, ent, rv) {
+        ho = this.obj(ho).capture();
+        this.thread.on("networksocket", (sock) => {
+          ho.link(sock).primarysocket = sock;
+        });
+      });
+      module.rule("nsHalfOpenSocket::SetupBackupStream [this=%p ent=%s rv=%x]", function(ho, ent, rv) {
+        ho = this.obj(ho).capture();
+        this.thread.on("networksocket", (sock) => {
+          ho.link(sock).backupsocket = sock;
+        });
+      });
       module.rule("nsHalfOpenSocket::OnOutputStreamReady [this=%p ent=%s %s]", function(ho, end, streamtype) {
         this.thread.halfopen = this.obj(ho).capture();
       });
@@ -860,7 +872,7 @@ logan.schema("moz",
       });
       schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn, ho) {
         delete this.thread.halfopen;
-        this.thread.on("sockettransport", st => {
+        this.thread.on("networksocket", st => {
           conn = this.obj(conn).link(st);
           conn.networksocket = st;
         });
@@ -921,8 +933,8 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("creating nsSocketTransport @%p", function(sock) {
-        sock = this.obj(sock).create("nsSocketTransport").grep();
-        netdiag.newSocket(sock);
+        this.thread.networksocket = this.obj(sock).create("nsSocketTransport").grep();
+        netdiag.newSocket(this.thread.networksocket);
       });
       module.rule("nsSocketTransport::Init [this=%p host=%s:%hu origin=%s:%d proxy=%s:%hu]\n", function(sock, host, hp, origin, op, proxy, pp) {
         this.obj(sock).prop("host", host + ":" + hp).prop("origin", origin + ":" + op).capture();
@@ -935,11 +947,12 @@ logan.schema("moz",
         });
       });
       module.rule("nsSocketTransport::InitiateSocket TCP Fast Open started [this=%p]", function(sock) {
-        this.thread.sockettransport = this.obj(sock).prop("attempt-TFO", true).capture();
+        this.thread.networksocket = this.obj(sock).prop("attempt-TFO", true).capture()
+          .follow("nsSocketTransport::InitiateSocket skipping speculative connection for host %*$", (sock) => { sock.capture() });
       });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
-        this.thread.sockettransport = this.obj(ptr).class("nsSocketTransport").prop("last-poll-flags", flgs).capture();
-        netdiag.socketReady(this.thread.sockettransport);
+        this.thread.networksocket = this.obj(ptr).class("nsSocketTransport").prop("last-poll-flags", flgs).capture();
+        netdiag.socketReady(this.thread.networksocket);
       });
       module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
         sock = this.obj(sock).class("nsSocketTransport").capture()
@@ -947,10 +960,10 @@ logan.schema("moz",
         netdiag.socketStatus(sock, convertProgressStatus(st));
       });
       module.rule("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
-        this.thread.on("sockettransport", st => st.alias(ptr).prop("output-cond", cond).capture());
+        this.thread.on("networksocket", st => st.alias(ptr).prop("output-cond", cond).capture());
       });
       module.rule("nsSocketInputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
-        this.thread.on("sockettransport", st => st.alias(ptr).prop("input-cond", cond).capture());
+        this.thread.on("networksocket", st => st.alias(ptr).prop("input-cond", cond).capture());
       });
       module.rule("nsSocketOutputStream::Write [this=%p count=%u]\n", function(ptr, count) {
         this.obj(ptr).capture().follow("  PR_Write returned [n=%d]\n", (sock, written) => {
@@ -975,8 +988,12 @@ logan.schema("moz",
        * nsSSLIOLayer / SSLSocket
        ******************************************************************************/
 
+      module.rule("[%p] nsSSLIOLayerSetOptions: using TLS version range (%x,%x)", function(fd) {
+        this.thread.sslsocket_tls_version = this.line;
+      });
       module.rule("[%p] Socket set up\n", function(fd) {
-        this.thread.sslsocket = this.obj(fd).create("SSLSocket").grep();
+        this.thread.sslsocket = this.obj(fd).create("SSLSocket").capture(this.thread.sslsocket_tls_version).grep();
+        delete this.thread.sslsocket_tls_version;
       });
       module.rule("[%p] Shutting down socket\n", function(fd) {
         this.obj(fd).destroy();
