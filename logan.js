@@ -77,11 +77,20 @@ const CAPTURED_LINE_LABEL = "a log line";
   let IF_RULE_INDEXER = 0;
 
   function isChildFile(file) {
-    return file.name.match(/\.child-\d+(?:\.\d)?$/);
+    return file.name.match(/\.child-\d+(?:\.\d+)?$/);
   }
 
   function isRotateFile(file) {
-    return file.name.match(/\.\d$/);
+    return file.name.match(/^(.*)\.\d+$/);
+  }
+
+  function rotateFileBaseName(file) {
+    let baseName = isRotateFile(file);
+    if (baseName) {
+      return baseName[1];
+    } 
+    
+    return file.name;
   }
 
   function escapeRegexp(s) {
@@ -700,7 +709,7 @@ const CAPTURED_LINE_LABEL = "a log line";
       }
     },
 
-    initProc: function() {
+    initProc: function(UI) {
       this.objects = [];
       this.searchProps = {};
       this._proc.global = {};
@@ -708,19 +717,29 @@ const CAPTURED_LINE_LABEL = "a log line";
       this._proc._captures = [];
       this._proc._sync = {};
 
-      let parents = 0;
-      let children = 0;
+      let parents = {};
+      let children = {};
       for (let file of this.files) {
-        // TODO - rotated logs...
+        file.__base_name = rotateFileBaseName(file);
         if (isChildFile(file)) {
           file.__is_child = true;
-          ++children;
+          children[file.__base_name] = true;
         } else {
-          ++parents;
+          parents[file.__base_name] = true;
         }
       }
 
-      this._proc._ipc = (parents == 1 && children > 0);
+      parents = Object.keys(parents).length;
+      children = Object.keys(children).length;
+
+      if (parents > 1) {
+        UI.warn("More than one parent log - is that what you want?");
+      }
+      if (parents == 0 && children > 1) {
+        UI.warn("Loading orphan child logs - is that what you want?");
+      }
+
+      this._proc._ipc = parents == 1 && children > 0;
       this._proc.threads = {};
       this._proc.objs = {};
 
@@ -751,7 +770,7 @@ const CAPTURED_LINE_LABEL = "a log line";
       files = [];
       for (let file of this.files) {
         if (!file.__is_child) {
-          UI.title(file.name);
+          UI.title(file.__base_name);
         }
         files.push(this.readFile(UI, file));
       }
@@ -843,7 +862,8 @@ const CAPTURED_LINE_LABEL = "a log line";
         // Make sure the file with the earliest timestamp line is the first,
         // we then consume files[0].
         files.sort((a, b) => {
-          return a.prepared.timestamp.getTime() - b.prepared.timestamp.getTime();
+          return a.prepared.timestamp.getTime() - b.prepared.timestamp.getTime() ||
+                 a.file.lastModified - b.file.lastModified; // when two rotated files overlap their timestamp
         });
 
         let consume = files.find(file => !file.file.__recv_wait);
@@ -898,7 +918,7 @@ const CAPTURED_LINE_LABEL = "a log line";
       this._proc.module = prepared.module;
       this._proc.linenumber = file.__line_number;
       this._proc.thread = ensure(this._proc.threads,
-        file.name + "|" + prepared.threadname,
+        file.__base_name + "|" + prepared.threadname,
         () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
 
       let module = this._schema.modules[prepared.module];
