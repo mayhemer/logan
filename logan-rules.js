@@ -202,6 +202,7 @@ logan.schema("moz",
         this.thread.on("httpchannelchild", ch => { ch.alias(req); });
         this.thread.on("wyciwigchild", ch => { ch.alias(req); });
         this.thread.on("imagerequestproxy", ch => { ch.alias(req); });
+        this.thread.on("imagerequest", ch => { ch.alias(req); });
 
         this.obj(lg).prop("requests", count => ++count).prop("foreground-requests", parseInt(count) + 1).capture().link(req);
         this.obj(req).class("unknown request").prop("in-load-group", lg, true);
@@ -271,7 +272,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("%d [this=%p] imgRequest::imgRequest()", function(now, ptr) {
-        this.obj(ptr).create("imgRequest")
+        this.thread.imagerequest = this.obj(ptr).create("imgRequest")
           .prop("url", this.thread.load_image_uri)
           .grep();
       });
