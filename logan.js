@@ -719,13 +719,17 @@ const CAPTURED_LINE_LABEL = "a log line";
 
       let parents = {};
       let children = {};
+      let update = (array, item) => {
+        return (array[item] = array[item] ? (array[item] + 1) : 1);
+      };
+
       for (let file of this.files) {
         file.__base_name = rotateFileBaseName(file);
         if (isChildFile(file)) {
           file.__is_child = true;
-          children[file.__base_name] = true;
+          file.__base_order = update(children, file.__base_name);
         } else {
-          parents[file.__base_name] = true;
+          file.__base_order = update(parents, file.__base_name);
         }
       }
 
@@ -863,7 +867,7 @@ const CAPTURED_LINE_LABEL = "a log line";
         // we then consume files[0].
         files.sort((a, b) => {
           return a.prepared.timestamp.getTime() - b.prepared.timestamp.getTime() ||
-                 a.file.lastModified - b.file.lastModified; // when two rotated files overlap their timestamp
+                 a.file.__base_order - b.file.__base_order; // overlapping of timestamp in rotated files
         });
 
         let consume = files.find(file => !file.file.__recv_wait);
