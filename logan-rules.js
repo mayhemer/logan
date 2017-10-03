@@ -941,11 +941,15 @@ logan.schema("moz",
         this.obj(sock).prop("host", host + ":" + hp).prop("origin", origin + ":" + op).capture();
       });
       module.rule("nsSocketTransport::BuildSocket [this=%p]\n", function(sock) {
-        this.obj(sock).capture().follow("  [secinfo=%p callbacks=%p]\n", (sock) => {
+        this.thread.networksocket = this.obj(sock).capture().follow("  [secinfo=%p callbacks=%p]\n", (sock) => {
           this.thread.on("sslsocket", ssl => {
             sock.link(ssl).sslsocket = ssl;
           });
         });
+      });
+      schema.ruleIf("  trying address: %s", proc => proc.thread.networksocket, function(address, sock) {
+        sock.capture();
+        this.thread.networksocket = null;
       });
       module.rule("nsSocketTransport::InitiateSocket TCP Fast Open started [this=%p]", function(sock) {
         this.thread.networksocket = this.obj(sock).prop("attempt-TFO", true).capture()
