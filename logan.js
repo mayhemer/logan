@@ -63,7 +63,7 @@ Bag.prototype.on = function(prop, handler, elseHandler) {
 };
 
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
-const POINTER_REGEXP = /^0*([0-9A-Fa-f]+)$/;
+const POINTER_REGEXP = /^(?:0x)?0*([0-9A-Fa-f]+)$/;
 const NULLPTR_REGEXP = /^(?:(?:0x)?0+|\(null\)|\(nil\))$/;
 const CAPTURED_LINE_LABEL = "a log line";
 
@@ -181,24 +181,41 @@ const CAPTURED_LINE_LABEL = "a log line";
       // This is grep() handler, has to be added as last because its condition handler
       // never returns true making following conditional rules process the line as well.
       this.plainIf(function(state) {
-        let pointers = state.line.match(GREP_REGEXP);
-        if (pointers) {
-          if (pointers.length === 1 && state.line.trim() == pointers[0]) {
-            // It doesn't make sense to include lines only containing the pointer.
-            // TODO the condition here should be made even smarter to filter out
-            // more of just useless lines.
-            return;
+        for (let regexp of [GREP_REGEXP, this.nonPtrAliases]) {
+          if (!regexp) {
+            break;
           }
-          for (let ptr of pointers) {
-            let obj = state.objs[pointerTrim(ptr)];
-            if (obj && obj._grep) {
-              obj.capture();
+          let pointers = state.line.match(regexp);
+          if (pointers) {
+            if (pointers.length === 1 && state.line.trim() == pointers[0]) {
+              // It doesn't make sense to include lines only containing the pointer.
+              // TODO the condition here should be made even smarter to filter out
+              // more of just useless lines.
+              break;
+            }
+            for (let ptr of pointers) {
+              let obj = state.objs[pointerTrim(ptr)];
+              if (obj && obj._grep) {
+                obj.capture();
+              }
             }
           }
         }
-      }, () => { throw "grep() internal consumer should never be called"; });
-    }
+      }.bind(this), () => { throw "grep() internal consumer should never be called"; });
+    };
+
+    this.update_alias_regexp = function() {
+      let nonPtrAliases = [];
+      for (let obj of Object.keys(logan._proc.objs)) {
+        if (!obj.match(POINTER_REGEXP)) {
+          nonPtrAliases.push(escapeRegexp(obj));
+        }
+      }
+      console.log(nonPtrAliases);
+      this.nonPtrAliases = nonPtrAliases.length === 0 ? null : new RegExp("(" + nonPtrAliases.join("|") + ")", "g");
+    };
   }
+
 
   Schema.prototype.module = function(name, builder) {
     builder(ensure(this.modules, name, new Module(name)));
@@ -283,7 +300,7 @@ const CAPTURED_LINE_LABEL = "a log line";
 
   Obj.prototype.on = Bag.prototype.on;
 
-  Obj.prototype.create = function(className) {
+  Obj.prototype.create = function(className, capture = true) {
     if (this.props.className) {
       console.warn(logan.exceptionParse("object already exists, recreting automatically from scratch"));
       this.destroy();
@@ -294,7 +311,11 @@ const CAPTURED_LINE_LABEL = "a log line";
 
     this.props.className = className;
     this.prop("state", "created");
-    return this.capture();
+
+    if (capture) {
+      this.capture();
+    }
+    return this;
   };
 
   Obj.prototype.alias = function(alias) {
@@ -309,6 +330,11 @@ const CAPTURED_LINE_LABEL = "a log line";
     alias = pointerTrim(alias);
     logan._proc.objs[alias] = this;
     this.aliases[alias] = true;
+
+    if (!alias.match(POINTER_REGEXP)) {
+      logan._schema.update_alias_regexp();
+    }
+
     return this;
   };
 
@@ -318,11 +344,19 @@ const CAPTURED_LINE_LABEL = "a log line";
     }
 
     delete logan._proc.objs[this.props.pointer];
+    let updateAliasRegExp = false;
     for (let alias in this.aliases) {
+      if (!alias.match(POINTER_REGEXP)) {
+        updateAliasRegExp = true;
+      }
       delete logan._proc.objs[alias];
     }
     this.prop("state", "released");
     delete this._references;
+
+    if (updateAliasRegExp) {
+      logan._schema.update_alias_regexp();
+    }
 
     return this.capture();
   };
@@ -478,7 +512,7 @@ const CAPTURED_LINE_LABEL = "a log line";
       // Already created
       return this;
     }
-    return this.create(className).state("partial").prop("missing-constructor", true);
+    return this.create(className, false).state("partial").prop("missing-constructor", true);
   };
 
   Obj.prototype.dispatch = function(target, name) {
@@ -625,6 +659,9 @@ const CAPTURED_LINE_LABEL = "a log line";
           obj = new Obj(ptr);
           if (store) {
             this.objs[ptr] = obj;
+            if (!ptr.match(POINTER_REGEXP)) {
+              logan._schema.update_alias_regexp();
+            }
           }
         }
 

@@ -889,7 +889,7 @@ logan.schema("moz",
        ******************************************************************************/
 
       module.rule("nsConnectionEntry::nsConnectionEntry this=%p key=%s", function(ptr, key) {
-        this.obj(ptr).create("nsConnectionEntry").alias(key).prop("key", key);
+        this.obj(ptr).create("nsConnectionEntry").alias(key).grep().prop("key", key);
       });
       module.rule("nsConnectionEntry::~nsConnectionEntry this=%p", function(ptr, key) {
         this.obj(ptr).destroy();
@@ -904,7 +904,7 @@ logan.schema("moz",
         });
       });
       module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
-        this.obj(ci).capture().follow("  %p", (ci, trans) => {
+        this.obj(ci).class("nsConnectionEntry").grep().capture().follow("  %p", (ci, trans) => {
           return ci.mention(trans);
         }, (ci, line) => {
           ci.capture();
