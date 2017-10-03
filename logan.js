@@ -64,7 +64,7 @@ Bag.prototype.on = function(prop, handler, elseHandler) {
 
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 const POINTER_REGEXP = /^0*([0-9A-Fa-f]+)$/;
-const NULLPTR_REGEXP = /^(?:0+|\(null\)|\(nil\))$/;
+const NULLPTR_REGEXP = /^(?:(?:0x)?0+|\(null\)|\(nil\))$/;
 const CAPTURED_LINE_LABEL = "a log line";
 
 (function() {
