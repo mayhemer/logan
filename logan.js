@@ -211,7 +211,6 @@ const CAPTURED_LINE_LABEL = "a log line";
           nonPtrAliases.push(escapeRegexp(obj));
         }
       }
-      console.log(nonPtrAliases);
       this.nonPtrAliases = nonPtrAliases.length === 0 ? null : new RegExp("(" + nonPtrAliases.join("|") + ")", "g");
     };
   }
