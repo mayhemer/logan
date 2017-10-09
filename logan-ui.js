@@ -636,7 +636,7 @@
               this.summary(obj, Object.keys, (obj, props) => {
                 element.append($("<div>")
                   .html(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
-                for (let prop of props) {
+                for (let prop of props.sort()) {
                   element.append($("<div>").text(prop + " = " + obj.props[prop]));
                 }
               });
