@@ -817,8 +817,6 @@ const CAPTURED_LINE_LABEL = "a log line";
 
       Promise.all(files).then((files) => {
         this.consumeParallel(UI, files);
-      }).catch((error) => {
-        window.onerror(error);
       });
     },
 
@@ -859,6 +857,10 @@ const CAPTURED_LINE_LABEL = "a log line";
           };
 
           reader.onerror = (event) => {
+            console.error(`Error while reading segment ${segment} of ${file.name}`);
+            console.exception(reader.error);
+            window.onerror(reader.error);
+
             reader.abort();
             reject(reader.error);
           };
