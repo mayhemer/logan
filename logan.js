@@ -790,7 +790,7 @@ const CAPTURED_LINE_LABEL = "a log line";
       this.seekId = 0;
       this.initProc();
 
-      fetch(url).then(function(response) {
+      fetch(url, { mode: 'cors', credentials: 'omit', }).then(function(response) {
         return response.blob();
       }).then(function(blob) {
         blob.name = "_net_"
