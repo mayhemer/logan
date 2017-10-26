@@ -290,6 +290,7 @@ div.search {
 div#seek {
   position: absolute;
   right: 0;
+  top: .5em;
   display: inline-flex;
 }
 
@@ -300,6 +301,7 @@ input#seek_to_tail {
 }
 
 div#breadcrumbs {
+  min-height: 2.2em;
   font-size: 12px;
   position: sticky;
   top: 0px;
