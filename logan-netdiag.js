@@ -60,7 +60,7 @@ var netdiagUI = null;
 
     topload: function(docshell, url) {
       let cap = this.capture(docshell, { load: url });
-      this.toploads.push({ capture: cap, rcid: docshell.loadgroup.props["rc-id"] });
+      this.toploads.push({ capture: cap, rcid: docshell.loadgroup ? docshell.loadgroup.props["rc-id"] : 0 });
     },
     DOMContentLoaded: function(docshell) {
       if (docshell) {
