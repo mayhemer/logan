@@ -548,7 +548,7 @@ logan.schema("moz",
         netdiag.channelResume(ch);
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
-        this.obj(ptr).state("cancelled").prop("status", status).capture();
+        this.obj(ptr).prop("cancel-status", status).prop("late-cancel", this.obj(ptr).state() == "finished").state("cancelled").capture();
       });
       module.rule("nsHttpChannel::ContinueProcessResponse1 [this=%p, rv=%x]", function(ptr) {
         this.thread.httpchannel_for_auth = this.obj(ptr).capture();
