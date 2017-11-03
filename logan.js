@@ -66,13 +66,12 @@ const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 const POINTER_REGEXP = /^(?:0x)?0*([0-9A-Fa-f]+)$/;
 const NULLPTR_REGEXP = /^(?:(?:0x)?0+|\(null\)|\(nil\))$/;
 const CAPTURED_LINE_LABEL = "a log line";
+const EPOCH_1970 = new Date("1970-01-01");
 
 (function() {
 
   const FILE_SLICE = 5 * 1024 * 1024;
   const USE_RULES_TREE_OPTIMIZATION = true;
-
-  const EPOCH_1970 = new Date("1970-01-01");
 
   let IF_RULE_INDEXER = 0;
 
@@ -159,10 +158,9 @@ const CAPTURED_LINE_LABEL = "a log line";
     return { grade1, grade2 };
   }
 
-  function Schema(namespace, lineRegexp, linePreparer) {
+  function Schema(namespace, preparer) {
     this.namespace = namespace;
-    this.lineRegexp = lineRegexp;
-    this.linePreparer = linePreparer;
+    this.preparer = preparer;
     this.modules = {};
     this.unmatch = [];
     this.ui = {
@@ -706,8 +704,8 @@ const CAPTURED_LINE_LABEL = "a log line";
     _schemes: {},
     _schema: null,
 
-    schema: function(name, lineRegexp, linePreparer, builder) {
-      this._schema = ensure(this._schemes, name, () => new Schema(name, lineRegexp, linePreparer));
+    schema: function(name, preparer, builder) {
+      this._schema = ensure(this._schemes, name, () => new Schema(name, preparer));
       builder(this._schema);
     },
 
@@ -927,8 +925,8 @@ const CAPTURED_LINE_LABEL = "a log line";
     prepareLine: function(line, previous) {
       previous = previous || {};
 
-      let match = line.match(this._schema.lineRegexp);
-      if (!match) {
+      let result = this._schema.preparer.call(null, line);
+      if (!result) {
         previous.module = 0;
         previous.raw = line;
         previous.text = line;
@@ -936,7 +934,7 @@ const CAPTURED_LINE_LABEL = "a log line";
         return previous;
       }
 
-      previous = this._schema.linePreparer.apply(null, match);
+      previous = result;
       previous.raw = line;
       return previous;
     },
