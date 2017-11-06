@@ -841,13 +841,17 @@ logan.schema("moz",
         // This only buffers the data, but it's an actual read from the socket, hence we
         // want it to be marked.  The rule for "read from flow control buffer" just below
         // will negate this so that the report from the transaction will balance.
-        netdiag.transactionReceived(stream.httptransaction, parseInt(count));
+        if (stream.httptransaction) {
+          netdiag.transactionReceived(stream.httptransaction, parseInt(count));
+        }
       });
       module.rule("Http2Stream::OnWriteSegment read from flow control buffer %p %x %d\n", function(stream, id, count) {
         stream = this.obj(stream).capture();
         // This is buffered data read and has already been reported on the transaction in the just above rule,
         // hence, make it negative to be ignored, since the transaction will report it again
-        netdiag.transactionReceived(stream.httptransaction, -parseInt(count));
+        if (stream.httptransaction) {
+          netdiag.transactionReceived(stream.httptransaction, -parseInt(count));
+        }
       });
       module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
         this.obj(stream).state("closed").prop("status", result).capture();
