@@ -925,7 +925,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     prepareLine: function(line, previous) {
       previous = previous || {};
 
-      let result = this._schema.preparer.call(null, line);
+      let result = this._schema.preparer.call(null, line, this._proc);
       if (!result) {
         previous.module = 0;
         previous.raw = line;

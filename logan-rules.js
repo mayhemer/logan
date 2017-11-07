@@ -1,4 +1,4 @@
-logan.schema("moz", (line) => 
+logan.schema("moz", (line, proc) => 
   {
     let match;
 
@@ -26,10 +26,18 @@ logan.schema("moz", (line) =>
 
     match = line.match(/^\[rr (\d+) (\d+)\]\[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
     if (match) {
+      // this is likely a mixed console log that may have both parent and child logs in it, force ipc usage
+      proc._ipc = true;
+
       let [all, pid, rrline, thread, level, module, text] = match;
+      let timestamp = new Date();
+
+      // This is a very hacky way of making the stuff sort correctly
+      // TODO - think of something better and less confusing when timestamp is missing
+      timestamp.setTime(EPOCH_1970.getTime() + rrline);
       return {
         text: text,
-        timestamp: EPOCH_1970,
+        timestamp: timestamp,
         threadname: thread,
         module: module,
       };
@@ -452,7 +460,7 @@ logan.schema("moz", (line) =>
       });
       module.rule("HttpChannelParent::ConnectChannel: Looking for a registered channel [this=%p, id=%u]", function(ch, id) {
         this.obj(ch).ipcid(id).recv("HttpChannel::ConnectParent", (parent, child) => {
-          parent.capture().follow("  and it is nsHttpChannel %p", function(parent, httpch) {
+          parent.capture().follow("  and it is HttpBaseChannel %p", function(parent, httpch) {
             parent.link(this.obj(httpch).ipcid(parent.ipcid()));
           });
           parent.httpchannelchild = child.link(parent);
