@@ -13,7 +13,6 @@ The code has originally been published on [GitHub](https://github.com/mayhemer/l
 logan works for most use cases and logs produced with current Firefox Nightly for mainly diagnosing networking issues.  It can process parent and child logs together.
 
 ### Missing functionality
-- processing of rotated logs [#19]
 - revealing additional lines not captured on objects on demand in the UI [#17]
 - way to easily customize the rules when using a life-staged instance [#7]
 - no worker to do parsing and searching off the main thread (expect your browser to be freezing with large logs)
