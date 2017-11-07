@@ -363,8 +363,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.time = logan._proc.timestamp;
     this.line = logan._proc.linenumber;
     this.location = {
-      file: this.file,
-      offset: this.binaryoffset,
+      file: logan._proc.file,
+      offset: logan._proc.binaryoffset,
     };
     this.thread = logan._proc.thread;
     this.what = what;
@@ -885,10 +885,10 @@ const EPOCH_1970 = new Date("1970-01-01");
             continue;
           }
 
-          let line;
-
-          // This also skips all empty and CRLF-only lines.
           nextline: while (!file.prepared) {
+            let line;
+
+            // Calculate line separators into binary offset
             while (line === undefined || line.match(/^([\r\n]+)$/)) {
               if (!file.lines.length) {
                 files.remove((item) => file === item);
@@ -905,9 +905,8 @@ const EPOCH_1970 = new Date("1970-01-01");
             }
 
             file.file.__line_number++;
+            // A blank line?  Skip it, but count
             if (!line.length) {
-              // A blank line, skip it, but count
-              line = undefined;
               continue nextline;
             }
 
