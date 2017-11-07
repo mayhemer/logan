@@ -542,7 +542,7 @@
         let element = $("<div>")
           .addClass("log_line expanded obj-" + obj.id)
           .append($("<span>").addClass("pre").html(this.highlight(this.escapeHtml(line))))
-          ;
+        ;
 
         return this.place(capture, element);
       },
