@@ -374,7 +374,7 @@ const EPOCH_1970 = new Date("1970-01-01");
   }
 
   Obj.prototype.capture = function(what, info = null) {
-    what = what || logan._proc.line;
+    what = what || logan._proc.raw;
     let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(what);
 
     if (info) {
