@@ -365,6 +365,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.location = {
       file: logan._proc.file,
       offset: logan._proc.binaryoffset,
+      next: logan._proc.nextoffset,
     };
     this.thread = logan._proc.thread;
     this.what = what;
@@ -822,16 +823,16 @@ const EPOCH_1970 = new Date("1970-01-01");
       });
     },
 
-    readFile: function(UI, file) {
-      UI.addToMaxProgress(file.size);
+    readFile: function(UI, file, from = 0, chunk = FILE_SLICE) {
+      UI && UI.addToMaxProgress(file.size);
 
       file.__line_number = 0;
-      file.__binary_offset = 0;
+      file.__binary_offset = from;
 
       let previousLine = "";
-      let slice = (segment) => {
+      let slice = (segmentoffset) => {
         return new Promise((resolve, reject) => {
-          let blob = file.slice(segment * FILE_SLICE, (segment + 1) * FILE_SLICE);
+          let blob = file.slice(segmentoffset, segmentoffset + chunk);
           if (blob.size == 0) {
             resolve({
               file: file,
@@ -843,7 +844,7 @@ const EPOCH_1970 = new Date("1970-01-01");
           let reader = new FileReader();
           reader.onloadend = (event) => {
             if (event.target.readyState == FileReader.DONE && event.target.result) {
-              UI.addToLoadProgress(blob.size);
+              UI && UI.addToLoadProgress(blob.size);
 
               let lines = event.target.result.split(/(\r\n|\r|\n)/);
 
@@ -854,13 +855,13 @@ const EPOCH_1970 = new Date("1970-01-01");
               resolve({
                 file: file,
                 lines: lines,
-                read_more: () => slice(segment + 1)
+                read_more: () => slice(segmentoffset + chunk)
               });
             }
           };
 
           reader.onerror = (event) => {
-            console.error(`Error while reading segment ${segment} of ${file.name}`);
+            console.error(`Error while reading at offset ${segmentoffset} from ${file.name}`);
             console.exception(reader.error);
             window.onerror(reader.error);
 
@@ -872,7 +873,29 @@ const EPOCH_1970 = new Date("1970-01-01");
         });
       };
 
-      return slice(0);
+      return slice(from);
+    },
+
+    readLine: async function(file, offset, filter) {
+      file = await this.readFile(null, file, offset, FILE_SLICE);
+      if (!file) {
+        return;
+      }
+      if (!file.lines.length) {
+        alert("No more lines in the log");
+        return;
+      }
+
+      let increment = 0;
+      let line;
+      do {
+        line = file.lines.shift();
+        while (file.lines.length && !line.trim()) {
+          line += file.lines.shift();
+        }
+        increment += line.length;
+      } while (filter(line.trim(), offset + increment) &&
+               file.lines.length);
     },
 
     consumeParallel: async function(UI, files) {
@@ -887,6 +910,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
           nextline: while (!file.prepared) {
             let line;
+            let offset;
 
             // Calculate line separators into binary offset
             while (line === undefined || line.match(/^([\r\n]+)$/)) {
@@ -901,6 +925,8 @@ const EPOCH_1970 = new Date("1970-01-01");
               }
 
               line = file.lines.shift();
+              // This is where this line starts
+              offset = file.file.__binary_offset;
               file.file.__binary_offset += line.length;
             }
 
@@ -912,7 +938,8 @@ const EPOCH_1970 = new Date("1970-01-01");
 
             file.prepared = this.prepareLine(line, file.previous);
             file.prepared.linenumber = file.file.__line_number;
-            file.prepared.binaryoffset = file.file.__binary_offset;
+            file.prepared.binaryoffset = offset;
+            file.prepared.nextoffset = file.file.__binary_offset;
           } // nextline:
         } // singlefile:
 
@@ -971,6 +998,12 @@ const EPOCH_1970 = new Date("1970-01-01");
       }
     },
 
+    ensureThread: function(file, prepared) {
+      return ensure(this._proc.threads,
+        file.__base_name + "|" + prepared.threadname,
+        () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
+    },
+
     consumeLineByRules: function(UI, file, prepared) {
       this._proc.file = file;
       this._proc.timestamp = prepared.timestamp;
@@ -979,9 +1012,8 @@ const EPOCH_1970 = new Date("1970-01-01");
       this._proc.module = prepared.module;
       this._proc.linenumber = prepared.linenumber;
       this._proc.binaryoffset = prepared.binaryoffset;
-      this._proc.thread = ensure(this._proc.threads,
-        file.__base_name + "|" + prepared.threadname,
-        () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
+      this._proc.nextoffset = prepared.nextoffset;
+      this._proc.thread = this.ensureThread(file, prepared);
 
       let module = this._schema.modules[prepared.module];
       if (module && this.processLine(module.get_rules(prepared.text), file, prepared)) {
