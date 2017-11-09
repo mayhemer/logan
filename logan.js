@@ -424,7 +424,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     if (typeof cond === "number") {
       capture.count = cond;
       capture.follow = (obj, line, proc) => {
-        obj.capture(line);
+        obj.capture();
         return --capture.count;
       };
     } else if (typeof cond === "string") {
