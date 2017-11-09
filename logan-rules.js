@@ -547,11 +547,19 @@ logan.schema("moz", (line, proc) =>
           .state("started")
           .capture();
       });
+      module.rule("HttpBaseChannel::DoApplyContentConversions [this=%p]", function(ch) {
+        this.thread.httpchannel_applying_conv = this.obj(ch).capture();
+      });
+      module.rule("nsHttpChannel::CallOnStartRequest [this=%p]", function(ch) {
+        this.thread.httpchannel_applying_conv = this.obj(ch).capture();
+      });
       module.rule("  calling mListener->OnStartRequest by ScopeExit [this=%p, listener=%p]\n", function(ch) {
         this.obj(ch).capture().send("HttpChannel::Start");
+        this.thread.httpchannel_applying_conv = null;
       });
       module.rule("  calling mListener->OnStartRequest [this=%p, listener=%p]\n", function(ch) {
         this.obj(ch).capture().send("HttpChannel::Start");
+        this.thread.httpchannel_applying_conv = null;
       });
       module.rule("HttpBaseChannel::DoNotifyListener this=%p", function(ch) {
         this.obj(ch).capture().send("HttpChannel::Start");
@@ -981,6 +989,20 @@ logan.schema("moz", (line, proc) =>
         });
       });
       schema.summaryProps("nsConnectionEntry", "key");
+
+      /******************************************************************************
+       * nsHttpCompresssConv
+       ******************************************************************************/
+
+      module.rule("nsHttpCompresssConv %p ctor", function(ptr) {
+        let conv = this.obj(ptr).create("nsHttpCompresssConv").grep();
+        this.thread.on("httpchannel_applying_conv", ch => {
+          ch.link(conv);
+        });
+      });
+      module.rule("nsHttpCompresssConv %p dtor", function(ptr) {
+        this.obj(ptr).destroy();
+      });
 
     }); // nsHttp
 
