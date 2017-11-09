@@ -1050,12 +1050,12 @@ logan.schema("moz", (line, proc) =>
         this.thread.on("networksocket", st => st.alias(ptr).prop("input-cond", cond).capture());
       });
       module.rule("nsSocketOutputStream::Write [this=%p count=%u]\n", function(ptr, count) {
-        this.obj(ptr).capture().follow("  PR_Write returned [n=%d]\n", (sock, written) => {
+        this.thread.networksocket = this.obj(ptr).capture().follow("  PR_Write returned [n=%d]\n", (sock, written) => {
           sock.capture();
         }, sock => sock.capture());
       });
       module.rule("nsSocketInputStream::Read [this=%p count=%u]\n", function(ptr, count) {
-        this.obj(ptr).capture().follow("  PR_Read returned [n=%d]\n", (sock, read) => {
+        this.thread.networksocket = this.obj(ptr).capture().follow("  PR_Read returned [n=%d]\n", (sock, read) => {
           sock.capture();
         }, sock => sock.capture());
       });
