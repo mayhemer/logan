@@ -1,4 +1,4 @@
-logan.schema("moz", (line, proc) => 
+logan.schema("moz", (line, proc) =>
   {
     let match;
 
@@ -73,7 +73,7 @@ logan.schema("moz", (line, proc) =>
         }
         return result || "0";
       }
-    };    
+    };
 
     convertProgressStatus = (status) => {
       switch (parseInt(status, 16)) {
@@ -88,7 +88,7 @@ logan.schema("moz", (line, proc) =>
         case 0x804b0005: return "STATUS_SENDING_TO";
         case 0x804b000a: return "STATUS_WAITING_FOR";
         case 0x804b0006: return "STATUS_RECEIVING_FROM";
-        default: return status;  
+        default: return status;
       }
     }
 
@@ -106,7 +106,7 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("DOCUMENT %p UnblockDOMContentLoaded", function(doc) {
         doc = this.obj(doc).capture();
-        netdiag.DOMContentLoaded(doc.docshell);
+        netcap(n => { n.DOMContentLoaded(doc.docshell) });
       });
       module.rule("DOCUMENT %p with PressShell %p and DocShell %p", function(doc, presshell, docshell) {
         this.thread.on("docshell", ds => {
@@ -138,7 +138,7 @@ logan.schema("moz", (line, proc) =>
       module.rule("PresShell::ScheduleBeforeFirstPaint this=%p", function(ps) {
         ps = this.obj(ps);
         ps.prop("first-paint-time-ms", this.duration(ps.__init_time)).capture();
-        netdiag.FirstPaint(ps.docshell);
+        netcap(n => { n.FirstPaint(ps.docshell) });
       });
     }); // PresShell
 
@@ -178,13 +178,13 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("nsDocShell[%p]: loading %s with flags 0x%08x", function(docshell, url, flags) {
         docshell = this.obj(docshell).prop("url", url, true).capture();
-        netdiag.topload(docshell, url);
+        netcap(n => { n.topload(docshell, url) });
       });
       module.rule("DOCSHELL %p SetCurrentURI %s\n", function(docshell, url) {
         this.thread.docshell = this.obj(docshell).capture();
       });
       schema.summaryProps("nsDocShell", ["url"]);
-      
+
     }); // nsDocShellLeak
 
     schema.module("RequestContext", (module) => {
@@ -258,7 +258,7 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("nsLoadGroup::OnEndPageLoad this=%p default-request=%p", function(lg, dch) {
         lg = this.obj(lg).capture().mention(dch);
-        netdiag.EndPageLoad(lg);
+        netcap(n => { n.EndPageLoad(lg) });
       });
       schema.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
 
@@ -345,7 +345,7 @@ logan.schema("moz", (line, proc) =>
       /******************************************************************************
        * imgRequestProxy
        ******************************************************************************/
-      
+
       module.rule("%d [this=%p] imgRequestProxy::imgRequestProxy", function(now, ptr) {
         this.thread.imagerequestproxy = this.obj(ptr).create("imgRequestProxy").grep();
       });
@@ -356,11 +356,11 @@ logan.schema("moz", (line, proc) =>
     }); // imageRequest
 
     schema.module("ScriptLoader", (module) => {
-      
+
       /******************************************************************************
        * ScriptLoader / ScriptLoadRequest
        ******************************************************************************/
-      
+
       module.rule("ScriptLoader::ScriptLoader %p", function(loader) {
         this.obj(loader).create("ScriptLoader").grep();
       });
@@ -369,13 +369,13 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("ScriptLoader %p creates ScriptLoadRequest %p", function(loader, request) {
         this.obj(loader).capture().link(this.obj(request).create("ScriptLoadRequest").grep());
-      });      
+      });
       module.rule("ScriptLoadRequest (%p): Start Load (url = %s)", function(request, url) {
         this.obj(request).capture().prop("url", url);
-      });      
+      });
       module.rule("ScriptLoadRequest (%p): async=%d defer=% tracking=%d", function(request, async, defer, tracking) {
         this.obj(request).capture().prop("async", async).prop("defer", defer).prop("tracking", tracking);
-      });      
+      });
       schema.summaryProps("ScriptLoadRequest", ["url"]);
 
     }); // ScriptLoader
@@ -392,7 +392,7 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsChannelClassifier::~nsChannelClassifier %p", function(clas) {
         this.obj(clas).destroy();
       });
-      
+
     });
 
     schema.module("nsHttp", (module) => {
@@ -438,11 +438,11 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("HttpChannelChild %p ClassOfService=%u", function(ch, cos) {
         ch = this.obj(ch).capture();
-        netdiag.channelCOS(ch, parseInt(cos));
+        netcap(n => { n.channelCOS(ch, parseInt(cos)) });
       });
       module.rule("HttpChannelChild::SetPriority %p p=%d", function(ch, prio) {
         ch = this.obj(ch).capture();
-        netdiag.channelPrio(ch, parseInt(prio));
+        netcap(n => { n.channelPrio(ch, parseInt(prio)) });
       });
       schema.summaryProps("HttpChannelChild", ["url", "status"]);
 
@@ -502,7 +502,7 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
         let channel = this.obj(ptr).state("open").capture();
         channel.__opentime = this.timestamp;
-        netdiag.channelAsyncOpen(channel);
+        netcap(n => { n.channelAsyncOpen(channel) });
       });
       module.rule("nsHttpChannel [%p] created nsChannelClassifier [%p]", function(ch, clas) {
         this.obj(ch).link(clas).capture();
@@ -526,13 +526,13 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("nsHttpChannel::SetupTransaction [this=%p, cos=%u, prio=%d]\n", function(ch, cos, prio) {
         ch = this.obj(ch).prop("cos-before-trans-open", cos).prop("priority-before-trans-open", prio).capture();
-        netdiag.channelCOS(ch, parseInt(cos));
-        netdiag.channelPrio(ch, parseInt(prio));
+        netcap(n => { n.channelCOS(ch, parseInt(cos)) });
+        netcap(n => { n.channelPrio(ch, parseInt(prio)) });
       });
       module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(ch, tr) {
         ch = this.obj(ch).capture().link(tr = this.obj(tr).prop("url", this.obj(ch).props["url"]));
         tr.httpchannel = ch;
-        netdiag.channelCreatesTrans(ch, tr);
+        netcap(n => { n.channelCreatesTrans(ch, tr) });
       });
       module.rule("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]", function(cl, ch) {
         this.obj(ch).capture().link(this.obj(cl).class("nsChannelClassifier"));
@@ -582,15 +582,15 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("nsHttpChannel %p calling OnStopRequest\n", function(ch) {
         ch = this.obj(ch).state("finished").capture();
-        netdiag.channelDone(ch);
+        netcap(n => { n.channelDone(ch) });
       });
       module.rule("nsHttpChannel::SuspendInternal [this=%p]", function(ch) {
         ch = this.obj(ch).prop("suspendcount", suspendcount => ++suspendcount).capture();
-        netdiag.channelSuspend(ch);
+        netcap(n => { n.channelSuspend(ch) });
       });
       module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ch) {
         ch = this.obj(ch).run("resume").prop("suspendcount", suspendcount => --suspendcount).capture();
-        netdiag.channelResume(ch);
+        netcap(n => { n.channelResume(ch) });
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
         this.obj(ptr).prop("cancel-status", status).prop("late-cancel", this.obj(ptr).state() == "finished").state("cancelled").capture();
@@ -609,7 +609,7 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("HttpBaseChannel::SetIsTrackingResource %p", function(ch) {
         ch = this.obj(ch).prop("tracker", true).capture();
-        netdiag.channelRecognizedTracker(ch);
+        netcap(n => { n.channelRecognizedTracker(ch) });
       });
       module.rule("nsHttpChannel %p on-local-blacklist=%d", function(ch, lcb) {
         this.obj(ch).prop("local-block-list", lcb === "1").capture();
@@ -618,7 +618,7 @@ logan.schema("moz", (line, proc) =>
         this.thread.tail_request = this.obj(ch).capture().mention(rc).follow("  blocked=%d", (ch, blocked) => {
           if (blocked === "1") {
             ch.prop("tail-blocked", true).capture().__blocktime = this.timestamp;
-            netdiag.channelTailing(ch);
+            netcap(n => { n.channelTailing(ch) });
           }
         });
       });
@@ -627,7 +627,7 @@ logan.schema("moz", (line, proc) =>
         let after = this.duration(ch.__blocktime);
         ch.prop("tail-blocked", false).prop("tail-block-time", after)
           .capture().capture("  after " + after + "ms").mention(rc);
-        netdiag.channelUntailing(ch);
+        netcap(n => { n.channelUntailing(ch) });
       });
       module.rule("HttpBaseChannel::AddAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
         this.thread.tail_request =
@@ -645,11 +645,11 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("nsHttpChannel::OnClassOfServiceUpdated this=%p, cos=%u", function(ch, cos) {
         ch = this.obj(ch).capture().capture("  cos = " + schema.ClassOfServiceFlags.stringify(cos));
-        netdiag.channelCOS(ch, parseInt(cos));
+        netcap(n => { n.channelCOS(ch, parseInt(cos)) });
       });
       module.rule("nsHttpChannel::SetPriority %p p=%d", function(ch, prio) {
         ch = this.obj(ch).capture();
-        netdiag.channelPrio(ch, parseInt(prio));
+        netcap(n => { n.channelPrio(ch, parseInt(prio)) });
       });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
@@ -735,28 +735,28 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
         trans = this.obj(trans).prop("status", status).state("closed").capture();
         trans.dispatch(trans.httpchannel, "stop");
-        netdiag.transactionDone(trans);
+        netcap(n => { n.transactionDone(trans) });
         this.thread.closedhttptransaction = trans;
       });
       module.rule("nsHttpTransaction::WritePipeSegment %p written=%u", function(trans, count) {
         trans = this.obj(trans).capture().dispatch(trans.httpchannel, "data");
-        netdiag.transactionReceived(trans, parseInt(count));
+        netcap(n => { n.transactionReceived(trans, parseInt(count)) });
       });
       module.rule("nsHttpTransaction::ReadRequestSegment %p read=%u", function(trans, count) {
         trans = this.obj(trans).capture();
-        netdiag.transactionSended(trans, parseInt(count));
+        netcap(n => { n.transactionSended(trans, parseInt(count)) });
       });
       module.rule("nsHttpTransaction::ShouldStopReading entry pressure this=%p", function(trans) {
         trans = this.obj(trans).prop("throttling-under-pressure", true).capture();
-        netdiag.transactionThrottlePressure(trans);
+        netcap(n => { n.transactionThrottlePressure(trans) });
       });
       module.rule("nsHttpTransaction::WriteSegments %p response throttled", function(trans) {
         trans = this.obj(trans).prop("throttled", true).prop("ever-throttled", true).capture();
-        netdiag.transactionThrottled(trans);
+        netcap(n => { n.transactionThrottled(trans) });
       });
       module.rule("nsHttpTransaction::ResumeReading %p", function(trans) {
         this.obj(trans).prop("throttled", false).capture();
-        netdiag.transactionUnthrottled(trans);
+        netcap(n => { n.transactionUnthrottled(trans) });
       });
       module.rule("nsHttpConnectionMgr::ShouldThrottle trans=%p", function(trans) {
         this.obj(trans).capture().follow("  %*$", trans => trans.capture());
@@ -781,7 +781,7 @@ logan.schema("moz", (line, proc) =>
         conn = this.obj(conn).capture();
         trans = this.obj(trans).state("active").capture().link(conn);
         trans.httpconnection = conn;
-        netdiag.transactionActive(trans);
+        netcap(n => { n.transactionActive(trans) });
       });
       module.rule("nsHttpConnection::SetUrgentStartOnly [this=%p urgent=%d]", function(conn, urgent) {
         this.obj(conn).prop("urgent", urgent === "1").capture();
@@ -887,7 +887,7 @@ logan.schema("moz", (line, proc) =>
         // want it to be marked.  The rule for "read from flow control buffer" just below
         // will negate this so that the report from the transaction will balance.
         if (stream.httptransaction) {
-          netdiag.transactionReceived(stream.httptransaction, parseInt(count));
+          netcap(n => { n.transactionReceived(stream.httptransaction, parseInt(count)) });
         }
       });
       module.rule("Http2Stream::OnWriteSegment read from flow control buffer %p %x %d\n", function(stream, id, count) {
@@ -895,7 +895,7 @@ logan.schema("moz", (line, proc) =>
         // This is buffered data read and has already been reported on the transaction in the just above rule,
         // hence, make it negative to be ignored, since the transaction will report it again
         if (stream.httptransaction) {
-          netdiag.transactionReceived(stream.httptransaction, -parseInt(count));
+          netcap(n => { n.transactionReceived(stream.httptransaction, -parseInt(count)) });
         }
       });
       module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
@@ -960,7 +960,7 @@ logan.schema("moz", (line, proc) =>
           connEntry.mention(conn);
           conn.on("closedtransaction", trans => {
             connEntry.capture("Last transaction on the connection:").mention(trans);
-          });  
+          });
         });
       });
       module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
@@ -1014,7 +1014,7 @@ logan.schema("moz", (line, proc) =>
 
       module.rule("creating nsSocketTransport @%p", function(sock) {
         this.thread.networksocket = this.obj(sock).create("nsSocketTransport").grep();
-        netdiag.newSocket(this.thread.networksocket);
+        netcap(n => { n.newSocket(this.thread.networksocket) });
       });
       module.rule("nsSocketTransport::Init [this=%p host=%s:%hu origin=%s:%d proxy=%s:%hu]\n", function(sock, host, hp, origin, op, proxy, pp) {
         this.obj(sock).prop("host", host + ":" + hp).prop("origin", origin + ":" + op).capture();
@@ -1036,12 +1036,12 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
         this.thread.networksocket = this.obj(ptr).class("nsSocketTransport").prop("last-poll-flags", flgs).capture();
-        netdiag.socketReady(this.thread.networksocket);
+        netcap(n => { n.socketReady(this.thread.networksocket) });
       });
       module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
         sock = this.obj(sock).class("nsSocketTransport").capture()
           .capture(`  ${st} = ${convertProgressStatus(st)}`).prop("last-status", convertProgressStatus(st));
-        netdiag.socketStatus(sock, convertProgressStatus(st));
+        netcap(n => { n.socketStatus(sock, convertProgressStatus(st)) });
       });
       module.rule("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
         this.thread.on("networksocket", st => st.alias(ptr).prop("output-cond", cond).capture());
@@ -1124,10 +1124,9 @@ logan.schema("moz", (line, proc) =>
 
     // Testing area
     schema.module("test", (module) => {
-      module.rule("TEST LINE OFFSET %d %d %d", function(linenum, binaryoffset, nextoffset) {
+      module.rule("TEST LINE OFFSET %d %d %d", function(linenum, filebinaryoffset) {
         console.log(`linenumber: ${linenum} = ${this.linenumber}`);
-        console.log(`binaryoffset: ${binaryoffset} = ${this.binaryoffset}`);
-        console.log(`nextoffset: ${nextoffset} = ${this.nextoffset}`);
+        console.log(`filebinaryoffset: ${filebinaryoffset} = ${this.filebinaryoffset}`);
       });
     });
   }

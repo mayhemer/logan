@@ -1,6 +1,8 @@
 var netdiag = null;
 var netdiagUI = null;
 
+const NET_DIAG_ENABLED = false;
+
 (function() {
 
   now = () => logan._proc.timestamp;
@@ -32,7 +34,7 @@ var netdiagUI = null;
   };
 
   netdiag = {
-    enabled: true,
+    enabled: NET_DIAG_ENABLED,
 
     reset: function() {
       this.channels = [];
@@ -152,6 +154,11 @@ var netdiagUI = null;
     },
 
     diagnose: function(UI, channel) {
+      if (!this.enabled) {
+        alert("Net diagnostic is disabled. You must hack logan to enable it (logan-netdiag.js)");
+        return;
+      }
+      
       if (channel.props.className != "nsHttpChannel") {
         alert("Works only for nsHttpChannels");
         return;
@@ -759,3 +766,9 @@ var netdiagUI = null;
   };
 
 })();
+
+netcap = (executor) => {
+  if (netdiag.enabled) {
+    executor(netdiag);
+  }
+};

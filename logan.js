@@ -87,8 +87,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     let baseName = isRotateFile(file);
     if (baseName) {
       return baseName[1];
-    } 
-    
+    }
+
     return file.name;
   }
 
@@ -278,7 +278,6 @@ const EPOCH_1970 = new Date("1970-01-01");
     // NOTE: when this list is enhanced, UI.summary has to be updated the "collect properties manually" section
     this.props = new Bag({ pointer: ptr, className: null, logid: this.id });
     this.captures = [];
-    this.file = logan._proc.file;
     this.aliases = {};
     this._grep = false;
     this._dispatches = {};
@@ -287,10 +286,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     // the unique ordered position, see UI.position.)
     // Otherwise there would be no other way than to use the first capture
     // that would lead to complicated duplications.
-    this.placement = {
-      time: logan._proc.timestamp,
-      id: ++logan._proc.captureid,
-    };
+    this.placement = new Capture({ placement: this });
+    this.placement.time = logan._proc.timestamp;
 
     logan.objects.push(this);
   }
@@ -359,22 +356,29 @@ const EPOCH_1970 = new Date("1970-01-01");
   };
 
   function Capture(what) {
-    this.id = ++logan._proc.captureid;
-    this.time = logan._proc.timestamp;
-    this.line = logan._proc.linenumber;
-    this.location = {
+    if (!what) {
+      logan._proc._raw_capture_made = true;
+    }
+
+    what = what || {
+      // This is a raw line capture.  We load them from disk when put on the screen.
       file: logan._proc.file,
-      offset: logan._proc.binaryoffset,
-      next: logan._proc.nextoffset,
+      line: logan._proc.linenumber,
+      offset: logan._proc.filebinaryoffset,
     };
+
+    this.id = logan.captures.length;
+    if (netdiag.enabled) {
+      // This property takes surprisingly a lot of memory...
+      this.time = logan._proc.timestamp;
+    }
     this.thread = logan._proc.thread;
     this.what = what;
 
-    logan._proc._captures[this.id] = this;
+    logan.captures.push(this);
   }
 
   Obj.prototype.capture = function(what, info = null) {
-    what = what || logan._proc.raw;
     let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(what);
 
     if (info) {
@@ -689,7 +693,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       // private
 
       save: function() {
-        return ["timestamp", "thread", "line", "file", "module", "raw", "binaryoffset"].reduce(
+        return ["timestamp", "thread", "line", "file", "module", "raw", "filebinaryoffset"].reduce(
           (result, prop) => (result[prop] = this[prop], result), {});
       },
 
@@ -750,10 +754,9 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     initProc: function(UI) {
       this.objects = [];
+      this.captures = [];
       this.searchProps = {};
       this._proc.global = {};
-      this._proc.captureid = 0;
-      this._proc._captures = [];
       this._proc._sync = {};
 
       let parents = {};
@@ -823,11 +826,11 @@ const EPOCH_1970 = new Date("1970-01-01");
       });
     },
 
-    readFile: function(UI, file, from = 0, chunk = FILE_SLICE) {
+    readFile: function(UI, file, from = 0, line = 0, chunk = FILE_SLICE) {
       UI && UI.addToMaxProgress(file.size);
 
-      file.__line_number = 0;
       file.__binary_offset = from;
+      file.__line_number = line;
 
       let previousLine = "";
       let slice = (segmentoffset) => {
@@ -836,6 +839,7 @@ const EPOCH_1970 = new Date("1970-01-01");
           if (blob.size == 0) {
             resolve({
               file: file,
+              fromline: line,
               lines: [previousLine]
             });
             return;
@@ -856,6 +860,7 @@ const EPOCH_1970 = new Date("1970-01-01");
               resolve({
                 file: file,
                 lines: lines,
+                fromline: line,
                 read_more: () => slice(segmentoffset + chunk)
               });
             }
@@ -877,26 +882,39 @@ const EPOCH_1970 = new Date("1970-01-01");
       return slice(from);
     },
 
-    readLine: async function(file, offset, filter) {
-      file = await this.readFile(null, file, offset, FILE_SLICE);
+    readCapture: async function(capture) {
+      let file = capture.what.file;
       if (!file) {
-        return;
-      }
-      if (!file.lines.length) {
-        alert("No more lines in the log");
-        return;
+        return Promise.reject();
       }
 
-      let increment = 0;
-      let line;
-      do {
-        line = file.lines.shift();
-        while (file.lines.length && !line.trim()) {
-          line += file.lines.shift();
-        }
-        increment += line.length;
-      } while (filter(line.trim(), offset + increment) &&
-               file.lines.length);
+      let cache, promise;
+      while (file.__cache_promise && promise !== file.__cache_promise) {
+        promise = file.__cache_promise;
+        cache = await promise;
+        // If the promise has changed (a new load has started while we were waiting), await again
+        // for this new cache to be resolved. Otherwise there would be a reload chain reaction.
+      }
+
+      let line = capture.what.line * 2; // text is interleaved with CRLFs
+
+      if (!cache || (line < cache.fromline) || (cache.fromline + cache.lines.length) < line) {
+        file.__cache_promise = new Promise((resolve, reject) => {
+          this.readFile(null, file, capture.what.offset, line, FILE_SLICE).then((cache) => {
+            if (!cache.lines.length) {
+              reject();
+              return;
+            }
+
+            resolve(cache);
+          });
+        });
+
+        cache = await file.__cache_promise;
+      }
+
+      let text = cache.lines[line - cache.fromline];
+      return Promise.resolve(text);
     },
 
     consumeParallel: async function(UI, files) {
@@ -913,6 +931,8 @@ const EPOCH_1970 = new Date("1970-01-01");
             if (!file.lines.length) {
               files.remove((item) => file === item);
               if (!file.read_more) {
+                delete file.file.__binary_offset;
+                delete file.file.__line_number;
                 break singlefile;
               }
 
@@ -937,8 +957,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
             file.prepared = this.prepareLine(line, file.previous);
             file.prepared.linenumber = file.file.__line_number;
-            file.prepared.binaryoffset = offset;
-            file.prepared.nextoffset = file.file.__binary_offset;
+            file.prepared.filebinaryoffset = offset;
           } while (!file.prepared);
         } // singlefile: for
 
@@ -987,13 +1006,19 @@ const EPOCH_1970 = new Date("1970-01-01");
     },
 
     consumeLine: function(UI, file, prepared) {
-      if (this.consumeLineByRules(UI, file, prepared)) {
-        return;
+      this._proc._raw_capture_made = false;
+
+      if (!this.consumeLineByRules(UI, file, prepared)) {
+        let follow = this._proc.thread._engaged_follows[prepared.module];
+        if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
+          delete this._proc.thread._engaged_follows[prepared.module];
+        }
       }
 
-      let follow = this._proc.thread._engaged_follows[prepared.module];
-      if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
-        delete this._proc.thread._engaged_follows[prepared.module];
+      if (!this._proc._raw_capture_made) {
+        // An unwanted line, make a record of it, so that when an extra line
+        // is demanded we may reliably add it.
+        new Capture();
       }
     },
 
@@ -1010,8 +1035,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this._proc.raw = prepared.raw;
       this._proc.module = prepared.module;
       this._proc.linenumber = prepared.linenumber;
-      this._proc.binaryoffset = prepared.binaryoffset;
-      this._proc.nextoffset = prepared.nextoffset;
+      this._proc.filebinaryoffset = prepared.filebinaryoffset;
       this._proc.thread = this.ensureThread(file, prepared);
 
       let module = this._schema.modules[prepared.module];

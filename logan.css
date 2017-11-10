@@ -109,9 +109,6 @@ div.log_line.expanded.revealer {
 div.log_line.checked {
   font-weight: bold;
 }
-div.log_line.expanded.shared {
-  color: darkred;
-}
 div.log_line.expanded.summary,
 div.log_line.checked.summary {
   font-weight: bolder;
@@ -129,6 +126,13 @@ div.log_line.past_capture_limit:before {
 div.log_line input[type="checkbox"] {
   position: absolute;
   margin: 0;
+}
+
+div.log_line.extra {
+  color: gray;
+}
+div.log_line.noextra {
+  color: black !important;
 }
 
 span.checker:before {
@@ -149,7 +153,18 @@ span.checker.expanded:before {
   /* content: '\26AB'; */
 }
 
-div.log_line > span:not(.checker) {
+div.log_line > span.line_controller {
+  cursor: pointer;
+  position: absolute;
+  padding: 0 1em;
+  display: none;
+  user-select: none;
+}
+div.log_line:hover > span.line_controller {
+  display: inline;
+}
+
+div.log_line > span.pre {
   margin-left: 3em;
 }
 span.branch > span:not(.checker) {

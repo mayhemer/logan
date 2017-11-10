@@ -419,6 +419,7 @@
         }
 
         element.__refs = 1;
+        element.data("capture", capture);
         return (this.display[position] = element);
       },
 
@@ -453,6 +454,13 @@
                   for (let capture of obj.captures) {
                     this.addCapture(obj, capture);
                   }
+                  if (obj._extraCaptures) {
+                    for (let capture of Object.values(obj._extraCaptures)) {
+                      this.addCapture(obj, capture, true);
+                    }
+                  } else {
+                    obj._extraCaptures = {};
+                  }
 
                   // Makes sure any newly added expanders on already expanded objects are checked
                   $(spanselector).addClass("expanded");
@@ -467,6 +475,9 @@
                   }
                   element.removeClass("checked");
                   for (let capture of obj.captures) {
+                    this.removeLine(this.position(capture));
+                  }
+                  for (let capture of Object.values(obj._extraCaptures)) {
                     this.removeLine(this.position(capture));
                   }
                 }
@@ -487,7 +498,7 @@
         return this.addRevealer(obj, (element) => {
           element
             .append($("<span>")
-              .addClass("obj-" + obj.id)
+              .addClass("obj-" + obj.id).addClass("pre")
               .text(this.summary(obj)))
             ;
         });
@@ -503,12 +514,92 @@
         return this.place(obj.placement, element);
       },
 
-      addCapture: function(obj, capture) {
+      addCapture: function(obj, capture, extra = false) {
         if (!capture.what) {
           return;
         }
 
+        let controller = () => {
+          let fetch = (element, increment) => {
+            let fromTop = $(element).parents(".log_line").offset().top - $(window).scrollTop();
+            fromTop |= 1; // to fix the jumping effect in Firefox
+
+            let id = capture.id + increment;
+            let next;
+
+            // Next on the same thread.
+            while ((next = logan.captures[id])) {
+              if ((next.what.file || (typeof next.what === "string")) && next.thread === capture.thread) {
+                break;
+              }
+              id += increment;
+              next = null;
+            }
+            if (!next) {
+              return;
+            }
+
+            let position = this.position(next);
+            if (position in obj._extraCaptures) {
+              // Already added as part of this object.
+              return;
+            }
+
+            obj._extraCaptures[position] = next;
+
+            if (position in this.display) {
+              // Already on the screen, but added via a different path, add a ref
+              this.place(next, this.display[position]);
+            } else {
+              element = this.addCapture(obj, next, true);
+              if (increment > 0) {
+                $(window).scrollTop(element.offset().top - fromTop);
+              }
+            }
+          }
+
+          return $("<span>")
+            .addClass("line_controller")
+            .append($("<span>")
+              .attr('title', 'Fetch previous line on this thread')
+              .text('\u2B71')
+              .click(function() {
+                fetch(this, -1);
+              })
+            )
+            .append($("<span>")
+              .attr('title', 'Fetch next line on this thread')
+              .text('\u2B73')
+              .click(function() {
+                fetch(this, +1);
+              })
+            )
+            .mousedown((e) => {
+              e.preventDefault();
+            })
+          ;
+        };
+
+        let classification = () => !extra ? ("noextra obj-" + obj.id) : "extra";
+
         if (typeof capture.what == "object") {
+          let file = capture.what.file;
+          if (file) {
+            let offset = capture.what.offset;
+            let span = $("<span>").addClass("pre").text(" loading...");
+            let element = $("<div>")
+              .addClass("log_line expanded")
+              .addClass(classification())
+              .append(controller())
+              .append(span);
+            
+            logan.readCapture(capture).then((line) => {
+              span.html(this.highlight(this.escapeHtml(line)));
+            });
+
+            return this.place(capture, element);
+          }
+
           let linkFrom = capture.what.linkFrom;
           let linkTo = capture.what.linkTo;
           if (linkTo && linkFrom) {
@@ -518,7 +609,7 @@
               element
                 .addClass("expanded revealer")
                 //.addClass("obj-" + obj.id)
-                .append($("<span>")
+                .append($("<span>").addClass("pre")
                   .html(this.quick(linkFrom) + " --> " + this.quick(linkTo)))
             }, capture, true, relation);
           }
@@ -529,7 +620,7 @@
               element
                 .addClass("expanded revealer")
                 //.addClass("obj-" + obj.id)
-                .append($("<span>").html("   " + this.quick(expose)))
+                .append($("<span>").addClass("pre").html(this.quick(expose)))
             }, capture, true);
           }
 
@@ -538,10 +629,12 @@
         }
 
         let element = $("<div>")
-          .addClass("log_line expanded obj-" + obj.id)
+          .addClass("log_line expanded")
+          .addClass(classification())
+          .append(controller())
           .append($("<span>").addClass("pre").html(this.highlight(this.escapeHtml(capture.what))))
-        ;
-
+          ;
+        
         return this.place(capture, element);
       },
 
@@ -773,7 +866,7 @@
       UI.addSearch({
         className: $("#search_className").val(),
         propName: $("#search_By").val(),
-        value: $("#search_PropValue").val(),
+        value: $("#search_PropValue").val().trim(),
         matching: $("#search_Matching").val(),
       });
     }.bind(this));
