@@ -96,6 +96,10 @@ const EPOCH_1970 = new Date("1970-01-01");
     return s.replace(/\n$/, "").replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
   }
 
+  function unescapeRegexp(s) {
+    return s.replace(/\\([\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|])/g, "$1");
+  }
+
   const printfToRegexpMap = [
     // IMPORTANT!!!
     // Use \\\ to escape regexp special characters in the match regexp (left),
@@ -108,7 +112,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     [/%\\\*s/g, "(.*)"],
     [/%\d*[xX]/g, "((?:0x)?[A-Fa-f0-9]+)"],
     [/%(?:\d+\\\.\d+)?f/g, "((?:[\\d]+)\.(?:[\\d]+))"],
-    [/%\\\*\\\$/g, "(.*$)"]
+    [/%\\\*\\\$/g, "(.*$)"],
+    [/%\\\/(.*)\\\/r/g, (m, p1) => "(" + unescapeRegexp(p1) + ")"]
   ];
 
   function convertPrintfToRegexp(printf) {
@@ -933,7 +938,7 @@ const EPOCH_1970 = new Date("1970-01-01");
               if (!file.read_more) {
                 delete file.file.__binary_offset;
                 delete file.file.__line_number;
-                break singlefile;
+                continue singlefile;
               }
 
               file = await file.read_more();
