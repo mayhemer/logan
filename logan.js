@@ -361,10 +361,6 @@ const EPOCH_1970 = new Date("1970-01-01");
   };
 
   function Capture(what) {
-    if (!what) {
-      logan._proc._raw_capture_made = true;
-    }
-
     what = what || {
       // This is a raw line capture.  We load them from disk when put on the screen.
       file: logan._proc.file,
@@ -384,7 +380,7 @@ const EPOCH_1970 = new Date("1970-01-01");
   }
 
   Obj.prototype.capture = function(what, info = null) {
-    let capture = Capture.prototype.isPrototypeOf(what) ? what : new Capture(what);
+    let capture = Capture.prototype.isPrototypeOf(what) ? what : logan.capture(what);
 
     if (info) {
       info.capture = capture;
@@ -1010,8 +1006,20 @@ const EPOCH_1970 = new Date("1970-01-01");
       return previous;
     },
 
+    capture: function(what) {
+      if (!what) {
+        if (!this._raw_capture) {
+          this._raw_capture = new Capture();
+        }
+
+        return this._raw_capture;
+      }
+
+      return new Capture(what);
+    },
+
     consumeLine: function(UI, file, prepared) {
-      this._proc._raw_capture_made = false;
+      this._raw_capture = null;
 
       if (!this.consumeLineByRules(UI, file, prepared)) {
         let follow = this._proc.thread._engaged_follows[prepared.module];
@@ -1020,11 +1028,8 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
       }
 
-      if (!this._proc._raw_capture_made) {
-        // An unwanted line, make a record of it, so that when an extra line
-        // is demanded we may reliably add it.
-        new Capture();
-      }
+      // make sure every line is captured
+      this.capture();
     },
 
     ensureThread: function(file, prepared) {
