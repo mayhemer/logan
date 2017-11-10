@@ -156,7 +156,7 @@ span.checker.expanded:before {
 div.log_line > span.line_controller {
   cursor: pointer;
   position: absolute;
-  padding: 0 1em;
+  padding: 0 .5rem;
   display: none;
   user-select: none;
 }

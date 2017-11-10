@@ -562,14 +562,14 @@
             .addClass("line_controller")
             .append($("<span>")
               .attr('title', 'Fetch previous line on this thread')
-              .text('\u2B71')
+              .text('\uD83D\uDF81')
               .click(function() {
                 fetch(this, -1);
               })
             )
             .append($("<span>")
               .attr('title', 'Fetch next line on this thread')
-              .text('\u2B73')
+              .text('\uD83D\uDF83')
               .click(function() {
                 fetch(this, +1);
               })
