@@ -791,7 +791,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     consumeURL: function(UI, url) {
       this.seekId = 0;
-      this.initProc();
+      this.initProc(UI);
 
       fetch(url, { mode: 'cors', credentials: 'omit', }).then(function(response) {
         return response.blob();
@@ -806,7 +806,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
       this.files = Array.from(files);
       this.seekId = 0;
-      this.initProc();
+      this.initProc(UI);
 
       UI.resetProgress();
 
