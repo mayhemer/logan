@@ -776,6 +776,9 @@ logan.schema("moz", (line, proc) =>
         conn = this.obj(conn).capture();
         // The socket link is added as part of the halfopen connection creation
       });
+      module.rule("nsHttpConnection::StartSpdy [this=%p, mDid0RTTSpdy=%d]", function(conn) {
+        this.thread.spdyconn = this.obj(conn).capture();
+      });
       module.rule("nsHttpConnection::Activate [this=%p trans=%p caps=%x]", function(conn, trans, caps) {
         conn = this.obj(conn).capture();
         trans = this.obj(trans).state("active").capture().link(conn);
@@ -829,6 +832,9 @@ logan.schema("moz", (line, proc) =>
 
       module.rule("Http2Session::Http2Session %p serial=%x", function(session) {
         session = this.obj(session).create("Http2Session").grep();
+        this.thread.on("spdyconn", conn => {
+          session.link(conn);
+        });
         this.thread.on("spdyconnentrykey", ent => {
           session.prop("key", ent).mention(ent);
         });
