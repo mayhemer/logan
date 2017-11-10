@@ -1009,8 +1009,9 @@ const EPOCH_1970 = new Date("1970-01-01");
     capture: function(what) {
       if (!what) {
         if (!this._raw_capture) {
-          throw "INTERNAL ERROR: logan.capture() called outside logan.consumeLine(...)";
+          this._raw_capture = new Capture();
         }
+
         return this._raw_capture;
       }
 
@@ -1018,6 +1019,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     },
 
     consumeLine: function(UI, file, prepared) {
+      this._raw_capture = null;
+
       if (!this.consumeLineByRules(UI, file, prepared)) {
         let follow = this._proc.thread._engaged_follows[prepared.module];
         if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
@@ -1025,7 +1028,8 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
       }
 
-      this._raw_capture = null;
+      // make sure every line is captured
+      this.capture();
     },
 
     ensureThread: function(file, prepared) {
@@ -1043,9 +1047,6 @@ const EPOCH_1970 = new Date("1970-01-01");
       this._proc.linenumber = prepared.linenumber;
       this._proc.filebinaryoffset = prepared.filebinaryoffset;
       this._proc.thread = this.ensureThread(file, prepared);
-
-      // make sure every line is captured and also deduplicate
-      this._raw_capture = new Capture();
 
       let module = this._schema.modules[prepared.module];
       if (module && this.processLine(module.get_rules(prepared.text), file, prepared)) {
