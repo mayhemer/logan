@@ -507,7 +507,7 @@
       addSummary: function(obj) {
         let element = $("<div>")
           .addClass("log_line expanded summary obj-" + obj.id)
-          .append($("<span>")
+          .append($("<span>").addClass("pre")
             .text(this.summary(obj)))
           ;
 
