@@ -459,11 +459,10 @@ logan.schema("moz", (line, proc) =>
         });
       });
       module.rule("HttpChannelParent::ConnectChannel: Looking for a registered channel [this=%p, id=%u]", function(ch, id) {
-        this.obj(ch).ipcid(id).recv("HttpChannel::ConnectParent", (parent, child) => {
-          parent.capture().follow("  and it is HttpBaseChannel %p", function(parent, httpch) {
-            parent.link(this.obj(httpch).ipcid(parent.ipcid()));
-          });
+        this.obj(ch).ipcid(id).capture().recv("HttpChannel::ConnectParent", (parent, child) => {
           parent.httpchannelchild = child.link(parent);
+        }).follow("  and it is %/HttpBaseChannel|nsHttpChannel/r %p", function(parent, ignore, httpch) {
+          parent.capture().link(this.obj(httpch).ipcid(parent.ipcid()));
         });
       });
       module.rule("HttpChannelParent::OnStopRequest: [this=%p aRequest=%p status=%x]", function(parent, req) {
