@@ -481,7 +481,8 @@ logan.schema("moz", (line, proc) =>
           ch.prop("url", uri);
         });
         this.thread.on("httpchannelparent", parent => {
-          parent.link(ch.ipcid(parent.ipcid()));
+          ch.ipcid(parent.ipcid());
+          parent.link(ch);
           ch.httpparentchannel = parent;
         });
       });
