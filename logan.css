@@ -159,6 +159,7 @@ div.log_line > span.line_controller {
   padding: 0 .5rem;
   display: none;
   user-select: none;
+  margin-top: -0.3em;
 }
 div.log_line:hover > span.line_controller {
   display: inline;
