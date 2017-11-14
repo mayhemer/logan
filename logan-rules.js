@@ -541,7 +541,7 @@ logan.schema("moz", (line, proc) =>
         this.obj(ptr).prop("from-cache", true).capture();
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        ch = this.obj(ch);
+        ch = this.obj(ch).class("nsHttpChannel");
         ch.run("start")
           .prop("start-time", this.duration(ch.__opentime))
           .state("started")
@@ -565,7 +565,7 @@ logan.schema("moz", (line, proc) =>
         this.obj(ch).capture().send("HttpChannel::Start");
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
-        ch = this.obj(ch);
+        ch = this.obj(ch).class("nsHttpChannel");
         ch.run("data")
           .propIfNull("first-data-time", this.duration(ch.__opentime))
           .prop("last-data-time", this.duration(ch.__opentime))
@@ -574,7 +574,7 @@ logan.schema("moz", (line, proc) =>
           .send("HttpChannel::Data");
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        ch = this.obj(ch);
+        ch = this.obj(ch).class("nsHttpChannel");
         ch.run("stop")
           .prop("status", status, true)
           .prop("stop-time", this.duration(ch.__opentime))
