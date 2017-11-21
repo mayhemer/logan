@@ -360,7 +360,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this.capture();
   };
 
-  function Capture(what) {
+  function Capture(what, obj = null) {
     what = what || {
       // This is a raw line capture.  We load them from disk when put on the screen.
       file: logan._proc.file,
@@ -374,13 +374,14 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.time = logan._proc.timestamp;
     }
     this.thread = logan._proc.thread;
+    this.obj = obj;
     this.what = what;
 
     logan.captures.push(this);
   }
 
   Obj.prototype.capture = function(what, info = null) {
-    let capture = Capture.prototype.isPrototypeOf(what) ? what : logan.capture(what);
+    let capture = Capture.prototype.isPrototypeOf(what) ? what : logan.capture(what, this);
 
     if (info) {
       info.capture = capture;
@@ -499,7 +500,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.link = function(that) {
     that = logan._proc.obj(that);
-    let capture = new Capture({ linkFrom: this, linkTo: that });
+    let capture = new Capture({ linkFrom: this, linkTo: that }, this);
     this.capture(capture);
     that.capture(capture);
     return this;
@@ -1006,16 +1007,16 @@ const EPOCH_1970 = new Date("1970-01-01");
       return previous;
     },
 
-    capture: function(what) {
+    capture: function(what, obj) {
       if (!what) {
         if (!this._raw_capture) {
-          this._raw_capture = new Capture();
+          this._raw_capture = new Capture(undefined, obj);
         }
 
         return this._raw_capture;
       }
 
-      return new Capture(what);
+      return new Capture(what, obj);
     },
 
     consumeLine: function(UI, file, prepared) {
@@ -1150,7 +1151,9 @@ const EPOCH_1970 = new Date("1970-01-01");
       UI.searchingEnabled(true);
     },
 
-    search: function(UI, className, propName, matchValue, match, seekId, coloring) {
+    search: async function(UI, className, propName, matchValue, match, seekId, coloring) {
+      UI.searchingEnabled(false);
+      
       var matchFunc;
       propToString = (prop) => (prop === undefined ? "" : prop.toString());
       switch (match) {
@@ -1202,24 +1205,37 @@ const EPOCH_1970 = new Date("1970-01-01");
           throw "Unexpected match operator";
       }
 
-      for (let obj of this.objects) {
-        if (className !== '*' && className != obj.props.className) {
-          continue;
-        }
-        if (seekId && obj.captures[0].id > seekId) {
-          continue;
-        }
+      let addResult = (obj) => {
+        UI.addResult(obj).addClass("result").css("color", coloring);
+      }
 
-        if (propName === CAPTURED_LINE_LABEL) {
-          if (!obj.captures.find(capture => {
-            if (seekId && capture.id > seekId) {
-              return false;
-            }
-            return typeof capture.what === "string" && matchFunc(capture.what);
-          })) {
+      if (propName === CAPTURED_LINE_LABEL) {
+        for (let capture of this.captures) {
+          if (seekId && capture.id > seekId) {
+            break;
+          }
+          if (!capture.obj || (className !== '*' && className != capture.obj.props.className)) {
             continue;
           }
-        } else {
+
+          if (capture.what.file) {
+            let line = await this.readCapture(capture);
+            if (matchFunc(line)) {
+              addResult(capture.obj);
+            }
+          } else if (typeof capture.what === "string" && matchFunc(capture.what)) {
+            addResult(capture.obj);
+          }
+        }
+      } else {
+        for (let obj of this.objects) {
+          if (className !== '*' && className != obj.props.className) {
+            continue;
+          }
+          if (seekId && obj.captures[0].id > seekId) {
+            continue;
+          }
+
           if (seekId && obj.captures.last().id >= seekId) {
             // The object lives around the cutting point, find the prop value
             var prop = "";
@@ -1238,9 +1254,12 @@ const EPOCH_1970 = new Date("1970-01-01");
           if (!matchFunc(prop)) {
             continue;
           }
+
+          addResult(obj);
         }
-        UI.addResult(obj).addClass("result").css("color", coloring);
       }
+
+      UI.searchingEnabled(true);      
     },
   }; // logan impl
 

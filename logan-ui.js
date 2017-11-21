@@ -57,6 +57,7 @@
       objColors: {},
       maxProgress: 0,
       currentProgress: 0,
+      searchDisableCount: 0,
 
       escapeHtml: function(string) {
         return String(string).replace(/[&<>"'`=\/]/g, function(s) {
@@ -127,8 +128,10 @@
       },
 
       searchingEnabled: function(enabled) {
-        $("#search_button").prop('disabled', !enabled);
-        $("#files").prop('disabled', !enabled);
+        this.searchDisableCount += (enabled ? -1 : +1);
+
+        $("#search_button").prop('disabled', !!this.searchDisableCount);
+        $("#files").prop('disabled', !!this.searchDisableCount);
       },
 
       setResultsView: function() {
@@ -195,12 +198,17 @@
       },
 
       fillSearchBy: function(props) {
+        let select = $("#search_By");
+        select.empty();
+
         if (!props) {
           props = logan.searchProps[$("#search_className").val()] || {};
         }
-        let select = $("#search_By");
-        select.empty();
-        for (let prop of Object.keys(props).sort().concat([/* (issue #25) CAPTURED_LINE_LABEL, */ "pointer"])) {
+        props = Array.from(new Set(
+          Object.keys(props).concat([CAPTURED_LINE_LABEL, "pointer"])
+        )).sort();
+
+        for (let prop of props) {
           select.append($("<option>").attr("value", prop).text(prop));
         }
       },
