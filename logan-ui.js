@@ -200,7 +200,7 @@
         }
         let select = $("#search_By");
         select.empty();
-        for (let prop of Object.keys(props).sort().concat([CAPTURED_LINE_LABEL, "pointer"])) {
+        for (let prop of Object.keys(props).sort().concat([/* (issue #25) CAPTURED_LINE_LABEL, */ "pointer"])) {
           select.append($("<option>").attr("value", prop).text(prop));
         }
       },
