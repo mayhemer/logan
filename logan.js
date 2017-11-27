@@ -991,8 +991,8 @@ const EPOCH_1970 = new Date("1970-01-01");
 
       this.processEOS(UI);
 
-      performance.measure("parsing", "parsing-start", "parsing-end");
       performance.mark("parsing-end");
+      performance.measure("parsing", "parsing-start", "parsing-end");
     },
 
     prepareLine: function(line, previous) {
