@@ -920,6 +920,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     },
 
     consumeParallel: async function(UI, files) {
+      performance.mark("parsing-start");
+
       while (files.length) {
         // Make sure that the first line on each of the files is prepared
         // Preparation means to determine timestamp, thread name, module, if found,
@@ -988,6 +990,8 @@ const EPOCH_1970 = new Date("1970-01-01");
       }
 
       this.processEOS(UI);
+
+      performance.mark("parsing-end");
     },
 
     prepareLine: function(line, previous) {
@@ -1153,7 +1157,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     search: async function(UI, className, propName, matchValue, match, seekId, coloring) {
       UI.searchingEnabled(false);
-      
+
       var matchFunc;
       propToString = (prop) => (prop === undefined ? "" : prop.toString());
       switch (match) {
@@ -1259,7 +1263,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
       }
 
-      UI.searchingEnabled(true);      
+      UI.searchingEnabled(true);
     },
   }; // logan impl
 
