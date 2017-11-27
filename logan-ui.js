@@ -339,7 +339,7 @@
       },
 
       summary: function(obj, propKeys = this.summaryProps, generate = (source, props) => {
-        var summary = obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim();
+        var summary = obj.placement.time ? obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim() : "";
         for (let prop of props) {
           if (summary) summary += " \u2043 ";
           summary += source.props[prop] || "n/a";
@@ -734,7 +734,7 @@
                 )
               this.summary(obj, Object.keys, (obj, props) => {
                 element.append($("<div>")
-                  .html(this.quick(obj) + " created " + obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim()));
+                  .html(this.quick(obj) + " created " + (obj.placement.time && obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim())));
                 for (let prop of props.sort()) {
                   element.append($("<div>").text(prop + " = " + obj.props[prop]));
                 }

@@ -1003,13 +1003,11 @@ const EPOCH_1970 = new Date("1970-01-01");
         previous.module = 0;
         previous.raw = line;
         previous.text = line;
-        previous.timestamp = previous.timestamp || EPOCH_1970;
         return previous;
       }
 
-      previous = result;
-      previous.raw = line;
-      return previous;
+      result.raw = line;
+      return result;
     },
 
     capture: function(what, obj) {

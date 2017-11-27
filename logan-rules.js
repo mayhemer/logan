@@ -18,7 +18,6 @@ logan.schema("moz", (line, proc) =>
       let [all, thread, level, module, text] = match;
       return {
         text: text,
-        timestamp: EPOCH_1970,
         threadname: thread,
         module: module,
       };
@@ -30,15 +29,9 @@ logan.schema("moz", (line, proc) =>
       proc._ipc = true;
 
       let [all, pid, rrline, thread, level, module, text] = match;
-      let timestamp = new Date();
-
-      // This is a very hacky way of making the stuff sort correctly
-      // TODO - think of something better and less confusing when timestamp is missing
-      timestamp.setTime(EPOCH_1970.getTime() + rrline);
       return {
         text: text,
-        timestamp: timestamp,
-        threadname: thread,
+        threadname: `${thread}[${pid}]`,
         module: module,
       };
     }
