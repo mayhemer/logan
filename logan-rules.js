@@ -503,7 +503,11 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
       });
+      module.rule("nsHttpChannel::OpenCacheEntry [this=%p]", function(ch) {
+        this.thread.cacheentryconsumer = this.obj(ch).capture();
+      });
       module.rule("nsHttpChannel::TriggerNetwork [this=%p]", function(ptr) {
+        delete this.thread.cacheentryconsumer;
         this.obj(ptr).capture().follow(1);
       });
       module.rule("nsHttpChannel::OnCacheEntryCheck enter [channel=%p entry=%p]", function(ch, entry) {
@@ -1112,7 +1116,10 @@ logan.schema("moz", (line, proc) =>
         entry.prop("key", key);
       });
       module.rule("New CacheEntryHandle %p for entry %p", function(handle, entry) {
-        this.obj(entry).capture().alias(handle);
+        this.obj(entry).class("CacheEntry").capture().grep().alias(handle);
+        this.thread.on("cacheentryconsumer", c => {
+          c.link(entry);
+        });
       });
       module.rule("CacheEntry::~CacheEntry [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
