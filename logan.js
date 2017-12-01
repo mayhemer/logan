@@ -972,6 +972,9 @@ const EPOCH_1970 = new Date("1970-01-01");
         // Make sure the file with the earliest timestamp line is the first,
         // we then consume files[0].
         files.sort((a, b) => {
+          if (!a.prepared.timestamp || !b.prepared.timestamp) {
+            return 0;
+          }
           return a.prepared.timestamp.getTime() - b.prepared.timestamp.getTime() ||
             a.file.__base_order - b.file.__base_order; // overlapping of timestamp in rotated files
         });
