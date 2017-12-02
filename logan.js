@@ -598,7 +598,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     LOG(" send() calling on stored recv() " + logan._proc.line + " ipcid=" + this.ipc_id);
 
     let proc = logan._proc.swap(sync.proc);
-    logan._proc.file.__recv_wait = false;
+    logan._proc.file.__base.recv_wait = false;
     sync.func(sync.receiver, this);
     logan._proc.restore(proc);
 
@@ -627,7 +627,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         proc: logan._proc.save(),
       };
 
-      logan._proc.file.__recv_wait = true;
+      logan._proc.file.__base.recv_wait = true;
 
       LOG(" blocking and storing recv() " + logan._proc.line + " ipcid=" + this.ipc_id + " file=" + logan._proc.file.name);
       return this;
@@ -763,17 +763,20 @@ const EPOCH_1970 = new Date("1970-01-01");
 
       let parents = {};
       let children = {};
-      let update = (array, item) => {
-        return (array[item] = array[item] ? (array[item] + 1) : 1);
-      };
+      let bases = {};
 
       for (let file of this.files) {
-        file.__base_name = rotateFileBaseName(file);
+        let basename = rotateFileBaseName(file);
+        file.__base = ensure(bases, basename, () => ({
+          name: basename, recv_wait: false,
+        }));
+
+        file.__base_order = 0; // will be updated from the first timestamp in the file
         if (isChildFile(file)) {
           file.__is_child = true;
-          file.__base_order = update(children, file.__base_name);
+          children[basename] = true;
         } else {
-          file.__base_order = update(parents, file.__base_name);
+          parents[basename] = true;
         }
       }
 
@@ -818,7 +821,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       files = [];
       for (let file of this.files) {
         if (!file.__is_child) {
-          UI.title(file.__base_name);
+          UI.title(file.__base.name);
         }
         files.push(this.readFile(UI, file));
       }
@@ -962,6 +965,11 @@ const EPOCH_1970 = new Date("1970-01-01");
             file.prepared = this.prepareLine(line, file.previous);
             file.prepared.linenumber = file.file.__line_number;
             file.prepared.filebinaryoffset = offset;
+
+            if (!file.file.__base_order) {
+              file.file.__base_order = (file.prepared.timestamp && file.prepared.timestamp.getTime()) || 0;
+            }
+
           } while (!file.prepared);
         } // singlefile: for
 
@@ -973,13 +981,13 @@ const EPOCH_1970 = new Date("1970-01-01");
         // we then consume files[0].
         files.sort((a, b) => {
           if (!a.prepared.timestamp || !b.prepared.timestamp) {
-            return 0;
+            return a.file.__base_order - b.file.__base_order;
           }
           return a.prepared.timestamp.getTime() - b.prepared.timestamp.getTime() ||
             a.file.__base_order - b.file.__base_order; // overlapping of timestamp in rotated files
         });
 
-        let consume = files.find(file => !file.file.__recv_wait);
+        let consume = files.find(file => !file.file.__base.recv_wait);
         if (!consume) {
           // All files are blocked probably because of large timestamp shift
           // Let's just unblock parsing, in most cases we will satisfy recv()
@@ -1041,7 +1049,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     ensureThread: function(file, prepared) {
       return ensure(this._proc.threads,
-        file.__base_name + "|" + prepared.threadname,
+        file.__base.name + "|" + prepared.threadname,
         () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
     },
 
