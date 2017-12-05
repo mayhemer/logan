@@ -701,6 +701,9 @@ logan.schema("moz", (line, proc) =>
           conn_info.link(trans);
         });
       });
+      module.rule("nsHttpTransaction::CheckForStickyAuthScheme this=%p", function(trans) {
+        this.obj(trans).capture().follow("  %*$");
+      });
       module.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
         trans = this.obj(trans);
         trans.dispatch(trans.httpchannel, "start");
@@ -756,7 +759,7 @@ logan.schema("moz", (line, proc) =>
         netcap(n => { n.transactionUnthrottled(trans) });
       });
       module.rule("nsHttpConnectionMgr::ShouldThrottle trans=%p", function(trans) {
-        this.obj(trans).capture().follow("  %*$", trans => trans.capture());
+        this.obj(trans).capture().follow("  %*$");
       });
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
@@ -978,9 +981,7 @@ logan.schema("moz", (line, proc) =>
                   "[trans=%p halfOpen=%p conn=%p ci=%p ci=%s caps=%x tunnelprovider=%p " +
                   "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
           this.thread.httptransaction = this.obj(trans).capture("Attempt to dispatch on " + ci_key).mention(ci_key);
-          this.thread.conn_info = this.obj(ci_key).capture().expect("   %*$", (ci) => {
-            ci.capture();
-          }).mention(trans).mention(conn);
+          this.thread.conn_info = this.obj(ci_key).capture().expect("   %*$").mention(trans).mention(conn);
         });
       schema.ruleIf("Spdy Dispatch Transaction via Activate(). Transaction host = %s, Connection host = %s",
         proc => proc.thread.httptransaction, function(trhost, conhost, tr) {

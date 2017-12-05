@@ -10,7 +10,7 @@ The code has originally been published on [GitHub](https://github.com/mayhemer/l
 
 # Current state
 
-logan works for most use cases and logs produced with current Firefox Nightly for mainly diagnosing networking issues.  It can process parent and child logs together.
+logan works for most use cases and logs produced with current Firefox Nightly for mainly diagnosing networking issues.  It can process parent and child logs together as well as rotated logs automatically.
 
 ### Missing functionality
 - way to easily customize the rules when using a life-staged instance [#7]
@@ -128,7 +128,7 @@ Obj (an object) methods:
 - `.destroy(["classname"])`: called from destructors, this sets the state of the object to 'released' and removes the object from the processing state; it means that a following call to `this.obj()` in rules with the same identifier value will return a new blank object; if "classname" is provided, the object is destroyed only when the object's class name is identical to it
 - `.capture("string" or no argument)`: this adds a line to the object so that it then appears in the results when the object is expanded in the results view; when there is no argument passed, the currently processed line is automatically added
 - `.alias("alias")`: an object can be identified by multiple values sometimes thanks static_cast pointer shifts, wrapping helper classes ("handlers"), or simply by a unique key side by a pointer; this method allows you to define such an alias so that calls to `this.obj("alias")` will resolve to this object
-- `.grep()`: this conveniently instructs the object to capture all lines that contain the object's pointer or any of its aliases
+- `.grep()`: this conveniently instructs the object to capture all lines that contain the object's pointer or any of its aliases that are in form of a pointer
 - `.link("identifier" or object)`: this adds a 'this object links to other object' line, as described in the **Links to referred or referring objects** section above, the argument can be an identifier or an alias (will be resolved) or directly an object as returned by `this.obj()`; note that the link is automatically added to both objects with the correct vector
 - `.mention("identifier" or object)`: this simply adds a line that mentions the given object so that it can be expanded in the results view - via a line with a checkbox; this doesn't establish any relation between the two objects
 - `.prop("name", value, merge = false)`: sets or deletes a property on an object
@@ -142,7 +142,7 @@ Obj (an object) methods:
 - `.propIf("name", value, cond, merge)`: sets the property only when `cond` evaluates to `true`; the `cond` function is called with the object as the only argument
 - `.props`: property Bag - a simple object - holding all the currently captured properties for reading, provides `.on("property", handler)` method for convenience, see **this.thread.on** above for details
 - `.state(value or ommited)`: this is a shorthand to the "state" property of the object, if `value` has a value it's set on the object's "state", if called without arguments the method returns the current object's "state" value
-- `.expect("format", consumer[, unmatch])`: use this to process lines following the current line on the same thread; `consumer` and optional `unmatch` handlers will be called as long as their results evaluate to `true`
+- `.expect("format", [consumer[, unmatch]])`: use this to process lines following the current line on the same thread; optional `consumer` and `unmatch` handlers will be called as long as their results evaluate to `true`
 
   `consumer` is called only when a line matches the format string, the arguments are:
   * this: the processing state
@@ -150,14 +150,22 @@ Obj (an object) methods:
   * found values: passed the same way as for a rule consumer (see **A simple rule** section)
   * `proc`: the processing state, once more
   * result: *true* to continue the follow, *false* to stop it
+  
+  if `consumer` is not not specified, the default is capture of the line on the object and then stop the follow by returning false
 
   the optional `unmatch` handler is called when a line doesn't match the format with following arguments:
   * this: the processing state
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
   * result: *true* to continue the follow, *false* to stop it
-- `.follow("format", consumer[, unmatch])`: the same as `.expect()` but stops when any rule from the same module matches a line on the same thread where this follow has been started, this is convenient for cases one doesn't know if the line matching "format" will or will not follow the currently processed line
-- `.follow(consumer)`: similar to the above form of `.follow()` but without a rule-like formating; the `consumer` function is called for lines with the same module or non-prefixed lines as long as no other rule from the same module matches on the same thread and as long as the the consumer's result is evaluating to `true` (note that the consumer function can do anything it wants, not just capturing) ; the arguments are:
+
+  if `unmatch` is not specified, the default is a function returning always true to not break the follow
+- `.follow("format", [consumer[, unmatch]])`: similar to `.expect()` but stops when any rule from the same module (or non-prefixed lines) matches a line on the same thread where this follow has been started, this is convenient for cases one doesn't know if the line matching "format" will or will not follow the currently processed line
+  
+  if `consumer` is not not specified, the default is capture of the matching line on the object and continue of the follow (this is different from `expect`)
+
+  `unmatch` behaves the same as for `expect`
+- `.follow(consumer)`: similar to the above form of `.follow()` but without a rule-like formating; the `consumer` function is called for lines with the same module (or non-prefixed lines) on the same thread as long as no other rule from the same module matches on the thread and as long as the consumer's result is evaluating to `true` (note that the consumer function can do anything it wants, not just capturing) ; the arguments are:
   * `obj`: the object this follow has been initiated for
   * `line`: the line being currently processed
   * `proc`: the processing state as described above

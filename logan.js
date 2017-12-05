@@ -398,7 +398,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
-  Obj.prototype.expect = function(format, consumer, error = () => true) {
+  Obj.prototype.expect = function(format, consumer = (obj) => { obj.capture() }, error = () => true) {
     let match = convertPrintfToRegexp(format);
     let obj = this;
     let thread = logan._proc.thread;
@@ -420,7 +420,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
-  Obj.prototype.follow = function(cond, consumer, error = () => true) {
+  Obj.prototype.follow = function(cond, consumer = (obj) => obj.capture(), error = () => true) {
     let capture = {
       obj: this,
       module: logan._proc.module,
