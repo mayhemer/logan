@@ -1039,11 +1039,11 @@ logan.schema("moz", (line, proc) =>
           .follow("nsSocketTransport::InitiateSocket skipping speculative connection for host %*$", (sock) => { sock.capture() });
       });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
-        this.thread.networksocket = this.obj(ptr).class("nsSocketTransport").prop("last-poll-flags", flgs).capture();
+        this.thread.networksocket = this.obj(ptr).class("nsSocketTransport").grep().prop("last-poll-flags", flgs).capture();
         netcap(n => { n.socketReady(this.thread.networksocket) });
       });
       module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
-        sock = this.obj(sock).class("nsSocketTransport").capture()
+        sock = this.obj(sock).class("nsSocketTransport").grep().capture()
           .capture(`  ${st} = ${convertProgressStatus(st)}`).prop("last-status", convertProgressStatus(st));
         netcap(n => { n.socketStatus(sock, convertProgressStatus(st)) });
       });
