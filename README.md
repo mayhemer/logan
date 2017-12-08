@@ -6,7 +6,7 @@ The main focus is to search for objects of selected classes and their properties
 
 The analyzer is based on [logan-rules.js](logan-rules.js) file containing set of matching rules to track objects lifetime, relations and properties.  It's hugely generic, thus very powerful and pretty much open to enhancements by anyone.  See below the **Rules definition reference** section for details.
 
-The code has originally been published on [GitHub](https://github.com/mayhemer/logan) and a **live instance is running on [my site](https://janbambas.cz/moz/logan/)**.
+The code has originally been published on [GitHub](https://github.com/mayhemer/logan) and a **live instance is running on [my site](https://janbambas.cz/moz/logan/)** as well as a beta staging [here](https://janbambas.cz/moz/logan/beta/).
 
 # Current state
 
