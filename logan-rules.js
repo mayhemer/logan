@@ -92,7 +92,7 @@ logan.schema("moz", (line, proc) =>
        ******************************************************************************/
 
       module.rule("DOCUMENT %p created", function(doc) {
-        this.obj(doc).create("nsDocument");
+        this.obj(doc).create("nsDocument").grep();
       });
       module.rule("DOCUMENT %p destroyed", function(doc) {
         this.obj(doc).destroy();
