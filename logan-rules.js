@@ -503,6 +503,18 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsHttpChannel::Connect [this=%p]", function(ptr) {
         this.obj(ptr).state("connected").capture();
       });
+      module.rule("nsHttpChannel::ContinueBeginConnectWithResult [this=%p]", function(ch) {
+        this.thread.httpchannel = this.obj(ch).capture();
+      });
+      module.rule("nsHttpChannel::Connect() STS permissions found", function(ch) {
+        this.thread.on("httpchannel", ch => {
+          ch.prop("sts-found", true).capture();
+        });
+      });
+      module.rule("nsHttpChannel::ContinueBeginConnectWithResult result [this=%p rv=%x mCanceled=%d]", function(ch) {
+        delete this.thread.httpchannel;
+        this.obj(ch).capture();
+      });
       module.rule("nsHttpChannel::OpenCacheEntry [this=%p]", function(ch) {
         this.thread.cacheentryconsumer = this.obj(ch).capture();
       });
