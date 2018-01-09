@@ -739,9 +739,9 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     exceptionParse: function(exception) {
       if (typeof exception === "object") {
-        exception = "'" + exception.message + "' at " + exception.fileName + ":" + exception.lineNumber
+        exception = "'" + exception.message + "' at " + exception.fileName + ":" + exception.lineNumber + "\n";
       }
-      exception += "\nwhile processing '" + this._proc.raw +
+      exception += "while processing '" + this._proc.raw +
                    "'\nat " + this._proc.file.name + ":" + this._proc.linenumber;
       return new Error(exception);
     },
