@@ -860,7 +860,7 @@ logan.schema("moz", (line, proc) =>
           stream = this.obj(stream).prop("id", id);
           session = this.obj(session).class("Http2Session").grep().link(stream);
         });
-      module.rule("Http2Session::LogIO %p stream=%p id=%x [%*s]", function(session, stream, id, what) {
+      module.rule("Http2Session::LogIO %p stream=%p id=%x [%*]", function(session, stream, id, what) {
         this.obj(session).class("Http2Session").capture().mention(stream);
       });
       schema.summaryProps("Http2Session", ["key"]);
