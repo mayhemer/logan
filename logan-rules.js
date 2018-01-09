@@ -1141,12 +1141,5 @@ logan.schema("moz", (line, proc) =>
 
     }); // cache2
 
-    // Testing area
-    schema.module("test", (module) => {
-      module.rule("TEST LINE OFFSET %d %d %d", function(linenum, filebinaryoffset) {
-        console.log(`linenumber: ${linenum} = ${this.linenumber}`);
-        console.log(`filebinaryoffset: ${filebinaryoffset} = ${this.filebinaryoffset}`);
-      });
-    });
   }
 ); // moz
