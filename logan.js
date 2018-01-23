@@ -303,7 +303,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     if (this.props.className) {
       console.warn(logan.exceptionParse("object already exists, recreting automatically from scratch"));
       this.destroy();
-      return logan._proc.obj(this.__most_recent_accessor).create(className);
+      return logan._proc.obj(this.__most_recent_accessor).create(className, capture);
     }
 
     ensure(logan.searchProps, className, { pointer: true, state: true, logid: true });
