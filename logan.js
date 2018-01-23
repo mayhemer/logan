@@ -301,8 +301,29 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.create = function(className, capture = true) {
     if (this.props.className) {
-      console.warn(logan.exceptionParse("object already exists, recreting automatically from scratch"));
-      this.destroy();
+      console.warn(logan.exceptionParse("object already exists, recreting automatically from scratch "));
+    }
+
+    if (this.props.className || this.captures.length) {
+      //
+      // this.captures.length:
+      //
+      // An existing temporary object(no class) found with something captured on.
+      // As this is very likely from a log line match right after a destructor line
+      // we want to scratch that.  If this is an object created by e.g. mention() or
+      // link() before class() or create() call then that mention/link will point
+      // to a bad object!
+      //
+      // Correct solution:
+      // 1. add a log at the end of a detructor and destroy() using that instead
+      // 2. make sure a class()'ed only object is called class() before it's used
+      //    the first time.
+      //
+      // This is not logged on purpose, since there is a lot of cases we recycle
+      // pointers for which we have created temps from link() et al as well as 
+      // a lot of log lines written after object's respective destructor line.
+
+      this.destroy(undefined /* always */, false /* no auto-capture */);
       return logan._proc.obj(this.__most_recent_accessor).create(className, capture);
     }
 
@@ -337,7 +358,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
-  Obj.prototype.destroy = function(ifClassName) {
+  Obj.prototype.destroy = function(ifClassName, capture = true) {
     if (ifClassName && this.props.className !== ifClassName) {
       return this;
     }
@@ -357,7 +378,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       logan._schema.update_alias_regexp();
     }
 
-    return this.capture();
+    return capture ? this.capture() : this;
   };
 
   function Capture(what, obj = null) {
