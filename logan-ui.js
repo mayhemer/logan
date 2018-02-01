@@ -325,11 +325,13 @@
         return function(event) {
           if (set === true) {
             this.changeDynamicStyle("obj-" + obj.id, style);
-          } else if (set === false) {
+          }
+          // Deliberatly leaving the obj highlight in the style...
+          /* else if (set === false) {
             this.changeDynamicStyle("obj-" + obj.id);
           } else {
             this.toggleDynamicStyle("obj-" + obj.id, style);
-          }
+          } */
         }.bind(this);
       },
 
