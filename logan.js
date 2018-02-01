@@ -107,7 +107,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     // a '\' before each of such chars.
     [/%p/g, "((?:(?:0x)?[A-Fa-f0-9]+)|(?:\\(null\\))|(?:\\(nil\\)))"],
     [/%d/g, "(-?[\\d]+)"],
-    [/%h?u/g, "([\\d]+)"],
+    [/%[hz]?u/g, "([\\d]+)"],
     [/%s/g, "([^\\s]*)"],
     [/%\\\*\\\$/g, "(.*$)"],
     [/%\\\*/g, "(.*)"], // this must process after %*$ because this one is more general

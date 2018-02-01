@@ -544,7 +544,7 @@ logan.schema("moz", (line, proc) =>
         netcap(n => { n.channelCreatesTrans(ch, tr) });
       });
       module.rule("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]", function(cl, ch) {
-        this.obj(ch).capture().link(this.obj(cl).class("nsChannelClassifier"));
+        this.obj(ch).capture().link(this.obj(cl).class("nsChannelClassifier")).__classifystarttime = this.timestamp;
       });
       module.rule("nsHttpChannel::ReadFromCache [this=%p] Using cached copy of: %s", function(ptr) {
         this.obj(ptr).prop("from-cache", true).capture();
@@ -583,7 +583,7 @@ logan.schema("moz", (line, proc) =>
           .send("HttpChannel::Data");
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        ch = this.obj(ch).class("nsHttpChannel");
+        ch = this.obj(ch).class("nsHttpChannel").state("on-stop");
         ch.run("stop")
           .prop("status", status, true)
           .prop("stop-time", this.duration(ch.__opentime))
@@ -598,7 +598,12 @@ logan.schema("moz", (line, proc) =>
         netcap(n => { n.channelSuspend(ch) });
       });
       module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ch) {
-        ch = this.obj(ch).run("resume").prop("suspendcount", suspendcount => --suspendcount).capture();
+        ch = this.obj(ch).run("resume").prop("suspendcount", suspendcount => --suspendcount);
+        // The classification time is rather vague, this doesn't necessarily has
+        // to be the Resume() called by the classifier, it's just likely to be the one.
+        ch.propIf("classify-time", this.duration(ch.__classifystarttime), ch => ch.__classifystarttime);
+        delete ch.__classifystarttime;
+        ch.capture();
         netcap(n => { n.channelResume(ch) });
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
@@ -616,12 +621,9 @@ logan.schema("moz", (line, proc) =>
       module.rule("sending progress and status notification [this=%p status=%x progress=%u/%d]", function(ch, status) {
         this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
       });
-      module.rule("HttpBaseChannel::SetIsTrackingResource %p", function(ch) {
-        ch = this.obj(ch).prop("tracker", true).capture();
+      module.rule("nsHttpChannel %p tracking resource=%d, cos=%u", function(ch, tracker) {
+        ch = this.obj(ch).prop("tracker", tracker === "1").capture();
         netcap(n => { n.channelRecognizedTracker(ch) });
-      });
-      module.rule("nsHttpChannel %p on-local-blacklist=%d", function(ch, lcb) {
-        this.obj(ch).prop("local-block-list", lcb === "1").capture();
       });
       module.rule("nsHttpChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
         this.thread.tail_request = this.obj(ch).capture().mention(rc).follow("  blocked=%d", (ch, blocked) => {
@@ -659,6 +661,13 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsHttpChannel::SetPriority %p p=%d", function(ch, prio) {
         ch = this.obj(ch).capture();
         netcap(n => { n.channelPrio(ch, parseInt(prio)) });
+      });
+      module.rule("nsHttpChannel::OnRedirectVerifyCallback [this=%p] " +
+                  "result=%x stack=%zu mWaitingForRedirectCallback=%u\n", function(ch, result) {
+        ch = this.obj(ch).capture();
+        if (result == "0") {
+          ch.state("redirected");        
+        }
       });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
