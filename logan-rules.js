@@ -1141,5 +1141,20 @@ logan.schema("moz", (line, proc) =>
 
     }); // cache2
 
+    schema.module("proxy", (module) => {
+
+      /******************************************************************************
+       * AsyncApplyFilters
+       ******************************************************************************/
+
+      module.rule("AsyncApplyFilters %p", function(ptr) {
+        this.obj(ptr).create("Proxy::AsyncApplyFilters").grep();
+      });
+      module.rule("~AsyncApplyFilters %p", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+    }); // proxy
+
   }
 ); // moz
