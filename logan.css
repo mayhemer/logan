@@ -109,6 +109,9 @@ div.log_line.expanded.revealer {
 div.log_line.checked {
   font-weight: bold;
 }
+div.log_line.summary {
+  text-shadow: 1px 1px 0px white, 1px -1px 0px white, -1px 1px 0px white, -1px -1px 0px white;
+}
 div.log_line.expanded.summary,
 div.log_line.checked.summary {
   font-weight: bolder;
