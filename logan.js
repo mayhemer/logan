@@ -1000,7 +1000,7 @@ const EPOCH_1970 = new Date("1970-01-01");
               continue;
             }
 
-            file.prepared = this.prepareLine(line, file.previous);
+            file.prepared = this.prepareLine(this._schema, line, file.previous);
             file.prepared.linenumber = file.file.__line_number;
             file.prepared.filebinaryoffset = offset;
 
@@ -1033,7 +1033,7 @@ const EPOCH_1970 = new Date("1970-01-01");
           consume = files[0];
         }
 
-        this.consumeLine(consume.file, consume.prepared);
+        this.consumeLine(this._schema, consume.file, consume.prepared);
         consume.previous = consume.prepared;
         delete consume.prepared;
       }
@@ -1044,10 +1044,10 @@ const EPOCH_1970 = new Date("1970-01-01");
       performance.measure("parsing", "parsing-start", "parsing-end");
     },
 
-    prepareLine: function(line, previous) {
+    prepareLine: function(schema, line, previous) {
       previous = previous || {};
 
-      let result = this._schema.preparer.call(null, line, this._proc);
+      let result = schema.preparer.call(null, line, this._proc);
       if (!result) {
         previous.module = 0;
         previous.text = line;
@@ -1071,10 +1071,10 @@ const EPOCH_1970 = new Date("1970-01-01");
       return new Capture(what, obj);
     },
 
-    consumeLine: function(file, prepared) {
+    consumeLine: function(schema, file, prepared) {
       this._raw_capture = null;
 
-      if (!this.consumeLineByRules(file, prepared)) {
+      if (!this.consumeLineByRules(schema, file, prepared)) {
         let follow = this._proc.thread._engaged_follows[prepared.module];
         if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
           delete this._proc.thread._engaged_follows[prepared.module];
@@ -1091,7 +1091,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
     },
 
-    consumeLineByRules: function(file, prepared) {
+    consumeLineByRules: function(schema, file, prepared) {
       this._proc.file = file;
       this._proc.timestamp = prepared.timestamp;
       this._proc.line = prepared.text;
@@ -1101,12 +1101,18 @@ const EPOCH_1970 = new Date("1970-01-01");
       this._proc.filebinaryoffset = prepared.filebinaryoffset;
       this._proc.thread = this.ensureThread(file, prepared);
 
-      let module = this._schema.modules[prepared.module];
+      let module = schema.modules[prepared.module];
       if (module && this.processLine(module.get_rules(prepared.text), file, prepared)) {
         return true;
       }
-      if (this.processLine(this._schema.unmatch, file, prepared)) {
+      if (this.processLine(schema.unmatch, file, prepared)) {
         return true;
+      }
+
+      schema = prepared.pass_on && this._schemes[prepared.pass_on];
+      if (schema) {
+        prepared = this.prepareLine(schema, prepared.raw, null);
+        return this.consumeLine(schema, file, prepared);
       }
 
       return false;

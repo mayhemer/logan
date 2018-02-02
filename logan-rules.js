@@ -1210,6 +1210,8 @@ logan.schema("TaskCluster log", (line, proc) =>
           threadname: `${process_name}:${pid}`,
           timestamp: new Date("1970-01-01T" + time + "Z"),
           module: "process",
+          // experimental!
+          pass_on: "MOZ_LOG",
         };
       }
     }
