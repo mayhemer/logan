@@ -344,6 +344,9 @@
         var summary = obj.placement.time ? obj.placement.time.toISOString().replace(/[TZ]/g, " ").trim() : "";
         for (let prop of props) {
           if (summary) summary += " \u2043 ";
+          if (["className", "pointer", "state"].indexOf(prop) < 0) {
+            summary += prop + "=";
+          }
           summary += source.props[prop] || "n/a";
         }
         return summary;
@@ -504,12 +507,19 @@
         return this.place(placement, element);
       },
 
-      addResult: function(obj) {
+      addResult: function(obj, searchProp) {
         return this.addRevealer(obj, (element) => {
           element
             .append($("<span>")
               .addClass("obj-" + obj.id).addClass("pre")
-              .text(this.summary(obj)))
+              .text(this.summary(obj, (props) => {
+                // This prepends the property we searched the object by
+                let result = this.summaryProps(props);
+                if (result.indexOf(searchProp) < 0) {
+                  result.unshift(searchProp);
+                }
+                return result;
+              })))
             ;
         });
       },
