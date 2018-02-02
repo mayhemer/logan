@@ -842,6 +842,38 @@
   $(() => {
     logan.init();
 
+    consume = () => {
+      var files = $("#files").get()[0].files;
+      if (files.length) {
+        UI.clearResultsView();
+        UI.setSearchView(true);
+        logan.consumeFiles(UI, files);
+      } else if (location.search) {
+        UI.clearResultsView();
+        UI.setSearchView(true);
+        logan.consumeURL(UI, location.search.substr(1))
+      } else {
+        UI.setInitialView();
+      }
+    }
+
+    let select_schema = $("#select_schema").change((select) => {
+      location.hash = escape(select_schema.val());
+      logan.activeSchema(select_schema.val());
+      consume();
+    });
+    for (let schema in logan._schemes) {
+      select_schema.append($("<option>").attr("value", schema).text(schema));
+    }
+
+    let schema_name = unescape(location.hash.substr(1));
+    let active_schema = logan.activeSchema(schema_name);
+    if (!active_schema) {
+      alert("There is no schema '" + schema_name + "'");
+    } else {
+      select_schema.val(active_schema.namespace);
+    }
+
     window.onerror = function(err) {
       $("#error_section").show().text(err.message || err);
     };
@@ -925,19 +957,7 @@
     $(document).keydown(escapeHandler);
     $("#seek_to").keydown(escapeHandler);
 
-    var files = $("#files").get()[0].files;
-    if (files.length) {
-      UI.clearResultsView();
-      UI.setSearchView(true);
-      logan.consumeFiles(UI, files);
-    } else if (location.search) {
-      UI.clearResultsView();
-      UI.setSearchView(true);
-      logan.consumeURL(UI, location.search.substr(1))
-    } else {
-      UI.setInitialView();
-    }
-
+    consume();
   });
 
 })();

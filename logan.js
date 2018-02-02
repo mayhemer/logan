@@ -122,13 +122,16 @@ const EPOCH_1970 = new Date("1970-01-01");
       return printf;
     }
 
+    let input = printf;
     printf = escapeRegexp(printf);
 
     for (let [source, target] of printfToRegexpMap) {
       printf = printf.replace(source, target);
     }
+    printf = '^' + printf + '$';
 
-    return new RegExp('^' + printf + '$');
+    LOG("input '" + input + "' \nregexp '" + printf + "'");
+    return new RegExp(printf);
   }
 
   // Windows sometimes writes %p as upper-case-padded and sometimes as lower-case-unpadded
@@ -275,6 +278,10 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Module.prototype.rule = function(exp, consumer = function(ptr) { this.obj(ptr).capture(); }) {
     this.set_rule({ regexp: convertPrintfToRegexp(exp), cond: null, consumer: consumer }, exp);
+  };
+
+  Module.prototype.ruleIf = function(exp, condition, consumer) {
+    this.set_rule({ regexp: convertPrintfToRegexp(exp), cond: condition, consumer: consumer }, exp);
   };
 
 
@@ -692,6 +699,7 @@ const EPOCH_1970 = new Date("1970-01-01");
               logan._schema.update_alias_regexp();
             }
           }
+          obj.factual = store;
         }
 
         obj.__most_recent_accessor = ptr;
@@ -741,8 +749,17 @@ const EPOCH_1970 = new Date("1970-01-01");
       builder(this._schema);
     },
 
+    defaultSchema: function(name) {
+      this._defaultSchema = name;
+    },
+
     activeSchema: function(name) {
-      this._schema = this._schemes[name];
+      name = name || this._defaultSchema;
+      if (!this._schemes[name]) {
+        return false;
+      }
+
+      return (this._schema = this._schemes[name]);
     },
 
     parse: function(line, printf, consumer, unmatch) {
@@ -1033,12 +1050,12 @@ const EPOCH_1970 = new Date("1970-01-01");
       let result = this._schema.preparer.call(null, line, this._proc);
       if (!result) {
         previous.module = 0;
-        previous.raw = line;
         previous.text = line;
-        return previous;
+        result = previous;
       }
 
       result.raw = line;
+      result.threadname = result.threadname || "_default_";
       return result;
     },
 

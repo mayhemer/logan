@@ -1,4 +1,4 @@
-logan.schema("moz", (line, proc) =>
+logan.schema("MOZ_LOG", (line, proc) =>
   {
     let match;
 
@@ -673,7 +673,7 @@ logan.schema("moz", (line, proc) =>
                   "result=%x stack=%zu mWaitingForRedirectCallback=%u\n", function(ch, result) {
         ch = this.obj(ch).capture();
         if (result == "0") {
-          ch.state("redirected");        
+          ch.state("redirected");
         }
       });
       schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
@@ -1180,3 +1180,105 @@ logan.schema("moz", (line, proc) =>
 
   }
 ); // moz
+
+
+
+logan.schema("TaskCluster log", (line, proc) =>
+  {
+    let match;
+
+    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(?:(\w+)\((\d+)\) \| )?(.*)$/);
+    if (match) {
+      let [all, time, level, process_name, pid, text] = match;
+      if (process_name) {
+        return {
+          text: text,
+          threadname: `${process_name}:${pid}`,
+          timestamp: new Date("1970-01-01T" + time + "Z"),
+          module: "process",
+        };
+      }
+    }
+
+    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(?:((?:None)?\d+) ([A-Z]+) )?(.*)$/);
+    if (match) {
+      let [all, time, level, sub_order, sub_level, text] = match;
+      if (sub_level) {
+        return {
+          text: text,
+          sub_level,
+          timestamp: new Date("1970-01-01T" + time + "Z"),
+          module: "test",
+        };
+      }
+    }
+
+    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(.*)$/);
+    if (match) {
+      let [all, time, level, text] = match;
+      return {
+        text: text,
+        timestamp: new Date("1970-01-01T" + time + "Z"),
+        module: "root",
+      };
+    }
+
+    return undefined;
+  },
+
+  (schema) => {
+
+    let pids = (proc, pid) => {
+      return ensure(ensure(proc.global, "pids", () => []), pid, {});
+    }
+
+    schema.module("test", (module) => {
+
+      module.rule("TEST-START | %s", function(test) {
+        if (test === "Shutdown") {
+        } else {
+          this.global.running_test = this.obj(test).create("test-run").grep();
+        }
+      });
+      module.rule("TEST-%/OK|PASS|UNEXPECTED-FAIL/r | %s | took %dms", function(result, test, duration) {
+        if (test === "Shutdown") {
+        } else {
+          this.obj(test).prop("result", result).prop("duration", duration).destroy();
+          delete this.global.running_test;
+        }
+      });
+
+    }); // test
+
+    schema.module("process", (module) => {
+
+      module.ruleIf("++DOMWINDOW == %u (%p) [pid = %d] [serial = %d] [outer = %p]", proc => proc.global.running_test, function(count, win, pid, serial, outer, test) {
+        win = this.obj(win).create("DOMWINDOW").prop("serial", serial).prop("pid", pid).mention(outer);
+        win.__pid = pid;
+        win.__test = test;
+      });
+      module.rule("--DOMWINDOW == %u (%p) [pid = %d] [serial = %d] [outer = %p] [url = %s]", function(count, win, pid, serial, outer, url) {
+        win = this.objIf(win).prop("url", url);
+
+        if (win.__test && pids(this, pid).after_leak_collection) {
+          win.prop("leaked", true);
+          win.capture(`leaked at ${win.__test.props.pointer}`).mention(win.__test);
+        }
+
+        win.destroy();
+      });
+      schema.summaryProps("DOMWINDOW", ["url", "pid"]);
+
+      module.rule("Completed ShutdownLeaks collections in process %u", function(pid) {
+        pids(this, pid).after_leak_collection = true;
+      });
+
+    }); // process
+
+    schema.module("root", (module) => {
+    }); // root
+
+  }
+); // tc-log
+
+logan.defaultSchema("MOZ_LOG");
