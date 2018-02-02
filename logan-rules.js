@@ -385,6 +385,13 @@ logan.schema("moz", (line, proc) =>
       module.rule("nsChannelClassifier::~nsChannelClassifier %p", function(clas) {
         this.obj(clas).destroy();
       });
+      // ESR 52 compat
+      module.rule("nsChannelClassifier[%p]%*$", function(clas) {
+        this.obj(clas).class("nsChannelClassifier").capture();
+      });
+      module.rule("nsChannelClassifier::%s[%p]%*$", function(method, clas) {
+        this.obj(clas).class("nsChannelClassifier").capture();
+      });
 
     });
 
@@ -1161,6 +1168,12 @@ logan.schema("moz", (line, proc) =>
       });
       module.rule("~AsyncApplyFilters %p", function(ptr) {
         this.obj(ptr).destroy();
+      });
+      module.rule("AsyncApplyFilters::ProcessNextFilter %p ENTER pi=%p", function(ptr) {
+        this.obj(ptr).capture().follow("  %*$");
+      });
+      module.rule("AsyncApplyFilters::OnProxyFilterResult %p pi=%p", function(ptr) {
+        this.obj(ptr).capture().follow("  %*$");
       });
 
     }); // proxy
