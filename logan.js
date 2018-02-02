@@ -1033,7 +1033,7 @@ const EPOCH_1970 = new Date("1970-01-01");
           consume = files[0];
         }
 
-        this.consumeLine(UI, consume.file, consume.prepared);
+        this.consumeLine(consume.file, consume.prepared);
         consume.previous = consume.prepared;
         delete consume.prepared;
       }
@@ -1071,10 +1071,10 @@ const EPOCH_1970 = new Date("1970-01-01");
       return new Capture(what, obj);
     },
 
-    consumeLine: function(UI, file, prepared) {
+    consumeLine: function(file, prepared) {
       this._raw_capture = null;
 
-      if (!this.consumeLineByRules(UI, file, prepared)) {
+      if (!this.consumeLineByRules(file, prepared)) {
         let follow = this._proc.thread._engaged_follows[prepared.module];
         if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
           delete this._proc.thread._engaged_follows[prepared.module];
@@ -1091,7 +1091,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
     },
 
-    consumeLineByRules: function(UI, file, prepared) {
+    consumeLineByRules: function(file, prepared) {
       this._proc.file = file;
       this._proc.timestamp = prepared.timestamp;
       this._proc.line = prepared.text;
