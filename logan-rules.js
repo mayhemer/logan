@@ -22,6 +22,20 @@ logan.schema("MOZ_LOG", (line, proc) =>
         module: module,
       };
     }
+    
+    match = line.match(/^\w+\(\d+\) \| (\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
+    if (match) {
+      // this is a console output of browser test mixed with MOZ_LOG output, parent/child mixed
+      proc._ipc = true;
+
+      let [all, date, time, thread, level, module, text] = match;
+      return {
+        text: text,
+        timestamp: new Date(date + "T" + time + "Z"),
+        threadname: thread,
+        module: module,
+      };
+    }
 
     match = line.match(/^\[rr (\d+) (\d+)\]\[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
     if (match) {
