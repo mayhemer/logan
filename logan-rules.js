@@ -1134,12 +1134,11 @@ logan.schema("MOZ_LOG", (line, proc) =>
        * nsHostResolver
        ******************************************************************************/
 
-      module.resolver = (proc) => proc.obj("nsHostResolver::singleton").class("nsHostResolver");
       module.rule("Resolving host [%s].\n", function(host) {
-        module.resolver(this).capture();
+        this.service("nsHostResolver").capture();
       });
       module.rule("Resolving host [%s] - bypassing cache.\n", function(host) {
-        module.resolver(this).capture();
+        this.service("nsHostResolver").capture();
       });
     }); // nsHostResolver
 
@@ -1172,7 +1171,7 @@ logan.schema("MOZ_LOG", (line, proc) =>
     schema.module("proxy", (module) => {
 
       /******************************************************************************
-       * AsyncApplyFilters
+       * nsProtocolProxyService::AsyncApplyFilters
        ******************************************************************************/
 
       module.rule("AsyncApplyFilters %p", function(ptr) {
@@ -1186,6 +1185,28 @@ logan.schema("MOZ_LOG", (line, proc) =>
       });
       module.rule("AsyncApplyFilters::OnProxyFilterResult %p pi=%p", function(ptr) {
         this.obj(ptr).capture().follow("  %*$");
+      });
+
+      /******************************************************************************
+       * nsProtocolProxyService::FilterLink
+       ******************************************************************************/
+
+      module.rule("nsProtocolProxyService::FilterLink::FilterLink %p, %/(?:channel\-)?/rfilter=%p", function(filter, kind, target) {
+        this.obj(filter).create("Proxy::FilterLink").alias(target).grep().__creation_time = this.timestamp;
+      });
+      module.rule("nsProtocolProxyService::FilterLink::~FilterLink %p", function(filter) {
+        this.obj(filter).prop("lifetime", (val, filter) => this.duration(filter.__creation_time)).destroy();
+      });
+
+      /******************************************************************************
+       * nsProtocolProxyService
+       ******************************************************************************/
+
+      module.rule("nsProtocolProxyService::InsertFilterLink filter=%p", function(filter) {
+        this.service("nsProtocolProxyService").capture();
+      });
+      module.rule("nsProtocolProxyService::RemoveFilterLink target=%p", function(filter) {
+        this.service("nsProtocolProxyService").capture();
       });
 
     }); // proxy

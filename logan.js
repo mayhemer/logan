@@ -714,6 +714,10 @@ const EPOCH_1970 = new Date("1970-01-01");
         return this._obj(ptr, true);
       },
 
+      service: function(name) {
+        return this.obj(`${name}::service`).class(name).state("service");
+      },
+
       duration: function(timestamp) {
         if (!timestamp) {
           return undefined;
