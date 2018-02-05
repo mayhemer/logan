@@ -489,7 +489,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     if (value === undefined) {
       delete this.props[name];
     } else if (typeof value === "function") {
-      this.props[name] = value(this.props[name] || 0);
+      this.props[name] = value(this.props[name] || 0, this);
     } else if (merge && this.props[name]) {
       this.props[name] += ("," + value);
     } else {

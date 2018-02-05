@@ -143,8 +143,7 @@ logan.schema("MOZ_LOG", (line, proc) =>
         this.obj(ps).__init_time = this.timestamp;
       });
       module.rule("PresShell::ScheduleBeforeFirstPaint this=%p", function(ps) {
-        ps = this.obj(ps);
-        ps.prop("first-paint-time-ms", this.duration(ps.__init_time)).capture();
+        ps = this.obj(ps).prop("first-paint-time-ms", (val, ps) => this.duration(ps.__init_time)).capture();
         netcap(n => { n.FirstPaint(ps.docshell) });
       });
     }); // PresShell
@@ -334,12 +333,10 @@ logan.schema("MOZ_LOG", (line, proc) =>
           .capture();
       });
       module.rule("%d [this=%p] imgRequest::OnDataAvailable (count=\"%d\") {ENTER}", function(now, ptr, count) {
-        let request = this.obj(ptr);
-        request.capture().propIfNull("open-to-first-data", this.duration(request.__opentime));
+        this.obj(ptr).propIfNull("open-to-first-data", (val, request) => this.duration(request.__opentime)).capture();
       });
       module.rule("%d [this=%p] imgRequest::OnStopRequest", function(now, ptr) {
-        let request = this.obj(ptr);
-        request.capture().prop("open-to-stop", this.duration(request.__opentime));
+        this.obj(ptr).prop("open-to-stop", (val, request) => this.duration(request.__opentime)).capture();
       });
       module.rule("%d [this=%p] imgRequest::~imgRequest() (keyuri=\"%s\")", function(now, ptr, key) {
         this.obj(ptr).destroy();
@@ -571,9 +568,9 @@ logan.schema("MOZ_LOG", (line, proc) =>
         this.obj(ptr).prop("from-cache", true).capture();
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        ch = this.obj(ch).class("nsHttpChannel");
-        ch.run("start")
-          .prop("start-time", this.duration(ch.__opentime))
+        this.obj(ch).class("nsHttpChannel")
+          .run("start")
+          .prop("start-time", (val, ch) => this.duration(ch.__opentime))
           .state("started")
           .capture();
       });
@@ -595,19 +592,20 @@ logan.schema("MOZ_LOG", (line, proc) =>
         this.obj(ch).capture().send("HttpChannel::Start");
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
-        ch = this.obj(ch).class("nsHttpChannel");
-        ch.run("data")
-          .propIfNull("first-data-time", this.duration(ch.__opentime))
-          .prop("last-data-time", this.duration(ch.__opentime))
+        this.obj(ch).class("nsHttpChannel")
+          .run("data")
+          .propIfNull("first-data-time", (val, ch) => this.duration(ch.__opentime))
+          .prop("last-data-time", (val, ch) => this.duration(ch.__opentime))
           .state("data")
           .capture()
           .send("HttpChannel::Data");
       });
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
-        ch = this.obj(ch).class("nsHttpChannel").state("on-stop");
-        ch.run("stop")
+        this.obj(ch).class("nsHttpChannel")
+          .state("on-stop")
+          .run("stop")
           .prop("status", status, true)
-          .prop("stop-time", this.duration(ch.__opentime))
+          .prop("stop-time", (val, ch) => this.duration(ch.__opentime))
           .capture();
       });
       module.rule("nsHttpChannel %p calling OnStopRequest\n", function(ch) {
@@ -1178,10 +1176,10 @@ logan.schema("MOZ_LOG", (line, proc) =>
        ******************************************************************************/
 
       module.rule("AsyncApplyFilters %p", function(ptr) {
-        this.obj(ptr).create("Proxy::AsyncApplyFilters").grep();
+        this.obj(ptr).create("Proxy::AsyncApplyFilters").grep().__creation_time = this.timestamp;
       });
       module.rule("~AsyncApplyFilters %p", function(ptr) {
-        this.obj(ptr).destroy();
+        this.obj(ptr).prop("lifetime", (val, applier) => this.duration(applier.__creation_time)).destroy();
       });
       module.rule("AsyncApplyFilters::ProcessNextFilter %p ENTER pi=%p", function(ptr) {
         this.obj(ptr).capture().follow("  %*$");
