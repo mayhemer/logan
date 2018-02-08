@@ -464,7 +464,7 @@ logan.schema("MOZ_LOG",
 
       module.rule("Creating nsHttpChannel [this=%p]", function(ch) {
         ch = this.obj(ch).create("nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
-          ch.prop("url", uri);
+          ch.prop("url", uri).capture();
         });
         this.thread.on("httpchannelparent", parent => {
           ch.ipcid(parent.ipcid());
@@ -1287,10 +1287,20 @@ logan.schema("./mach test",
 
     proc._ipc = true;
 
-    /* GECKO(7912) | some console text */
+    /* GECKO(7912) | some console text */ // this is mochitest-browser
     match = line.match(/^(\w+)\((\d+)\) \| (.*)$/);
     if (match) {
       let [all, process_name, pid, text] = match;
+      return {
+        text: text,
+        forward: { "text console": text },
+      };
+    }
+
+    /* PID 12584 | 2018-02-08 17:30:20.052000 UTC - [12584:Main Thread]: D/nsHostResolver nsHostResolver::Init this=0000021C55746300 */ // this is xpcshell
+    match = line.match(/^PID (\d+) \| (.*)$/);
+    if (match) {
+      let [all, pid, text] = match;
       return {
         text: text,
         forward: { "text console": text },
