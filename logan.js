@@ -42,7 +42,7 @@ function ensure(array, itemName, def = {}) {
   return array[itemName];
 }
 
-function Bag(def) {
+function Bag(def = {}) {
   for (let prop in def) {
     this[prop] = def[prop];
   }
@@ -60,6 +60,11 @@ Bag.prototype.on = function(prop, handler, elseHandler) {
     return (this[prop] = val);
   }
   delete this[prop];
+};
+
+Bag.prototype.data = function(name, key) {
+  let map = ensure(this, name, {});
+  return ensure(map, key, () => new Bag());
 };
 
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
@@ -305,6 +310,7 @@ const EPOCH_1970 = new Date("1970-01-01");
   }
 
   Obj.prototype.on = Bag.prototype.on;
+  Obj.prototype.data = Bag.prototype.data;
 
   Obj.prototype.create = function(className, capture = true) {
     if (this.props.className) {
@@ -800,7 +806,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.objects = [];
       this.captures = [];
       this.searchProps = {};
-      this._proc.global = {};
+      this._proc.global = new Bag();
       this._proc._sync = {};
 
       let parents = {};
@@ -1037,7 +1043,7 @@ const EPOCH_1970 = new Date("1970-01-01");
           consume = files[0];
         }
 
-        this.consumeLine(this._schema, consume.file, consume.prepared);
+        this.consumeLine(this._schema, consume, consume.prepared);
         consume.previous = consume.prepared;
         delete consume.prepared;
       }
@@ -1059,7 +1065,8 @@ const EPOCH_1970 = new Date("1970-01-01");
       }
 
       result.raw = line;
-      result.threadname = result.threadname || "_default_";
+      result.threadname = result.threadname || "default";
+      result.module = result.module || "default";
       return result;
     },
 
@@ -1075,18 +1082,22 @@ const EPOCH_1970 = new Date("1970-01-01");
       return new Capture(what, obj);
     },
 
-    consumeLine: function(schema, file, prepared) {
+    consumeLine: function(schema, consume, prepared) {
       this._raw_capture = null;
 
-      if (!this.consumeLineByRules(schema, file, prepared)) {
+      this.consumeLineAndFollow(schema, consume, prepared);
+
+      // make sure every line is captured
+      this.capture();
+    },
+
+    consumeLineAndFollow: function(schema, consume, prepared) {
+      if (!this.consumeLineByRules(schema, consume, prepared)) {
         let follow = this._proc.thread._engaged_follows[prepared.module];
         if (follow && !follow.follow(follow.obj, prepared.text, this._proc)) {
           delete this._proc.thread._engaged_follows[prepared.module];
         }
       }
-
-      // make sure every line is captured
-      this.capture();
     },
 
     ensureThread: function(file, prepared) {
@@ -1095,28 +1106,42 @@ const EPOCH_1970 = new Date("1970-01-01");
         () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
     },
 
-    consumeLineByRules: function(schema, file, prepared) {
-      this._proc.file = file;
+    consumeLineByRules: function(schema, consume, prepared) {
+      this._proc.file = consume.file;
       this._proc.timestamp = prepared.timestamp;
       this._proc.line = prepared.text;
       this._proc.raw = prepared.raw;
       this._proc.module = prepared.module;
       this._proc.linenumber = prepared.linenumber;
       this._proc.filebinaryoffset = prepared.filebinaryoffset;
-      this._proc.thread = this.ensureThread(file, prepared);
+      this._proc.thread = this.ensureThread(consume.file, prepared);
 
       let module = schema.modules[prepared.module];
-      if (module && this.processLine(module.get_rules(prepared.text), file, prepared)) {
+      if (module && this.processLine(module.get_rules(prepared.text), consume.file, prepared)) {
         return true;
       }
-      if (this.processLine(schema.unmatch, file, prepared)) {
+      if (this.processLine(schema.unmatch, consume.file, prepared)) {
         return true;
       }
 
-      schema = prepared.pass_on && this._schemes[prepared.pass_on];
-      if (schema) {
-        prepared = this.prepareLine(schema, prepared.raw, null);
-        return this.consumeLine(schema, file, prepared);
+      if (prepared.forward) {
+        for (let forward_schema in prepared.forward) {
+          schema = this._schemes[forward_schema];
+          if (!schema) {
+            throw this.exceptionParse(`Missing farward-to schema ${forward_schema}`);
+          }
+
+          let text = prepared.forward[forward_schema];
+          let forward_prepared = ensure(ensure(consume, "__forward_prepared", {}), forward_schema, {});
+
+          forward_prepared = this.prepareLine(schema, text, forward_prepared);
+          forward_prepared.linenumber = prepared.linenumber;
+          forward_prepared.filebinaryoffset = prepared.filebinaryoffset;
+
+          if (this.consumeLineAndFollow(schema, consume, forward_prepared)) {
+            return true;
+          }
+        }
       }
 
       return false;

@@ -1,7 +1,8 @@
-logan.schema("MOZ_LOG", (line, proc) =>
-  {
+logan.schema("MOZ_LOG",
+  (line, proc) => {
     let match;
 
+    /* 2018-02-05 16:38:27.269000 UTC - [7912:Socket Thread]: V/nsHttp nsHttpTransaction::WriteSegments 000001E7DD4AFC00 */
     match = line.match(/^(\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
     if (match) {
       let [all, date, time, thread, level, module, text] = match;
@@ -13,6 +14,7 @@ logan.schema("MOZ_LOG", (line, proc) =>
       };
     }
 
+    /* [7912:Socket Thread]: V/nsHttp nsHttpTransaction::WriteSegments 000001E7DD4AFC00 */
     match = line.match(/^\[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
     if (match) {
       let [all, thread, level, module, text] = match;
@@ -23,33 +25,6 @@ logan.schema("MOZ_LOG", (line, proc) =>
       };
     }
     
-    match = line.match(/^\w+\(\d+\) \| (\d+-\d+-\d+) (\d+:\d+:\d+\.\d+) \w+ - \[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
-    if (match) {
-      // this is a console output of browser test mixed with MOZ_LOG output, parent/child mixed
-      proc._ipc = true;
-
-      let [all, date, time, thread, level, module, text] = match;
-      return {
-        text: text,
-        timestamp: new Date(date + "T" + time + "Z"),
-        threadname: thread,
-        module: module,
-      };
-    }
-
-    match = line.match(/^\[rr (\d+) (\d+)\]\[([^\]]+)\]: ([A-Z])\/(\w+) (.*)$/);
-    if (match) {
-      // this is likely a mixed console log that may have both parent and child logs in it, force ipc usage
-      proc._ipc = true;
-
-      let [all, pid, rrline, thread, level, module, text] = match;
-      return {
-        text: text,
-        threadname: `${thread}[${pid}]`,
-        module: module,
-      };
-    }
-
     return undefined; // just express it explicitly
   },
 
@@ -1212,62 +1187,22 @@ logan.schema("MOZ_LOG", (line, proc) =>
     }); // proxy
 
   }
-); // moz
+); // MOZ_LOG
 
 
-
-logan.schema("TaskCluster log", (line, proc) =>
-  {
-    let match;
-
-    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(?:(\w+)\((\d+)\) \| )?(.*)$/);
-    if (match) {
-      let [all, time, level, process_name, pid, text] = match;
-      if (process_name) {
-        return {
-          text: text,
-          threadname: `${process_name}:${pid}`,
-          timestamp: new Date("1970-01-01T" + time + "Z"),
-          module: "process",
-          // experimental!
-          pass_on: "MOZ_LOG",
-        };
-      }
-    }
-
-    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(?:((?:None)?\d+) ([A-Z]+) )?(.*)$/);
-    if (match) {
-      let [all, time, level, sub_order, sub_level, text] = match;
-      if (sub_level) {
-        return {
-          text: text,
-          sub_level,
-          timestamp: new Date("1970-01-01T" + time + "Z"),
-          module: "test",
-        };
-      }
-    }
-
-    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(.*)$/);
-    if (match) {
-      let [all, time, level, text] = match;
-      return {
-        text: text,
-        timestamp: new Date("1970-01-01T" + time + "Z"),
-        module: "root",
-      };
-    }
-
-    return undefined;
-  },
+logan.schema("text console",
+  (line, proc) => {
+    proc._ipc = true;
+  
+    return {
+      text: line,
+      forward: { "MOZ_LOG": line, },
+    };
+  },  
 
   (schema) => {
 
-    let pids = (proc, pid) => {
-      return ensure(ensure(proc.global, "pids", () => []), pid, {});
-    }
-
-    schema.module("test", (module) => {
+    schema.module("default", (module) => {
 
       module.rule("TEST-START | %s", function(test) {
         if (test === "Shutdown") {
@@ -1283,10 +1218,6 @@ logan.schema("TaskCluster log", (line, proc) =>
         }
       });
 
-    }); // test
-
-    schema.module("process", (module) => {
-
       module.ruleIf("++DOMWINDOW == %u (%p) [pid = %d] [serial = %d] [outer = %p]", proc => proc.global.running_test, function(count, win, pid, serial, outer, test) {
         win = this.obj(win).create("DOMWINDOW").prop("serial", serial).prop("pid", pid).mention(outer);
         win.__pid = pid;
@@ -1295,7 +1226,7 @@ logan.schema("TaskCluster log", (line, proc) =>
       module.rule("--DOMWINDOW == %u (%p) [pid = %d] [serial = %d] [outer = %p] [url = %s]", function(count, win, pid, serial, outer, url) {
         win = this.objIf(win).prop("url", url);
 
-        if (win.__test && pids(this, pid).after_leak_collection) {
+        if (win.__test && this.global.data("pids", pid).after_leak_collection) {
           win.prop("leaked", true);
           win.capture(`leaked at ${win.__test.props.pointer}`).mention(win.__test);
         }
@@ -1305,15 +1236,101 @@ logan.schema("TaskCluster log", (line, proc) =>
       schema.summaryProps("DOMWINDOW", ["url", "pid"]);
 
       module.rule("Completed ShutdownLeaks collections in process %u", function(pid) {
-        pids(this, pid).after_leak_collection = true;
+        this.global.data("pids", pid).after_leak_collection = true;
+        this.service("shutdown").capture();
       });
 
-    }); // process
+    }); // console
+  }
+); // text console
 
-    schema.module("root", (module) => {
-    }); // root
+
+logan.schema("TaskCluster log",
+  (line, proc) => {
+    let match;
+
+    proc._ipc = true;
+
+    /* 22:54:10     INFO -  17 INFO TEST-START | browser/components/originattributes/test/browser/browser_cache.js */
+    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+((?:None)?\d+) ([A-Z]+) (.*)$/);
+    if (match) {
+      let [all, time, level, sub_order, sub_level, text] = match;
+      return {
+        text: text,
+        module: "test",
+        forward: { "text console": text, },
+      };
+    }
+
+    /* 22:54:10     INFO -  some console text */
+    match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+(.*)$/);
+    if (match) {
+      let [all, time, level, text] = match;
+      return {
+        text: text,
+        forward: { "./mach test": text, },
+      };
+    }
+
+    return undefined;
+  },
+
+  (schema) => {
 
   }
-); // tc-log
+); // TaskCluster log
+
+
+logan.schema("./mach test",
+  (line, proc) => {
+    let match;
+
+    proc._ipc = true;
+
+    /* GECKO(7912) | some console text */
+    match = line.match(/^(\w+)\((\d+)\) \| (.*)$/);
+    if (match) {
+      let [all, process_name, pid, text] = match;
+      return {
+        text: text,
+        forward: { "text console": text },
+      };
+    }
+
+    return {
+      text: line,
+      forward: { "text console": line },
+    };
+  },
+
+  (schema) => {
+
+  }
+); // runtests.py
+
+
+logan.schema("rr console",
+  (line, proc) => {
+    let match;
+
+    match = line.match(/^\[rr (\d+) (\d+)\](.*)$/);
+    if (match) {
+      // this is likely a mixed console log that may have both parent and child logs in it, force ipc usage
+      proc._ipc = true;
+
+      let [all, pid, rrline, text] = match;
+      return {
+        text: text,
+        forward: { "text console": text, }
+      };
+    }
+
+  },
+
+  (schema) => {
+
+  }
+); // rr console
+
 
 logan.defaultSchema("MOZ_LOG");

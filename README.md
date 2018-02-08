@@ -82,16 +82,18 @@ The code lives in [logan-netdiag.js](logan-netdiag.js) with API referred from th
 
 # Rules definition reference
 
-The rules are defined in [logan-rules.js](logan-rules.js) file in a hierarchy of a *schema* (a top level name-space) - currently there is only one - "`moz`", and *modules* within the schema.  A module is an equivalent of a mozilla log module (e.g. nsHttp, cache2).  See [logan-rules.js heading](https://github.com/mayhemer/logan/blob/master/logan-rules.js) for a life example, should be easy to follow what's going on.
+The rules are defined in [logan-rules.js](logan-rules.js) file in a hierarchy of a *schema* (a top level name-space), and *modules* within the schema.  A module is an equivalent of a mozilla log module (e.g. nsHttp, cache2).  See [logan-rules.js heading](https://github.com/mayhemer/logan/blob/master/logan-rules.js) for a life example.
 
-*A schema pre-processes every line with a pre-processing regexp and function.  The `moz` schema parses and separates the time stamp, module name, thread name and the actual log text.  Lines w/o the timestamp/thread/module prefix will use the last known timestamp and thread values.*
+There are multiple schemes.  You can load MOZ\_LOG generated files, raw console output, a try run console output, logs from TaskCluster (try server).  Nice thing is that these "wrapping" schemes are capable of "forwarding" the unwrapped input to lower level schemes such as MOZ\_LOG or 'text console', which means everything is nicely merged together - for instance DOM window counters and MOZ\_LOG tracked objects.
+
+A schema pre-processes every line with a pre-processing function.  The `MOZ_LOG` schema parses and separates the time stamp, module name, thread name and the actual log text.  Lines w/o the timestamp/thread/module prefix will use the last known timestamp and thread values.
 
 
 The rules themselves need a bit more thorough explanation.
 
 There are 3 types of rules that you can define:
 1. a simple rule by a printf formatting - via `module.rule()`
-2. a more general printf rule conditioned by a state evaluation - via `schema.ruleIf()`
+2. a more general printf rule conditioned by a state evaluation - via `schema.ruleIf()` or `module.ruleIf()`
 3. a general rule (no string matching) only conditioned by a state - via `schema.plainIf()`
 
 ## A simple rule
@@ -110,14 +112,23 @@ For convenience the called consumer function is given the found values as argume
 
 `this` inside the function is assigned the **processing state** object.  Some of its properties and methods are:
 
-- `this.thread`: an object representing the thread as found on the current line, this simple object lives through out the file processing and you can store properties on it at will to build ruleIf() and plainIf() conditions based on it (more on it below)
+- `this.thread`: an object (a property Bag, see below) representing the thread as found on the current line, this simple object lives through out the file processing and you can store properties on it at will to build ruleIf() and plainIf() conditions based on it (more on it below)
 - `this.thread.name`: obviously the name of the thread
-- `this.thread.on("property", handler)`: a convenience method to perform a conditioned operation + change value or nullify the property in one easy step ; the handler is called when the property is non-null on the thread, the handler is passed value of that property as an argument, return value of the handler replaces the value of that property on the thread (note that when you don't return a value it effectively nullifies the property)
 - `this.line`: the currently processed line, stripped the timestamp, thread name and module name
 - `this.timestamp`: a Date object holding the time as read from the log line
 - `this.obj(identifier)`: this method returns a JS object representing the given `identifier` that can be then conveniently worked with, more below ; *note: the same object is always returned since its first call for the same identifier until `destroy()` is called on that object*
 - `this.objIf(identifier)`: same as above, but only a temporary object is returned when the object didn't exist before; this prevents null-checks in the rule code
+- `this.service(className)`: this conveniently creates a service object - a singleton, bound to the log file (think of it as 'bound to the process') which then behaves as an object created with `this.obj`
 - `this.duration(timestamp)`: calculates number of milliseconds since timestamp till now, timestamp is expected to be a Date object, the result is a number of milliseconds
+- `this.global`: a property Bag object that is carried through out the whole parsing process being common (global) to all files and threads; you can store any global data you need on it
+
+## Property Bag helper object
+
+Some of the data fields on the processing state (thread, global) and objects you create with `this.obj()` are so called "property Bags".  It's nothing more then a simple JS object (of a class `Bag`) for keeping arbitrary properties and providing following convenient methods:
+
+- `.on("property", handler)`: a convenience method to perform a conditioned operation + change value or nullify the property in one easy step ; the handler is called when the property is non-null on the object you call .on() for, the handler is passed value of that property as its single argument, and the return value of the handler replaces the value of that property on the thread (note that when you don't return a value it effectively deletes the property from the object)
+- `.data("key", value)`: a convenience function that ensures a property "key" on the object exists, [object].key = {}, and then ensures [object].key.value = new Bag().  You can then store and access arbitrary properties on it.
+
 
 ## Working with objects
 
@@ -135,7 +146,7 @@ Obj (an object) methods:
   * when `value` has a value, it will be set under the name as a property on the object that you can then search by and examine
   * when `value` has a value and merge = true, it will be joined with the pre-existing value with ','
   * when `value` is undefined, the property will be removed from the object
-  * when `value` is a function it will be called with one argument being the existing property value or 0 (a number) when the property has not yet been set, the result of the function is then stored as a new property value (ignoring the `merge` argument!); this is convenient for counters
+  * when `value` is a function it will be called with two argument, the first being the existing property value or 0 (a number, convenient for counters) when the property has not yet been set, the second is the object, the result of the function is  stored as a new property value (ignoring the `merge` argument!);
   * the `merge` argument can be a function too, called with one argument being the object
   * note that reading a property back is only possible via direct access on object's `props` simple object (a hashtable); it's strongly discouraged to modify this array directly as it would break properties history capture (seek)
 - `.propIfNull("name", value)`: sets the property but only when it's not already present; use to set a property only once
@@ -206,16 +217,18 @@ This can be used for adding rules for lines that are too general or indistinguis
 An example of a conditional rule definition:
 
 ```javascript
-schema.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url, channel) {
+module.ruleIf("uri=%s", proc => proc.thread.httpchannel, function(url, channel) {
   delete this.thread.httpchannel; // we only want to hit this once
   channel.prop("url", url);
 });
 ```
 The rule assumes that a rule executed just before has set `thread.httpchannel` on the **processing state** to the object we want to assign the URL to.
 
-The first argument to `schema.ruleIf()` is equal to what is being passed to `module.rule()`.  The second argument is a condition function that is evaluated prior to evaluating the formatting string.  It has an only argument - the processing state as described above.  If the condition function returns anything evaluating to `true` and the string matches, the function is called the same way as in the *simple rule* case with one added argument at the end - the result of the condition for convenience.
+The first argument to `module.ruleIf()` is equal to what is being passed to `module.rule()`.  The second argument is a condition function that is evaluated prior to evaluating the formatting string.  It has an only argument - the processing state as described above.  If the condition function returns anything evaluating to `true` and the string matches, the function is called the same way as in the *simple rule* case with one added argument at the end - the result of the condition for convenience.
 
 Note: you can define more than one conditional rule with the same formatting string.
+
+Note: you can define an "If" rule on either the schema (for raw lines w/o a module) or on a module (to not conflict and be more efficient).
 
 ## A conditional plain rule
 
