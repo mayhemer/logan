@@ -1136,9 +1136,10 @@ const EPOCH_1970 = new Date("1970-01-01");
           }
 
           let text = prepared.forward[forward_schema];
-          let forward_prepared = ensure(ensure(consume, "__forward_prepared", {}), forward_schema, {});
+          let forward_prepared = ensure(ensure(consume, "forward_prepared", {}), forward_schema, {});
 
           forward_prepared = this.prepareLine(schema, text, forward_prepared);
+          forward_prepared.timestamp = forward_prepared.timestamp || prepared.timestamp;
           forward_prepared.linenumber = prepared.linenumber;
           forward_prepared.filebinaryoffset = prepared.filebinaryoffset;
 
