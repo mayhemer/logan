@@ -1240,7 +1240,7 @@ logan.schema("text console",
         this.service("shutdown").capture();
       });
 
-    }); // console
+    }); // default
   }
 ); // text console
 
@@ -1306,7 +1306,7 @@ logan.schema("./mach test",
   (schema) => {
 
   }
-); // runtests.py
+); // ./mach test
 
 
 logan.schema("rr console",
