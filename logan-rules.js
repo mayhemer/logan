@@ -164,7 +164,7 @@ logan.schema("MOZ_LOG",
       module.rule("DOCSHELL %p SetCurrentURI %s\n", function(docshell, url) {
         this.thread.docshell = this.obj(docshell).capture();
       });
-      schema.summaryProps("nsDocShell", ["url"]);
+      logan.summaryProps("nsDocShell", ["url"]);
 
     }); // nsDocShellLeak
 
@@ -200,7 +200,7 @@ logan.schema("MOZ_LOG",
         rc = this.obj(rc).capture();
         this.thread.on("tail_request", (ch) => (rc.mention(ch), ch));
       });
-      schema.summaryProps("RequestContext", []);
+      logan.summaryProps("RequestContext", []);
 
     }); // RequestContext
 
@@ -241,7 +241,7 @@ logan.schema("MOZ_LOG",
         lg = this.obj(lg).capture().mention(dch);
         netcap(n => { n.EndPageLoad(lg) });
       });
-      schema.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
+      logan.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
 
     }); // LoadGroup
 
@@ -319,7 +319,7 @@ logan.schema("MOZ_LOG",
       module.rule("%d [this=%p] imgRequest::~imgRequest()", function(now, ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("imgRequest", ["url"]);
+      logan.summaryProps("imgRequest", ["url"]);
 
       /******************************************************************************
        * imgRequestProxy
@@ -355,7 +355,7 @@ logan.schema("MOZ_LOG",
       module.rule("ScriptLoadRequest (%p): async=%d defer=% tracking=%d", function(request, async, defer, tracking) {
         this.obj(request).capture().prop("async", async).prop("defer", defer).prop("tracking", tracking);
       });
-      schema.summaryProps("ScriptLoadRequest", ["url"]);
+      logan.summaryProps("ScriptLoadRequest", ["url"]);
 
     }); // ScriptLoader
 
@@ -430,7 +430,7 @@ logan.schema("MOZ_LOG",
         ch = this.obj(ch).capture();
         netcap(n => { n.channelPrio(ch, parseInt(prio)) });
       });
-      schema.summaryProps("HttpChannelChild", ["url", "status"]);
+      logan.summaryProps("HttpChannelChild", ["url", "status"]);
 
       /******************************************************************************
        * HttpChannelParent
@@ -663,7 +663,7 @@ logan.schema("MOZ_LOG",
           ch.state("redirected");
         }
       });
-      schema.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
+      logan.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
 
       /******************************************************************************
        * nsHttpChannelAuthProvider
@@ -779,7 +779,7 @@ logan.schema("MOZ_LOG",
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("nsHttpTransaction", ["blocking", "tab-id", "url"]);
+      logan.summaryProps("nsHttpTransaction", ["blocking", "tab-id", "url"]);
 
       /******************************************************************************
        * nsHttpConnection
@@ -866,7 +866,7 @@ logan.schema("MOZ_LOG",
       module.rule("Http2Session::LogIO %p stream=%p id=%x [%*]", function(session, stream, id, what) {
         this.obj(session).class("Http2Session").capture().mention(stream);
       });
-      schema.summaryProps("Http2Session", ["key"]);
+      logan.summaryProps("Http2Session", ["key"]);
 
       /******************************************************************************
        * Http2Stream
@@ -922,7 +922,7 @@ logan.schema("MOZ_LOG",
       module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
         this.obj(stream).state("closed").prop("status", result).capture();
       });
-      schema.summaryProps("Http2Stream", ["status", "url"]);
+      logan.summaryProps("Http2Stream", ["status", "url"]);
 
       /******************************************************************************
        * nsHalfOpenSocket
@@ -960,7 +960,7 @@ logan.schema("MOZ_LOG",
       module.rule("Destroying nsHalfOpenSocket [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("nsHalfOpenSocket", ["key"]);
+      logan.summaryProps("nsHalfOpenSocket", ["key"]);
 
       /******************************************************************************
        * connection manager
@@ -1007,7 +1007,7 @@ logan.schema("MOZ_LOG",
           trans.capture().mention(conn);
         });
       });
-      schema.summaryProps("nsConnectionEntry", "key");
+      logan.summaryProps("nsConnectionEntry", "key");
 
       /******************************************************************************
        * nsHttpCompresssConv
@@ -1081,7 +1081,7 @@ logan.schema("MOZ_LOG",
       module.rule("destroying nsSocketTransport @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("nsSocketTransport", ["origin"]);
+      logan.summaryProps("nsSocketTransport", ["origin"]);
 
     }); // nsSocketTransport
 
@@ -1139,7 +1139,7 @@ logan.schema("MOZ_LOG",
       module.rule("CacheEntry::~CacheEntry [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
-      schema.summaryProps("CacheEntry", "key");
+      logan.summaryProps("CacheEntry", "key");
 
     }); // cache2
 
@@ -1233,7 +1233,7 @@ logan.schema("text console",
 
         win.destroy();
       });
-      schema.summaryProps("DOMWINDOW", ["url", "pid"]);
+      logan.summaryProps("DOMWINDOW", ["url", "pid"]);
 
       module.rule("Completed ShutdownLeaks collections in process %u", function(pid) {
         this.global.data("pids", pid).after_leak_collection = true;

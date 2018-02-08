@@ -176,9 +176,6 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.preparer = preparer;
     this.modules = {};
     this.unmatch = [];
-    this.ui = {
-      summary: {}, // map: className -> prop to display on the summary line
-    };
 
     this._finalize = function() {
       if (USE_RULES_TREE_OPTIMIZATION) {
@@ -236,10 +233,6 @@ const EPOCH_1970 = new Date("1970-01-01");
   Schema.prototype.removeIf = function(rule) {
     this.unmatch.remove(item => item.id === rule.id);
   }
-
-  Schema.prototype.summaryProps = function(className, arrayOfProps) {
-    this.ui.summary[className] = arrayOfProps;
-  };
 
 
   function Module(name) {
@@ -323,7 +316,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       //    the first time.
       //
       // This is not logged on purpose, since there is a lot of cases we recycle
-      // pointers for which we have created temps from link() et al as well as 
+      // pointers for which we have created temps from link() et al as well as
       // a lot of log lines written after object's respective destructor line.
 
       this.destroy(undefined /* always */, false /* no auto-capture */);
@@ -754,6 +747,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     _schemes: {},
     _schema: null,
+    _summaryProps: {},
 
     schema: function(name, preparer, builder) {
       this._schema = ensure(this._schemes, name, () => new Schema(name, preparer));
@@ -771,6 +765,13 @@ const EPOCH_1970 = new Date("1970-01-01");
       }
 
       return (this._schema = this._schemes[name]);
+    },
+
+    summaryProps: function(className, arrayOfProps) {
+      if (this._summaryProps[className]) {
+        console.warn(`Overriding summary properties of class ${className}`);
+      }
+      this._summaryProps[className] = arrayOfProps;
     },
 
     parse: function(line, printf, consumer, unmatch) {
