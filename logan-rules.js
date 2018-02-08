@@ -1251,6 +1251,17 @@ logan.schema("TaskCluster log",
 
     proc._ipc = true;
 
+    /* [task 2018-02-08T11:29:03.142Z] 11:29:03     INFO - Stopping web server */
+    match = line.match(/^\[(\w+) (\d+\-\d\d\-\d\dT\d\d:\d\d:\d\d\.\d+Z)\] (\d+:\d\d:\d\d)\s+([A-Z]+) - (.*)$/);
+    if (match) {
+      let [all, origin, timestamp, time, level, text] = match;
+      return {
+        text: text,
+        timestamp: new Date(timestamp),
+        forward: { "./mach test": text, },
+      };
+    }
+
     /* 22:54:10     INFO -  17 INFO TEST-START | browser/components/originattributes/test/browser/browser_cache.js */
     match = line.match(/^(\d+:\d\d:\d\d)\s+([A-Z]+) -\s+((?:None)?\d+) ([A-Z]+) (.*)$/);
     if (match) {
