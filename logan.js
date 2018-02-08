@@ -192,7 +192,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       // This is grep() handler, has to be added as last because its condition handler
       // never returns true making following conditional rules process the line as well.
       this.plainIf(function(state) {
-        for (let regexp of [GREP_REGEXP, this.nonPtrAliases]) {
+        for (let regexp of [GREP_REGEXP, logan._proc.nonPtrAliases]) {
           if (!regexp) {
             break;
           }
@@ -213,16 +213,6 @@ const EPOCH_1970 = new Date("1970-01-01");
           }
         }
       }.bind(this), () => { throw "grep() internal consumer should never be called"; });
-    };
-
-    this.update_alias_regexp = function() {
-      let nonPtrAliases = [];
-      for (let obj of Object.keys(logan._proc.objs)) {
-        if (!obj.match(POINTER_REGEXP)) {
-          nonPtrAliases.push(escapeRegexp(obj));
-        }
-      }
-      this.nonPtrAliases = nonPtrAliases.length === 0 ? null : new RegExp("(" + nonPtrAliases.join("|") + ")", "g");
     };
   }
 
@@ -365,7 +355,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.aliases[alias] = true;
 
     if (!alias.match(POINTER_REGEXP)) {
-      logan._schema.update_alias_regexp();
+      logan._proc.update_alias_regexp();
     }
 
     return this;
@@ -388,7 +378,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     delete this._references;
 
     if (updateAliasRegExp) {
-      logan._schema.update_alias_regexp();
+      logan._proc.update_alias_regexp();
     }
 
     return capture ? this.capture() : this;
@@ -436,7 +426,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     let match = convertPrintfToRegexp(format);
     let obj = this;
     let thread = logan._proc.thread;
-    let rule = logan._schema.plainIf(proc => {
+    let schema = logan._proc.schema;
+    let rule = schema.plainIf(proc => {
       if (proc.thread !== thread) {
         return false;
       }
@@ -446,7 +437,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       }, line => {
         return error(obj, line);
       })) {
-        logan._schema.removeIf(rule);
+        schema.removeIf(rule);
       }
       return false;
     }, () => { throw "Obj.expect() handler should never be called"; });
@@ -702,7 +693,7 @@ const EPOCH_1970 = new Date("1970-01-01");
           if (store) {
             this.objs[ptr] = obj;
             if (!ptr.match(POINTER_REGEXP)) {
-              logan._schema.update_alias_regexp();
+              logan._proc.update_alias_regexp();
             }
           }
           obj.factual = store;
@@ -748,7 +739,17 @@ const EPOCH_1970 = new Date("1970-01-01");
         let result = this.save();
         this.restore(through);
         return result;
-      }
+      },
+
+      update_alias_regexp: function() {
+        let nonPtrAliases = [];
+        for (let obj of Object.keys(logan._proc.objs)) {
+          if (!obj.match(POINTER_REGEXP)) {
+            nonPtrAliases.push(escapeRegexp(obj));
+          }
+        }
+        this.nonPtrAliases = nonPtrAliases.length === 0 ? null : new RegExp("(" + nonPtrAliases.join("|") + ")", "g");
+      },
     },
 
     _schemes: {},
@@ -808,6 +809,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.searchProps = {};
       this._proc.global = new Bag();
       this._proc._sync = {};
+      delete this._proc.nonPtrAliases;
 
       let parents = {};
       let children = {};
@@ -1107,6 +1109,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     },
 
     consumeLineByRules: function(schema, consume, prepared) {
+      this._proc.schema = schema;
       this._proc.file = consume.file;
       this._proc.timestamp = prepared.timestamp;
       this._proc.line = prepared.text;
