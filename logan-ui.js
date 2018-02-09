@@ -206,7 +206,7 @@
           props = logan.searchProps[$("#search_className").val()] || {};
         }
         props = Array.from(new Set(
-          Object.keys(props).concat([CAPTURED_LINE_LABEL, "pointer"])
+          Object.keys(props).concat([CAPTURED_LINE_LABEL, "pointer", "state"])
         )).sort();
 
         let use = "state";
