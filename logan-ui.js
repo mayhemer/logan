@@ -58,6 +58,7 @@
       maxProgress: 0,
       currentProgress: 0,
       searchDisableCount: 0,
+      searchByCache: null,
 
       escapeHtml: function(string) {
         return String(string).replace(/[&<>"'`=\/]/g, function(s) {
@@ -208,9 +209,16 @@
           Object.keys(props).concat([CAPTURED_LINE_LABEL, "pointer"])
         )).sort();
 
+        let use = "state";
         for (let prop of props) {
           select.append($("<option>").attr("value", prop).text(prop));
+
+          if (prop == this.searchByCache) {
+            use = prop;
+          }
         }
+
+        select.val(use);
       },
 
       closeDetails: function() {
@@ -888,16 +896,19 @@
       $("#error_section").show().text(err.message || err);
     };
 
-    $("#tools_button").click((event) => {
-    });
-
     $("#files").on("change", (event) => {
       UI.clearResultsView();
       UI.setSearchView(true);
       logan.consumeFiles(UI, event.target.files);
     });
 
-    $("#search_By").on("change", (event) => {
+    let search_By = $("#search_By").on("change", (event) => {
+      if (event.originalEvent) { 
+        // a hacky way to recognize this is not a call to .change()
+        // but that actually comes from a user interaction.
+
+        UI.searchByCache = search_By.val();
+      }
     }).change();
 
     $("#search_Matching").on("change", (event) => {
