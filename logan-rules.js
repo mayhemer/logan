@@ -1138,7 +1138,7 @@ logan.schema("MOZ_LOG",
       });
       module.rule("CacheEntryHandle::Dismiss %p", function(handle) {
         // compatibility for logs w/o ~CacheEntryHandle
-        this.obj(handle).capture().unalias();
+        this.objIf(handle).capture().unalias();
       });
       module.rule("CacheEntryHandle::~CacheEntryHandle %p", function(handle) {
         this.objIf(handle).capture().unalias();
