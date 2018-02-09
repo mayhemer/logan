@@ -354,6 +354,22 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
+  Obj.prototype.unalias = function() {
+    alias = this.__most_recent_accessor;
+    if (!this.aliases[alias]) {
+      return this;
+    }
+
+    delete logan._proc.objs[alias];
+    delete this.aliases[alias];
+
+    if (!alias.match(POINTER_REGEXP)) {
+      logan._proc.update_alias_regexp();
+    }
+
+    return this;
+  };
+
   Obj.prototype.destroy = function(ifClassName, capture = true) {
     if (ifClassName && this.props.className !== ifClassName) {
       return this;

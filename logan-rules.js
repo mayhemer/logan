@@ -1136,6 +1136,13 @@ logan.schema("MOZ_LOG",
           c.link(entry);
         });
       });
+      module.rule("CacheEntryHandle::Dismiss %p", function(handle) {
+        // compatibility for logs w/o ~CacheEntryHandle
+        this.obj(handle).capture().unalias();
+      });
+      module.rule("CacheEntryHandle::~CacheEntryHandle %p", function(handle) {
+        this.objIf(handle).capture().unalias();
+      });
       module.rule("CacheEntry::~CacheEntry [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });

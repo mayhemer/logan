@@ -139,6 +139,7 @@ Obj (an object) methods:
 - `.destroy(["classname"])`: called from destructors, this sets the state of the object to 'released' and removes the object from the processing state; it means that a following call to `this.obj()` in rules with the same identifier value will return a new blank object; if "classname" is provided, the object is destroyed only when the object's class name is identical to it
 - `.capture("string" or no argument)`: this adds a line to the object so that it then appears in the results when the object is expanded in the results view; when there is no argument passed, the currently processed line is automatically added
 - `.alias("alias")`: an object can be identified by multiple values sometimes thanks static_cast pointer shifts, wrapping helper classes ("handlers"), or simply by a unique key side by a pointer; this method allows you to define such an alias so that calls to `this.obj("alias")` will resolve to this object
+- `.unalias()`: when there is an alias to an object that is a 'handle' or 'wrapper' object owning it and such a wrapper object can live shorter than the real object, you must un-alias it when its destroyed using this method so that there is no conflict when the pointer gets recycled
 - `.grep()`: this conveniently instructs the object to capture all lines that contain the object's pointer or any of its aliases that are in form of a pointer
 - `.link("identifier" or object)`: this adds a 'this object links to other object' line, as described in the **Links to referred or referring objects** section above, the argument can be an identifier or an alias (will be resolved) or directly an object as returned by `this.obj()`; note that the link is automatically added to both objects with the correct vector
 - `.mention("identifier" or object)`: this simply adds a line that mentions the given object so that it can be expanded in the results view - via a line with a checkbox; this doesn't establish any relation between the two objects
@@ -208,7 +209,7 @@ To make the capturing process reliable there is a suggested ordering of calls wh
 5. capture()
 6. send(), link() or mention()
 7. follow()
-8. destroy()
+8. destroy() or unalias()
 
 ## A conditional rule
 
