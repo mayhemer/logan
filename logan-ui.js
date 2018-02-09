@@ -516,10 +516,6 @@
       },
 
       addResult: function(obj, searchProp) {
-        if (!obj.factual) {
-          return null;
-        }
-        
         return this.addRevealer(obj, (element) => {
           element
             .append($("<span>")

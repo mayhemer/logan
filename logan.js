@@ -1314,7 +1314,9 @@ const EPOCH_1970 = new Date("1970-01-01");
       }
 
       let addResult = (obj) => {
-        UI.addResult(obj, propName).addClass("result").css("color", coloring);
+        if (obj.factual) {
+          UI.addResult(obj, propName).addClass("result").css("color", coloring);
+        }
       }
 
       if (propName === CAPTURED_LINE_LABEL) {
