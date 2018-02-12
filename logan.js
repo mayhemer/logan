@@ -554,7 +554,11 @@ const EPOCH_1970 = new Date("1970-01-01");
       // Already created
       return this;
     }
-    return this.create(className, false).state("partial").prop("missing-constructor", true);
+
+    ensure(logan.searchProps, className, { pointer: true, state: true, logid: true });
+
+    this.props.className = className;
+    return this.prop("state", "partial").prop("missing-constructor", true);
   };
 
   Obj.prototype.dispatch = function(target, name) {
