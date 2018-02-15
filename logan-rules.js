@@ -1061,7 +1061,7 @@ logan.schema("MOZ_LOG",
           .prop("last-poll-flags", flgs)
           .capture()
           .follow("ErrorAccordingToNSPR [in=%d out=%x]", (sock, nsprerr, mozerr) => {
-            sock.capture().prop("sock-error", mozerr);
+            sock.capture().prop("sock-error", mozerr, true);
           });
         netcap(n => { n.socketReady(this.thread.networksocket) });
       });
