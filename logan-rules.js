@@ -1054,7 +1054,15 @@ logan.schema("MOZ_LOG",
           .follow("nsSocketTransport::InitiateSocket skipping speculative connection for host %*$", (sock) => { sock.capture() });
       });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
-        this.thread.networksocket = this.obj(ptr).class("nsSocketTransport").grep().prop("last-poll-flags", flgs).capture();
+        this.thread.networksocket = this
+          .obj(ptr)
+          .class("nsSocketTransport")
+          .grep()
+          .prop("last-poll-flags", flgs)
+          .capture()
+          .follow("ErrorAccordingToNSPR [in=%d out=%x]", (sock, nsprerr, mozerr) => {
+            sock.capture().prop("sock-error", mozerr);
+          });
         netcap(n => { n.socketReady(this.thread.networksocket) });
       });
       module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
