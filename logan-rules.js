@@ -488,6 +488,9 @@ logan.schema("MOZ_LOG",
       module.rule("nsHttpChannel::AsyncOpen [this=%p]", function(ptr) {
         let channel = this.obj(ptr).state("open").capture();
         channel.__opentime = this.timestamp;
+        if (this.thread.httpchannel_init === channel) {
+          delete this.thread.httpchannel_init;
+        }
         netcap(n => { n.channelAsyncOpen(channel) });
       });
       module.rule("nsHttpChannel [%p] created nsChannelClassifier [%p]", function(ch, clas) {
