@@ -133,6 +133,7 @@
 
         $("#search_button").prop('disabled', !!this.searchDisableCount);
         $("#files").prop('disabled', !!this.searchDisableCount);
+        $("#select_schema").prop('disabled', !!this.searchDisableCount);
       },
 
       setResultsView: function() {
