@@ -297,7 +297,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.create = function(className, capture = true) {
     if (this.props.className) {
-      console.warn(logan.exceptionParse("object already exists, recreting automatically from scratch "));
+      console.warn(logan.exceptionParse(`object already exists (${this.props.className}@${this.props.pointer} - ${this.props.state}), recreting automatically from scratch`));
     }
 
     if (this.props.className || this.captures.length) {
