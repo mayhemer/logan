@@ -1057,8 +1057,7 @@ logan.schema("MOZ_LOG",
           .follow("nsSocketTransport::InitiateSocket skipping speculative connection for host %*$", (sock) => { sock.capture() });
       });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
-        this.thread.networksocket = this
-          .obj(ptr)
+        this.thread.networksocket = this.obj(ptr)
           .class("nsSocketTransport")
           .grep()
           .prop("last-poll-flags", flgs)
@@ -1073,11 +1072,11 @@ logan.schema("MOZ_LOG",
           .capture(`  ${st} = ${convertProgressStatus(st)}`).prop("last-status", convertProgressStatus(st));
         netcap(n => { n.socketStatus(sock, convertProgressStatus(st)) });
       });
-      module.rule("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
-        this.thread.on("networksocket", st => st.alias(ptr).prop("output-cond", cond).capture());
+      module.ruleIf("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", proc => proc.thread.networksocket, function(ptr, cond, sock) {
+        this.obj(sock).alias(ptr).prop("output-cond", cond).capture();
       });
-      module.rule("nsSocketInputStream::OnSocketReady [this=%p cond=%d]", function(ptr, cond) {
-        this.thread.on("networksocket", st => st.alias(ptr).prop("input-cond", cond).capture());
+      module.ruleIf("nsSocketInputStream::OnSocketReady [this=%p cond=%d]", proc => proc.thread.networksocket, function(ptr, cond, sock) {
+        this.obj(sock).alias(ptr).prop("input-cond", cond).capture();
       });
       module.rule("nsSocketOutputStream::Write [this=%p count=%u]\n", function(ptr, count) {
         this.thread.networksocket = this.obj(ptr).capture().follow("  PR_Write returned [n=%d]\n", (sock, written) => {
