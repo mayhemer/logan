@@ -67,6 +67,52 @@ Bag.prototype.data = function(name, key) {
   return ensure(map, key, () => new Bag());
 };
 
+class Stringifier {
+  // map = { HumanReadableIdentifier: numeric-value, ... };
+  constructor(map) {
+    this.map = {};
+    for (let term in map) {
+      this[term] = map[term];
+      this.map[map[term]] = term + "";
+    }
+  }
+}
+
+class Enum extends Stringifier {
+  $(numeric, radix = 16) {
+    if (typeof numeric === "string") {
+      numeric = parseInt(numeric, radix);
+    }
+    
+    return this.map[numeric] || numeric;
+  }
+}
+
+class Flags extends Stringifier {
+  $(numeric, radix = 10) {
+    if (typeof numeric === "string") {
+      numeric = parseInt(numeric, radix);
+    }
+
+    if (numeric == 0) {
+      return "0";
+    }
+
+    let result = "";
+    for (let flag in this.map) {
+      if (flag & numeric) {
+        if (result) {
+          result += ", ";
+        }
+        result += this.map[flag];
+        numeric &= ~flag;
+      }
+    }
+
+    return result + (numeric ? ` [unknow bits=${numeric.toString(2)}b]` : "");
+  }
+}
+
 const GREP_REGEXP = new RegExp("((?:0x)?[A-Fa-f0-9]{4,})", "g");
 const POINTER_REGEXP = /^(?:0x)?0*([0-9A-Fa-f]+)$/;
 const NULLPTR_REGEXP = /^(?:(?:0x)?0+|\(null\)|\(nil\))$/;

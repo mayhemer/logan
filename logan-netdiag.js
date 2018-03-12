@@ -10,7 +10,7 @@ const NET_DIAG_ENABLED = false;
   interval = (a, b) => a && b ? (a.getTime() - b.getTime()) : undefined
   interval_t = (a, b) => interval(a, b) + " ms";
   assert = (cond, msg) => { if (!cond) throw new Error(msg || "assertion failure"); }
-  COS = () => logan._schemes.moz.ClassOfServiceFlags;
+  let COS = () => logan._schemes.MOZ_LOG.COS;
 
   const ClassOfServiceFlags = {
     isLeaderOrUrgent: function(cos) {
@@ -147,6 +147,8 @@ const NET_DIAG_ENABLED = false;
   };
 
   netdiagUI = {
+    enabled: NET_DIAG_ENABLED,
+    
     channel_history: [],
 
     reset: function() {
@@ -672,9 +674,9 @@ const NET_DIAG_ENABLED = false;
       };
 
       add("URL", result.obj.props.url);
-      add("class-of-service", COS().stringify(result.cos));
+      add("class-of-service", COS().$(result.cos));
       if (result.latecos) {
-        add("class-of-service after activating transaction", result.latecos.map(cos => COS().stringify(cos)).join("|")).css({ color: "red" });
+        add("class-of-service after activating transaction", result.latecos.map(cos => COS().$(cos)).join("|")).css({ color: "red" });
         ctrl.warn();
       }
       add("priority", result.prio);

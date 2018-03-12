@@ -29,7 +29,7 @@ logan.schema("MOZ_LOG",
   },
 
   (schema) => {
-    schema.ClassOfServiceFlags = {
+    schema.COS = new Flags({
       Leader: 1 << 0,
       Follower: 1 << 1,
       Speculative: 1 << 2,
@@ -41,38 +41,33 @@ logan.schema("MOZ_LOG",
       Tail: 1 << 8,
       TailAllowed: 1 << 9,
       TailForbidden: 1 << 10,
+    });
 
-      stringify: function(cos) {
-        let result = "";
-        for (let flag in this) {
-          if (typeof this[flag] !== "number") {
-            continue;
-          }
-          if (cos & this[flag]) {
-            if (result) result += ", ";
-            result += flag;
-          }
-        }
-        return result || "0";
-      }
-    };
+    schema.NET_STATUS = new Enum({
+      STATUS_READING: 0x804B0008,
+      STATUS_WRITING: 0x804B0009,
+      STATUS_RESOLVING: 0x804b0003,
+      STATUS_RESOLVED: 0x804b000b,
+      STATUS_CONNECTING_TO: 0x804b0007,
+      STATUS_CONNECTED_TO: 0x804b0004,
+      STATUS_TLS_HANDSHAKE_STARTING: 0x804B000C,
+      STATUS_TLS_HANDSHAKE_ENDED: 0x804B000D,
+      STATUS_SENDING_TO: 0x804b0005,
+      STATUS_WAITING_FOR: 0x804b000a,
+      STATUS_RECEIVING_FROM: 0x804b0006,
+    });
 
-    convertProgressStatus = (status) => {
-      switch (parseInt(status, 16)) {
-        case 0x804B0008: return "STATUS_READING";
-        case 0x804B0009: return "STATUS_WRITING";
-        case 0x804b0003: return "STATUS_RESOLVING";
-        case 0x804b000b: return "STATUS_RESOLVED";
-        case 0x804b0007: return "STATUS_CONNECTING_TO";
-        case 0x804b0004: return "STATUS_CONNECTED_TO";
-        case 0x804B000C: return "STATUS_TLS_HANDSHAKE_STARTING";
-        case 0x804B000D: return "STATUS_TLS_HANDSHAKE_ENDED";
-        case 0x804b0005: return "STATUS_SENDING_TO";
-        case 0x804b000a: return "STATUS_WAITING_FOR";
-        case 0x804b0006: return "STATUS_RECEIVING_FROM";
-        default: return status;
-      }
-    }
+    schema.SOCK_CONN_FLAGS = new Flags({
+      BYPASS_CACHE: 1 << 0,
+      ANONYMOUS_CONNECT: 1 << 1,
+      DISABLE_IPV6: 1 << 2,
+      NO_PERMANENT_STORAGE: 1 << 3,
+      DISABLE_IPV4: 1 << 4,
+      DISABLE_RFC1918: 1 << 5,
+      MITM_OK: 1 << 6,
+      BE_CONSERVATIVE: 1 << 7,
+      DISABLE_TRR: 1 << 8,
+    });
 
     schema.module("DocumentLeak", (module) => {
 
@@ -613,10 +608,10 @@ logan.schema("MOZ_LOG",
         this.thread.httpchannel_for_auth = this.obj(ptr).prop("http-status", status, true).capture();
       });
       module.rule("sending progress notification [this=%p status=%x progress=%d/%d]", function(ch, status) {
-        this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
+        this.obj(ch).capture().capture("  " + status + " = " + schema.NET_STATUS.$(status));
       });
       module.rule("sending progress and status notification [this=%p status=%x progress=%u/%d]", function(ch, status) {
-        this.obj(ch).capture().capture("  " + status + " = " + convertProgressStatus(status));
+        this.obj(ch).capture().capture("  " + status + " = " + schema.NET_STATUS.$(status));
       });
       module.rule("nsHttpChannel %p tracking resource=%d, cos=%u", function(ch, tracker) {
         ch = this.obj(ch).prop("tracker", tracker === "1").capture();
@@ -652,7 +647,7 @@ logan.schema("MOZ_LOG",
         this.obj(ch).capture().mention(rc);
       });
       module.rule("nsHttpChannel::OnClassOfServiceUpdated this=%p, cos=%u", function(ch, cos) {
-        ch = this.obj(ch).capture().capture("  cos = " + schema.ClassOfServiceFlags.stringify(cos));
+        ch = this.obj(ch).capture().capture("  cos = " + schema.COS.$(cos));
         netcap(n => { n.channelCOS(ch, parseInt(cos)) });
       });
       module.rule("nsHttpChannel::SetPriority %p p=%d", function(ch, prio) {
@@ -1056,6 +1051,9 @@ logan.schema("MOZ_LOG",
         this.thread.networksocket = this.obj(sock).prop("attempt-TFO", true).capture()
           .follow("nsSocketTransport::InitiateSocket skipping speculative connection for host %*$", (sock) => { sock.capture() });
       });
+      module.rule("nsSocketTransport::SetConnectionFlags %p flags=%u", function(sock, flags) {
+        this.obj(sock).capture().capture(`  flags = ${schema.SOCK_CONN_FLAGS.$(flags)}`);
+      });
       module.rule("nsSocketTransport::OnSocketReady [this=%p outFlags=%d]", function(ptr, flgs) {
         this.thread.networksocket = this.obj(ptr)
           .class("nsSocketTransport")
@@ -1069,8 +1067,8 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsSocketTransport::SendStatus [this=%p status=%x]", function(sock, st) {
         sock = this.obj(sock).class("nsSocketTransport").grep().capture()
-          .capture(`  ${st} = ${convertProgressStatus(st)}`).prop("last-status", convertProgressStatus(st));
-        netcap(n => { n.socketStatus(sock, convertProgressStatus(st)) });
+          .capture(`  ${st} = ${schema.NET_STATUS.$(st)}`).prop("last-status", schema.NET_STATUS.$(st));
+        netcap(n => { n.socketStatus(sock, schema.NET_STATUS.$(st)) });
       });
       module.ruleIf("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", proc => proc.thread.networksocket, function(ptr, cond, sock) {
         this.obj(sock).alias(ptr).prop("output-cond", cond).capture();
