@@ -69,6 +69,14 @@ logan.schema("MOZ_LOG",
       DISABLE_TRR: 1 << 8,
     });
 
+    schema.H2STREAM_STATE = new Enum({
+      GENERATING_HEADERS: 0,
+      GENERATING_BODY: 1,
+      SENDING_BODY: 2,
+      SENDING_FIN_STREAM: 3,
+      UPSTREAM_COMPLETE: 4,
+    });
+
     schema.module("DocumentLeak", (module) => {
 
       /******************************************************************************
@@ -882,14 +890,8 @@ logan.schema("MOZ_LOG",
         this.obj(ptr).destroy();
       });
       module.rule("Http2Stream::ChangeState() %p from %d to %d", function(stream, oldst, newst) {
-        switch (parseInt(newst)) {
-          case 0: newst = "GENERATING_HEADERS"; break;
-          case 1: newst = "GENERATING_BODY"; break;
-          case 2: newst = "SENDING_BODY"; break;
-          case 3: newst = "SENDING_FIN_STREAM"; break;
-          case 4: newst = "UPSTREAM_COMPLETE"; break;
-        }
-        this.obj(stream).prop("upstreamstate", newst).capture();
+        let state = schema.H2STREAM_STATE.$(newst);
+        this.obj(stream).prop("upstreamstate", state).capture().capture(`  ${newst}=${state}`);
       });
       module.rule("Http2Session::ReadSegments %p stream=%p stream send complete", function(sess, stream) {
         this.obj(stream).state("sent").capture();
