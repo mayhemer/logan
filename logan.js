@@ -249,7 +249,7 @@ const EPOCH_1970 = new Date("1970-01-01");
             }
             for (let ptr of pointers) {
               let obj = state.objs[pointerTrim(ptr)];
-              if (obj && obj._grep) {
+              if (obj && obj._grep === state.schema) {
                 obj.capture();
               }
             }
@@ -473,7 +473,7 @@ const EPOCH_1970 = new Date("1970-01-01");
   };
 
   Obj.prototype.grep = function() {
-    this._grep = true;
+    this._grep = logan._proc.schema;
     return this;
   };
 
