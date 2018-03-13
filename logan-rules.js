@@ -24,7 +24,7 @@ logan.schema("MOZ_LOG",
         module: module,
       };
     }
-    
+
     return undefined; // just express it explicitly
   },
 
@@ -1205,15 +1205,19 @@ logan.schema("MOZ_LOG",
 ); // MOZ_LOG
 
 
-logan.schema("text console",
+logan.schema("debug text console",
+  /*
+   * This is the general text debug console output mixed with TEST-* lines
+   */
+
   (line, proc) => {
     proc._ipc = true;
-  
+
     return {
       text: line,
       forward: { "MOZ_LOG": line, },
     };
-  },  
+  },
 
   (schema) => {
 
@@ -1260,7 +1264,53 @@ logan.schema("text console",
 ); // text console
 
 
-logan.schema("TaskCluster log",
+logan.schema("./mach test",
+  /*
+   * This is for running |./mach test| locally and piping the output to a file
+   */
+
+  (line, proc) => {
+    let match;
+
+    proc._ipc = true;
+
+    /* GECKO(7912) | some console text */ // this is mochitest-browser
+    match = line.match(/^(\w+)\((\d+)\) \| (.*)$/);
+    if (match) {
+      let [all, process_name, pid, text] = match;
+      return {
+        text: text,
+        forward: { "debug text console": text },
+      };
+    }
+
+    /* PID 12584 | 2018-02-08 17:30:20.052000 UTC - [12584:Main Thread]: D/nsHostResolver nsHostResolver::Init this=0000021C55746300 */ // this is xpcshell
+    match = line.match(/^PID (\d+) \| (.*)$/);
+    if (match) {
+      let [all, pid, text] = match;
+      return {
+        text: text,
+        forward: { "debug text console": text },
+      };
+    }
+
+    return {
+      text: line,
+      forward: { "debug text console": line },
+    };
+  },
+
+  (schema) => {
+
+  }
+); // ./mach test
+
+
+logan.schema("treeherder log",
+  /*
+   * This is for logs downloaded from treeherder
+   */
+
   (line, proc) => {
     let match;
 
@@ -1284,7 +1334,7 @@ logan.schema("TaskCluster log",
       return {
         text: text,
         module: "test",
-        forward: { "text console": text, },
+        forward: { "debug text console": text, },
       };
     }
 
@@ -1298,69 +1348,46 @@ logan.schema("TaskCluster log",
       };
     }
 
+    /* 03-12 20:16:23.488  4670  4670 I Gecko   : [4670:Main Thread]: D/nsHttp nsHttpHandler::NewProxiedChannel [proxyInfo=0] */
+    match = line.match(/^\d+\-\d+ \d+:\d+:\d+\.\d+  (\d+)  (\d+) ([A-Z]) (\w+)   : (.*)$/);
+    if (match) {
+      let [all, pid, pid2, level, process_name, text] = match;
+      return {
+        text: text,
+        forward: { "debug text console": text },
+      };
+    }
+
     return undefined;
   },
 
   (schema) => {
 
   }
-); // TaskCluster log
+); // treeherder log
 
 
-logan.schema("./mach test",
+logan.schema("rr console",
+  /*
+   * This is for piped console output when running rr
+   */
+
   (line, proc) => {
     let match;
 
     proc._ipc = true;
 
-    /* GECKO(7912) | some console text */ // this is mochitest-browser
-    match = line.match(/^(\w+)\((\d+)\) \| (.*)$/);
-    if (match) {
-      let [all, process_name, pid, text] = match;
-      return {
-        text: text,
-        forward: { "text console": text },
-      };
-    }
-
-    /* PID 12584 | 2018-02-08 17:30:20.052000 UTC - [12584:Main Thread]: D/nsHostResolver nsHostResolver::Init this=0000021C55746300 */ // this is xpcshell
-    match = line.match(/^PID (\d+) \| (.*)$/);
-    if (match) {
-      let [all, pid, text] = match;
-      return {
-        text: text,
-        forward: { "text console": text },
-      };
-    }
-
-    return {
-      text: line,
-      forward: { "text console": line },
-    };
-  },
-
-  (schema) => {
-
-  }
-); // ./mach test
-
-
-logan.schema("rr console",
-  (line, proc) => {
-    let match;
-
     match = line.match(/^\[rr (\d+) (\d+)\](.*)$/);
     if (match) {
-      // this is likely a mixed console log that may have both parent and child logs in it, force ipc usage
-      proc._ipc = true;
 
       let [all, pid, rrline, text] = match;
       return {
         text: text,
-        forward: { "text console": text, }
+        forward: { "debug text console": text, }
       };
     }
 
+    return undefined;
   },
 
   (schema) => {
