@@ -1072,6 +1072,9 @@ logan.schema("MOZ_LOG",
           .capture(`  ${st} = ${schema.NET_STATUS.$(st)}`).prop("last-status", schema.NET_STATUS.$(st));
         netcap(n => { n.socketStatus(sock, schema.NET_STATUS.$(st)) });
       });
+      module.rule("nsSocketTransport::RecoverFromError [this=%p state=%u cond=%x]", function(sock, state, error) {
+        this.obj(sock).prop("error", error, true).capture().follow("  %*$", sock => sock.capture(), () => false);
+      });
       module.ruleIf("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", proc => proc.thread.networksocket, function(ptr, cond, sock) {
         this.obj(sock).alias(ptr).prop("output-cond", cond).capture();
       });
