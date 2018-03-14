@@ -123,6 +123,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   const FILE_SLICE = 1 * 1024 * 1024;
   const USE_RULES_TREE_OPTIMIZATION = true;
+  const ALLOW_NON_POINTER_ALIAS_GREPING = true;
 
   let IF_RULE_INDEXER = 0;
 
@@ -801,6 +802,10 @@ const EPOCH_1970 = new Date("1970-01-01");
       },
 
       update_alias_regexp: function() {
+        if (!ALLOW_NON_POINTER_ALIAS_GREPING) {
+          return;
+        }
+
         let nonPtrAliases = [];
         for (let obj of Object.keys(logan._proc.objs)) {
           if (!obj.match(POINTER_REGEXP)) {
@@ -955,6 +960,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       file.__line_number = line;
 
       let previousLine = "";
+      let halfCRLF = false;
       let slice = (segmentoffset) => {
         return new Promise((resolve, reject) => {
           let blob = file.slice(segmentoffset, segmentoffset + chunk);
@@ -973,7 +979,14 @@ const EPOCH_1970 = new Date("1970-01-01");
               UI && UI.addToLoadProgress(blob.size);
 
               // Change chunk size to 5MB and Chrome self-time of shift() is 1000x slower!
+              let maybeDeleteFirstEmptyLine =
+                halfCRLF && event.target.result.match(/^\n/);
+              halfCRLF = event.target.result.match(/\r$/);
+              
               let lines = event.target.result.split(/(\r\n|\r|\n)/);
+              if (maybeDeleteFirstEmptyLine) {
+                lines.shift();
+              }
 
               // This simple code assumes that a single line can't be longer than FILE_SLICE
               lines[0] = previousLine + lines[0];
