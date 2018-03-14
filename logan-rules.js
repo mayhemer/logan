@@ -67,6 +67,8 @@ logan.schema("MOZ_LOG",
       MITM_OK: 1 << 6,
       BE_CONSERVATIVE: 1 << 7,
       DISABLE_TRR: 1 << 8,
+      REFRESH_CACHE: 1 << 9,
+      RETRY_WITH_DIFFERENT_IP_FAMILY: 1 << 10,
     });
 
     schema.H2STREAM_STATE = new Enum({
