@@ -1301,6 +1301,16 @@ logan.schema("./mach test",
       };
     }
 
+    /* 0:01.67 pid:8768 [8768:Main Thread]: D/nsSocketTransport PollableEvent::Signal */ // comm-central xpcshell-test
+    match = line.match(/^\s*\d+:\d+\.\d+ pid:(\d+) (.*)$/);
+    if (match) {
+      let [all, pid, text] = match;
+      return {
+        text: text,
+        forward: { "debug text console": text },
+      };
+    }
+
     return {
       text: line,
       forward: { "debug text console": line },
