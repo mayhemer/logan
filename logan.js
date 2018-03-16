@@ -868,6 +868,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     },
 
     files: [],
+    cache: false,
 
     init: function() {
       for (let schema of Object.values(this._schemes)) {
@@ -931,11 +932,12 @@ const EPOCH_1970 = new Date("1970-01-01");
       }.bind(this));
     },
 
-    consumeFiles: function(UI, files) {
+    consumeFiles: function(UI, files, cache = false) {
       UI.searchingEnabled(false);
 
       this.files = Array.from(files);
       this.seekId = 0;
+      this.cache = cache;
       this.initProc(UI);
 
       UI.resetProgress();
@@ -1155,7 +1157,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     capture: function(what, obj) {
       if (!what) {
         if (!this._raw_capture) {
-          this._raw_capture = new Capture(undefined, obj);
+          // 'undefined' means to store file offset reference and reload when put on screen
+          this._raw_capture = new Capture(this.cache ? this._proc.raw : undefined, obj);
         }
 
         return this._raw_capture;

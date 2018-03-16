@@ -866,7 +866,7 @@
       if (files.length) {
         UI.clearResultsView();
         UI.setSearchView(true);
-        logan.consumeFiles(UI, files);
+        logan.consumeFiles(UI, files, $("#cache").prop("checked"));
       } else if (location.search) {
         UI.clearResultsView();
         UI.setSearchView(true);
@@ -900,7 +900,7 @@
     $("#files").on("change", (event) => {
       UI.clearResultsView();
       UI.setSearchView(true);
-      logan.consumeFiles(UI, event.target.files);
+      logan.consumeFiles(UI, event.target.files, $("#cache").prop("checked"));
     });
 
     let search_By = $("#search_By").on("change", (event) => {

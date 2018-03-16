@@ -26,13 +26,17 @@ div {
 .topbar > h2 {
   margin: 0;
   padding: 0;
-  font-size-adjust: 0.3;
+  font-size: 80%;
   display: inline;
+}
+
+.topbar > .hide-top {
+  display: none;
 }
 
 span#introduction {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size-adjust: 0.4;
+  font-size: 90%;
 }
 .topbar span#introduction {
   display: none;
@@ -42,7 +46,7 @@ span#introduction {
 }
 
 #warnings {
-  font-size-adjust: 0.4;
+  font-size: 80%;
   padding: 0.2em;
   background-color: #f2f25a;
   display: none;
@@ -58,7 +62,7 @@ div.load_progress {
 }
 
 div.section {
-  background-color: #eeeeea;
+  background-color: #fefefd;
   display: none;
   margin: 15%;
   padding: 2em;
@@ -250,8 +254,8 @@ label:not(.tail) {
   min-width: 10em;
   text-align: right;
 }
-.topbar label {
-  font-size-adjust: 0.5;
+.section label {
+  font-size: 70%;
 }
 
 input[type=text],
@@ -271,7 +275,7 @@ div.flow_root {
   display: flow-root;
 }
 div.flow_root.searches {
-  font-size-adjust: 0.5;
+  font-size: 80%;
 }
 
 div#searches {
@@ -292,7 +296,7 @@ div#active_searches {
 
 div.search:before {
   content: '\1f50d';
-  font-size-adjust: 0.4;
+  font-size: 80%;
 }
 div.search {
   display: inline-block;
