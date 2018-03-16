@@ -1,3 +1,5 @@
+var LOGAN_inlineExpand = null;
+
 (function() {
 
   function ensure(array, itemName, def = {}) {
@@ -308,21 +310,18 @@
         });
       },
 
-      highlight: function(input) {
+      highlight: function(input, at = 0) {
         if (typeof input === "object") {
           return "<span class='obj-" + input.id + "'>" + input.props.pointer + "</span>";
         }
 
         return input.replace(GREP_REGEXP, function(ptr) {
-          // TODO - this is the tricky part, the object has to be found
-          // by its pointer and all of its aliases and only within
-          // the object's lifetime span.
-          let obj = null;
-          if (obj) {
-            return "<span class='obj-" + obj.id + "'>" + ptr + "</span>";
+          let obj = logan.find(ptr, at);
+          if (obj && !(obj.id in this.expanders)) {
+            return `<span class='obj-${obj.id} inline-revealer' onclick='LOGAN_inlineExpand(this, ${obj.id});'>${ptr}</span>`;
           }
           return ptr;
-        });
+        }.bind(this));
       },
 
       objHighlighter: function(obj, source = null, set) {
@@ -460,8 +459,8 @@
                 return;
               }
 
-              expander = (expand) => {
-                let fromTop = element.offset().top - $(window).scrollTop();
+              expander = (expand, scrollanch = element) => {
+                let fromTop = scrollanch.offset().top - $(window).scrollTop();
                
                 // Must call in this order, since onExpansion wants to get the same color
                 this.objColor(obj);
@@ -504,7 +503,7 @@
                   }
                 }
 
-                $(window).scrollTop(element.offset().top - fromTop);
+                $(window).scrollTop(scrollanch.offset().top - fromTop);
               }
 
               this.expanders[obj.id] = expander;
@@ -623,7 +622,7 @@
               .append(span);
             
             logan.readCapture(capture).then((line) => {
-              span.html(this.highlight(this.escapeHtml(line)));
+              span.html(this.highlight(this.escapeHtml(line), capture.id));
             });
 
             return this.place(capture, element);
@@ -661,8 +660,9 @@
           .addClass("log_line expanded")
           .addClass(classification())
           .append(controller())
-          .append($("<span>").addClass("pre").html(this.highlight(this.escapeHtml(capture.what))))
-          ;
+          .append($("<span>").addClass("pre").html(this.highlight(
+            this.escapeHtml(capture.what), capture.id
+          )));
         
         return this.place(capture, element);
       },
@@ -855,8 +855,22 @@
         }
       }
     }; // UI
+  
+  LOGAN_inlineExpand = (element, objid) => {
+    let expander = UI.expanders[objid];
+    if (expander) {
+      expander(false, $(element));
+      delete UI.expanders[objid];
+      return;
+    }
 
+    element = $(element);
+    let fromTop = element.offset().top - $(window).scrollTop();
 
+    UI.addResult(logan.objects[objid]).children(".checker").click();
+
+    $(window).scrollTop(element.offset().top - fromTop);
+  };
 
   $(() => {
     logan.init();

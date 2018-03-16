@@ -1408,6 +1408,9 @@ const EPOCH_1970 = new Date("1970-01-01");
           if (className !== '*' && className != obj.props.className) {
             continue;
           }
+          if (!obj.captures.length) {
+            continue;
+          }
           if (seekId && obj.captures[0].id > seekId) {
             continue;
           }
@@ -1436,6 +1439,29 @@ const EPOCH_1970 = new Date("1970-01-01");
       }
 
       UI.searchingEnabled(true);
+    },
+
+    find: function(pointer, seekId) {
+      pointer = pointerTrim(pointer);
+      if (pointer === "0") {
+        return null;
+      }
+
+      for (let obj of this.objects) {
+        if (!obj.captures.length) {
+          continue;
+        }
+        if (obj.captures[0].id > seekId || obj.captures.last().id < seekId) {
+          continue;
+        }
+        // The object lives around the seek point
+
+        if (obj.props.pointer === pointer) {
+          return obj;
+        }
+      }
+
+      return null;
     },
   }; // logan impl
 

@@ -282,6 +282,11 @@ div#searches {
   display: none;
 }
 
+span.inline-revealer {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 div#active_searches:empty:before {
   content: 'no search performed';
   padding-left: .5em;
