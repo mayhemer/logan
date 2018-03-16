@@ -32,8 +32,8 @@
   </span>
   <h2>select log files</h2>
   <input type="file" id="files" multiple />
-  <span class="hide-top">
-    <input style="min-width: inherit" type="checkbox" id="cache" title=
+  <span class="hide-top min-width-default">
+    <input type="checkbox" id="cache" title=
 "Unchecked: don't keep the files' content in memory and load lines only when they are about to display on screen. Saves memory, but when the log files are overwritten, the results will cross-mix without any warning. 
 
 Checked: load everything into memory, so that you will work with a snapshot at the time of load. This eats a lot of memory and can cause OOM or significant slowdown with large log files."

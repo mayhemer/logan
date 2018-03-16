@@ -255,7 +255,11 @@ label:not(.tail) {
   text-align: right;
 }
 .section label {
-  font-size: 70%;
+  font-size: 90%;
+}
+
+.min-width-default > * {
+  min-width: inherit !important;
 }
 
 input[type=text],
