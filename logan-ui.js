@@ -1,5 +1,3 @@
-var LOGAN_inlineExpand = null;
-
 (function() {
 
   function ensure(array, itemName, def = {}) {
@@ -318,7 +316,7 @@ var LOGAN_inlineExpand = null;
         return input.replace(GREP_REGEXP, function(ptr) {
           let obj = logan.find(ptr, at);
           if (obj && obj !== ignore) {
-            return `<span class='obj-${obj.id} inline-revealer' onclick='LOGAN_inlineExpand(this, ${obj.id});'>${ptr}</span>`;
+            return `<span class='obj-${obj.id} inline-revealer' onclick='window.logan_inlineExpand(this, ${obj.id});'>${ptr}</span>`;
           }
           return ptr;
         }.bind(this));
@@ -856,7 +854,7 @@ var LOGAN_inlineExpand = null;
       }
     }; // UI
   
-  LOGAN_inlineExpand = (element, objid) => {
+  window.logan_inlineExpand = (element, objid) => {
     let expander = UI.expanders[objid];
     if (expander) {
       expander(false, $(element));
