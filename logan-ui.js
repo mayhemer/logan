@@ -310,14 +310,14 @@ var LOGAN_inlineExpand = null;
         });
       },
 
-      highlight: function(input, at = 0) {
+      highlight: function(input, at = 0, ignore = null) {
         if (typeof input === "object") {
           return "<span class='obj-" + input.id + "'>" + input.props.pointer + "</span>";
         }
 
         return input.replace(GREP_REGEXP, function(ptr) {
           let obj = logan.find(ptr, at);
-          if (obj && !(obj.id in this.expanders)) {
+          if (obj && obj !== ignore) {
             return `<span class='obj-${obj.id} inline-revealer' onclick='LOGAN_inlineExpand(this, ${obj.id});'>${ptr}</span>`;
           }
           return ptr;
@@ -328,7 +328,7 @@ var LOGAN_inlineExpand = null;
         source = source || obj;
 
         let color = this.objColor(source);
-        let style = ".obj-" + obj.id + " { background-color: " + color + "}";
+        let style = ".obj-" + obj.id + " { background-color: " + color + " !important}";
 
         return function(event) {
           if (set === true) {
@@ -523,7 +523,7 @@ var LOGAN_inlineExpand = null;
               .text(this.summary(obj, (props) => {
                 // This prepends the property we searched the object by
                 let result = this.summaryProps(props);
-                if (result.indexOf(searchProp) < 0) {
+                if (searchProp && result.indexOf(searchProp) < 0) {
                   result.unshift(searchProp);
                 }
                 return result;
@@ -622,7 +622,7 @@ var LOGAN_inlineExpand = null;
               .append(span);
             
             logan.readCapture(capture).then((line) => {
-              span.html(this.highlight(this.escapeHtml(line), capture.id));
+              span.html(this.highlight(this.escapeHtml(line), capture.id, obj));
             });
 
             return this.place(capture, element);
@@ -661,7 +661,7 @@ var LOGAN_inlineExpand = null;
           .addClass(classification())
           .append(controller())
           .append($("<span>").addClass("pre").html(this.highlight(
-            this.escapeHtml(capture.what), capture.id
+            this.escapeHtml(capture.what), capture.id, obj
           )));
         
         return this.place(capture, element);
