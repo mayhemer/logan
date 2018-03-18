@@ -192,10 +192,10 @@ logan.schema("MOZ_LOG",
         this.thread.on("tail_request", (tail) => {
           tail.alias(req);
         });
-        this.obj(rc).capture().mention(req).follow(1);
+        this.obj(rc).capture().follow(1);
       });
       module.rule("RequestContext::CancelTailedRequest %p req=%p removed=%d", function(rc, req) {
-        this.obj(rc).capture().mention(req);
+        this.obj(rc).capture();
       });
       module.rule("RequestContext::RemoveNonTailRequest this=%p, cnt=%d", function(rc, cnt) {
         rc = this.obj(rc).capture();
@@ -232,7 +232,7 @@ logan.schema("MOZ_LOG",
       });
       module.rule("LOADGROUP [%p]: Removing request %p %s status %x (count=%d).\n", function(lg, req, name, status, count) {
         this.obj(req).class("unknown request").prop("in-load-group");
-        this.obj(lg).prop("requests", count => --count).prop("foreground-requests", count).capture().mention(req);
+        this.obj(lg).prop("requests", count => --count).prop("foreground-requests", count).capture();
       });
       module.rule("LOADGROUP [%p]: Unable to remove request %p. Not in group!\n", function(lg, req) {
         this.obj(req).class("unknown request").prop("not-found-in-loadgroup", true);
@@ -243,7 +243,7 @@ logan.schema("MOZ_LOG",
         this.obj(lg).capture().link(this.obj(req).class("unknown default request"));
       });
       module.rule("nsLoadGroup::OnEndPageLoad this=%p default-request=%p", function(lg, dch) {
-        lg = this.obj(lg).capture().mention(dch);
+        lg = this.obj(lg).capture();
         netcap(n => { n.EndPageLoad(lg) });
       });
       logan.summaryProps("nsLoadGroup", ["requests", "foreground-requests"]);
@@ -628,7 +628,7 @@ logan.schema("MOZ_LOG",
         netcap(n => { n.channelRecognizedTracker(ch) });
       });
       module.rule("nsHttpChannel::WaitingForTailUnblock this=%p, rc=%p", function(ch, rc) {
-        this.thread.tail_request = this.obj(ch).capture().mention(rc).follow("  blocked=%d", (ch, blocked) => {
+        this.thread.tail_request = this.obj(ch).capture().follow("  blocked=%d", (ch, blocked) => {
           if (blocked === "1") {
             ch.prop("tail-blocked", true).capture().__blocktime = this.timestamp;
             netcap(n => { n.channelTailing(ch) });
@@ -639,22 +639,19 @@ logan.schema("MOZ_LOG",
         ch = this.obj(ch);
         let after = this.duration(ch.__blocktime);
         ch.prop("tail-blocked", false).prop("tail-block-time", after)
-          .capture().capture("  after " + after + "ms").mention(rc);
+          .capture().capture("  after " + after + "ms");
         netcap(n => { n.channelUntailing(ch) });
       });
       module.rule("HttpBaseChannel::AddAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
         this.thread.tail_request =
-          this.obj(ch).prop("tail-blocking", true).capture().mention(rc);
+          this.obj(ch).prop("tail-blocking", true).capture();
       });
       module.rule("HttpBaseChannel::RemoveAsNonTailRequest this=%p, rc=%p, already added=%d", function(ch, rc, added) {
         this.thread.tail_request =
-          this.objIf(ch).propIf("tail-blocking", false, () => added === "1").capture().mention(rc);
+          this.objIf(ch).propIf("tail-blocking", false, () => added === "1").capture();
       });
       module.rule("HttpBaseChannel::EnsureRequestContextID this=%p id=%x", function(ch, rcid) {
         this.obj(ch).prop("rc-id", rcid).capture();
-      });
-      module.rule("HttpBaseChannel::EnsureRequestContext this=%p rc=%p", function(ch, rc) {
-        this.obj(ch).capture().mention(rc);
       });
       module.rule("nsHttpChannel::OnClassOfServiceUpdated this=%p, cos=%u", function(ch, cos) {
         ch = this.obj(ch).capture().capture("  cos = " + schema.COS.$(cos));
@@ -743,17 +740,11 @@ logan.schema("MOZ_LOG",
         this.obj(rc).link(trans);
       });
       module.rule("   blocked by request context: [rc=%p trans=%p blockers=%d]", function(rc, trans) {
-        this.obj(trans).state("blocked").capture().mention(rc);
+        this.obj(trans).state("blocked").capture();
       });
       module.rule("nsHttpTransaction adding blocking transaction %p from request context %p", function(trans, rc) {
         this.obj(trans).prop("blocking", true).capture();
-        this.obj(rc).capture().mention(trans);
-      });
-      module.rule("nsHttpTransaction removing blocking transaction %p from request context %p. %d blockers remain.", function(trans, rc) {
-        this.obj(trans).capture().mention(rc);
-      });
-      module.rule("nsHttpTransaction %p request context set to null in ReleaseBlockingTransaction() - was %p", function(trans, rc) {
-        this.obj(trans).capture().mention(rc);
+        this.obj(rc).capture();
       });
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
         trans = this.obj(trans).prop("status", status).state("closed").capture();
@@ -830,13 +821,13 @@ logan.schema("MOZ_LOG",
         });
       });
       module.rule("nsHttpConnection::CloseTransaction[this=%p trans=%p reason=%x]", function(conn, trans, rv) {
-        this.obj(conn).state("done").capture().mention(trans);
+        this.obj(conn).state("done").capture();
       });
       module.rule("Entering Idle Monitoring Mode [this=%p]", function(conn) {
         this.obj(conn).state("idle").capture();
       });
       module.rule("nsHttpConnectionMgr::OnMsgReclaimConnection [ent=%p conn=%p]", function(ent, conn) {
-        this.thread.httpconnection_reclame = this.obj(conn).capture().mention(ent);
+        this.thread.httpconnection_reclame = this.obj(conn).capture();
         this.thread.httpconnection_reclame.closedtransaction = this.thread.closedhttptransaction;
       });
       module.rule("nsHttpConnection::MoveTransactionsToSpdy moves single transaction %p into SpdySession %p", function(tr, session) {
@@ -872,7 +863,7 @@ logan.schema("MOZ_LOG",
           session = this.obj(session).class("Http2Session").grep().link(stream);
         });
       module.rule("Http2Session::LogIO %p stream=%p id=%x [%*]", function(session, stream, id, what) {
-        this.obj(session).class("Http2Session").capture().mention(stream);
+        this.obj(session).class("Http2Session").capture();
       });
       logan.summaryProps("Http2Session", ["key"]);
 
@@ -980,7 +971,7 @@ logan.schema("MOZ_LOG",
         }
         let connEntry = this.obj(key).capture();
         this.thread.on("httpconnection_reclame", conn => {
-          connEntry.mention(conn);
+          connEntry.capture(`Reclaiming connection: ${conn.props.pointer}`);
           conn.on("closedtransaction", trans => {
             connEntry.capture("Last transaction on the connection:").mention(trans);
           });
@@ -988,7 +979,7 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
         this.obj(ci).class("nsConnectionEntry").grep().capture().follow("  %p", (ci, trans) => {
-          return ci.mention(trans);
+          return ci.capture();
         }, (ci, line) => {
           ci.capture();
           return line !== "]";
@@ -1245,7 +1236,7 @@ logan.schema("debug text console",
       });
 
       module.ruleIf("++DOMWINDOW == %u (%p) [pid = %d] [serial = %d] [outer = %p]", proc => proc.global.running_test, function(count, win, pid, serial, outer, test) {
-        win = this.obj(win).create("DOMWINDOW").prop("serial", serial).prop("pid", pid).mention(outer);
+        win = this.obj(win).create("DOMWINDOW").prop("serial", serial).prop("pid", pid);
         win.__pid = pid;
         win.__test = test;
       });
