@@ -778,7 +778,7 @@ logan.schema("MOZ_LOG",
       module.rule("Destroying nsHttpTransaction @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
-      logan.summaryProps("nsHttpTransaction", ["blocking", "tab-id", "url"]);
+      logan.summaryProps("nsHttpTransaction", ["url"]);
 
       /******************************************************************************
        * nsHttpConnection
@@ -922,7 +922,7 @@ logan.schema("MOZ_LOG",
        ******************************************************************************/
 
       module.rule("Creating nsHalfOpenSocket [this=%p trans=%p ent=%s key=%s]", function(ho, trans, ent, key) {
-        this.thread.halfopen = this.obj(ho).create("nsHalfOpenSocket").prop("key", key).grep();
+        this.thread.halfopen = this.obj(ho).create("nsHalfOpenSocket").prop("key", key).mention(key).grep();
       });
       module.rule("nsHalfOpenSocket::SetupPrimaryStream [this=%p ent=%s rv=%x]", function(ho, ent, rv) {
         ho = this.obj(ho).capture();
@@ -1039,7 +1039,7 @@ logan.schema("MOZ_LOG",
         });
       });
       schema.ruleIf("  trying address: %s", proc => proc.thread.networksocket, function(address, sock) {
-        sock.capture();
+        sock.capture().prop("addresses", address, true);
         this.thread.networksocket = null;
       });
       module.rule("nsSocketTransport::InitiateSocket TCP Fast Open started [this=%p]", function(sock) {
@@ -1066,7 +1066,7 @@ logan.schema("MOZ_LOG",
         netcap(n => { n.socketStatus(sock, schema.NET_STATUS.$(st)) });
       });
       module.rule("nsSocketTransport::RecoverFromError [this=%p state=%u cond=%x]", function(sock, state, error) {
-        this.obj(sock).prop("error", error, true).capture().follow("  %*$", sock => sock.capture(), () => false);
+        this.obj(sock).prop("recover-from-error", error, true).capture().follow("  %*$", sock => sock.capture(), () => false);
       });
       module.ruleIf("nsSocketOutputStream::OnSocketReady [this=%p cond=%d]", proc => proc.thread.networksocket, function(ptr, cond, sock) {
         this.obj(sock).alias(ptr).prop("output-cond", cond).capture();
