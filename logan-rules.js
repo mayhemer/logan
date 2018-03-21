@@ -1089,6 +1089,24 @@ logan.schema("MOZ_LOG",
       });
       logan.summaryProps("nsSocketTransport", ["origin"]);
 
+      /******************************************************************************
+       * PollableEvent
+       ******************************************************************************/
+
+      module.rule("PollableEvent::Signal PR_Write %d", function(count) {
+        count = parseInt(count);
+        this.service("PollableEvent").prop("signal-count", signal => signal + count, () => count > 0).capture();
+      });
+      module.rule("PollableEvent::Signal PR_Read %d", function(count) {
+        count = parseInt(count);
+        this.service("PollableEvent").propIf("signal-count", signal => signal - count, (pe) => {
+          return pe.props["signal-count"] && count > 0;
+        }).capture();
+      });
+      module.rule("PollableEvent::%*$", function() {
+        this.service("PollableEvent").capture();
+      });
+
     }); // nsSocketTransport
 
     schema.module("pipnss", (module) => {
