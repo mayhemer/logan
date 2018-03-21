@@ -54,6 +54,7 @@
       breadcrumbs: [],
       expandedElement: null,
       expanders: {},
+      loadWhole: new Set(),
       warnings: {},
       display: {},
       map: {},
@@ -179,6 +180,7 @@
           expander("cleanup");
         }
         this.expanders = {};
+        this.loadWhole = new Set();
         this.display = {};
         $("#active_searches").empty();
         this.searches = [];
@@ -491,7 +493,7 @@
 
           let observer = ensure(obj, handlername, () => {
             return $("<div>").addClass("scroll-observer").on("custom", () => {
-              if (this.isPastEdge(observer, up)) {
+              if (this.loadWhole.has(obj.id) || this.isPastEdge(observer, up)) {
                 this.addCaptures(obj, observer.data("nextid"), up, !up);
               }
             });
@@ -861,6 +863,12 @@
                 .append($("<input>").attr("type", "button").addClass("button").val("diagnose").css("margin-bottom", "1em")
                   .click(function() {
                     netdiagUI.diagnose(this, obj);
+                  }.bind(this))
+                )
+                .append($("<input>").attr("type", "button").addClass("button").val("load all lines").css("margin-bottom", "1em")
+                  .click(function() {
+                    this.loadWhole.add(obj.id);
+                    $(window).scroll();
                   }.bind(this))
                 )
               this.summary(obj, Object.keys, (obj, props) => {
