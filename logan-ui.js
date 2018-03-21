@@ -1,5 +1,10 @@
 (function() {
 
+  // Configuration of the UI
+  const LOAD_LINES_ON_SCROLL = true;
+  const ON_SCROLL_LINES_COUNT = 100;
+  // -----------------------
+
   function ensure(array, itemName, def = {}) {
     if (!(itemName in array)) {
       array[itemName] = (typeof def === "function") ? def() : def;
@@ -99,6 +104,15 @@
         }
         this.warnings[message] = true;
         $("#warnings").show().text(Object.keys(this.warnings).join(" | "));
+      },
+
+      isPastEdge: function(element, up) {
+        let top = $(window).scrollTop();
+        let bottom = top + $(window).height();
+        let elementTop = element.offset().top;
+
+        const margin = 100;
+        return up ? (elementTop > (top - margin)) : (elementTop < (bottom + margin));
       },
 
       setInitialView: function() {
@@ -442,6 +456,92 @@
         return (this.display[position] = element);
       },
 
+      addCaptures: function(obj, captureid, totop = true, tobottom = true) {
+        if (!obj._extraCaptures) {
+          obj._extraCaptures = {};
+        }
+
+        if (!LOAD_LINES_ON_SCROLL) {
+          for (let capture of obj.captures) {
+            this.addCapture(obj, capture);
+          }
+          for (let capture of Object.values(obj._extraCaptures)) {
+            this.addCapture(obj, capture, true);
+          }
+
+          return;
+        }
+
+        let process = (origin, up, handlername) => {
+          let filter = (captures, extra) => {
+            let index = captures.findIndex(c => c.id > origin);
+            if (index < 0) {
+              return [];
+            }
+            let slice = up ? captures.slice(0, index) : captures.slice(index);
+            return slice.map(capture => ({ capture, extra }));
+          } // filter()
+
+          let regular = filter(obj.captures, false);
+          let extra = filter(Object.values(obj._extraCaptures), true);
+          let captures = regular.concat(extra).sort((a, b) => a.capture.id - b.capture.id);
+
+          let observer = ensure(obj, handlername, () => {
+            return $("<div>").addClass("scroll-observer").on("custom", () => {
+              if (this.isPastEdge(observer, up)) {
+                this.addCaptures(obj, observer.data("nextid"), up, !up);
+              }
+            });
+          });
+
+          // Can't use the observer, since it's moving up as we add new capture lines
+          let scrollanchor = observer.next(".log_line");
+          scrollanchor = scrollanchor.length && $(scrollanchor[0]);
+          let scrolloffset = scrollanchor && (scrollanchor.offset().top - $(window).scrollTop());
+
+          let id, element;
+          let count = ON_SCROLL_LINES_COUNT;
+          while (count && captures.length) {
+            let capture = up ? captures.pop() : captures.shift();
+            let added = this.addCapture(obj, capture.capture, capture.extra);
+
+            id = capture.capture.id;
+            element = added || element;
+
+            if (added) {
+              // we've added an actual line!
+              count--;
+            }
+          }
+
+          if (!element) {
+            if (obj[handlername]) {
+              obj[handlername].remove();
+              delete obj[handlername];
+            }
+            return;
+          }
+
+          if (up) {
+            if (totop != tobottom && scrollanchor) {
+              $(window).scrollTop(scrollanchor.offset().top - scrolloffset);
+            }
+            observer.insertBefore(element);
+            observer.data("nextid", id - 1);
+          } else {
+            observer.data("nextid", id);
+            observer.insertAfter(element);
+          }
+        } // process()
+
+        if (totop) {
+          process(captureid, true, "scrollHandlerTop");
+        }
+        if (tobottom) {
+          process(captureid, false, "scrollHandlerBottom");
+        }
+      },
+
       addRevealer: function(obj, builder, placement = null, includeSummary = false, relation = {}) {
         placement = placement || obj.placement;
 
@@ -458,7 +558,7 @@
               }
 
               expander = (expand, scrollanch = element) => {
-                let fromTop = scrollanch.offset().top - $(window).scrollTop();
+                let scrolloffset = scrollanch.offset().top - $(window).scrollTop();
                
                 // Must call in this order, since onExpansion wants to get the same color
                 this.objColor(obj);
@@ -470,15 +570,11 @@
                     this.addSummary(obj);
                   }
                   element.addClass("checked");
-                  for (let capture of obj.captures) {
-                    this.addCapture(obj, capture);
-                  }
-                  if (obj._extraCaptures) {
-                    for (let capture of Object.values(obj._extraCaptures)) {
-                      this.addCapture(obj, capture, true);
-                    }
-                  } else {
-                    obj._extraCaptures = {};
+                  logan.deferReadCapture();
+                  try {
+                    this.addCaptures(obj, placement.id);
+                  } finally {
+                    logan.commitReadCapture();
                   }
 
                   // Makes sure any newly added expanders on already expanded objects are checked
@@ -499,9 +595,15 @@
                   for (let capture of Object.values(obj._extraCaptures)) {
                     this.removeLine(this.position(capture));
                   }
+                  for (let handler of ["scrollHandlerTop", "scrollHandlerBottom"]) {
+                    if (handler in obj) {
+                      obj[handler].remove();
+                      delete obj[handler];
+                    }
+                  }
                 }
 
-                $(window).scrollTop(scrollanch.offset().top - fromTop);
+                $(window).scrollTop(scrollanch.offset().top - scrolloffset);
               }
 
               this.expanders[obj.id] = expander;
@@ -863,11 +965,11 @@
     }
 
     element = $(element);
-    let fromTop = element.offset().top - $(window).scrollTop();
+    let scrolloffset = element.offset().top - $(window).scrollTop();
 
     UI.addResult(logan.objects[objid]).children(".checker").click();
 
-    $(window).scrollTop(element.offset().top - fromTop);
+    $(window).scrollTop(element.offset().top - scrolloffset);
   };
 
   $(() => {
@@ -990,6 +1092,15 @@
     };
     $(document).keydown(escapeHandler);
     $("#seek_to").keydown(escapeHandler);
+
+    $(window).scroll(() => {
+      logan.deferReadCapture();
+      try {
+        $(".scroll-observer").trigger("custom");
+      } finally {
+        logan.commitReadCapture();
+      }
+    });
 
     consume();
   });

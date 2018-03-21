@@ -121,9 +121,11 @@ const EPOCH_1970 = new Date("1970-01-01");
 
 (function() {
 
+  // Configuration of the internals
   const FILE_SLICE = 1 * 1024 * 1024;
   const USE_RULES_TREE_OPTIMIZATION = true;
   const ALLOW_NON_POINTER_ALIAS_GREPING = true;
+  // ------------------------------
 
   let IF_RULE_INDEXER = 0;
 
@@ -868,6 +870,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     },
 
     files: [],
+    readBlockCounter: 0,
+    readCaptureQueue: [],
     cache: false,
 
     init: function() {
@@ -1019,10 +1023,33 @@ const EPOCH_1970 = new Date("1970-01-01");
       return slice(from);
     },
 
+    deferReadCapture: function() {
+      this.readBlockCounter++
+    },
+
+    commitReadCapture: function() {
+      if (--this.readBlockCounter === 0) {
+        let queue = this.readCaptureQueue.sort((a, b) => a.capture.id - b.capture.id);
+        this.readCaptureQueue = [];
+
+        for (let promise of queue) {
+          this.readCapture(promise.capture).then((line) => {
+            promise.resolve(line);
+          });
+        }
+      }
+    },
+
     readCapture: async function(capture) {
       let file = capture.what.file;
       if (!file) {
         return Promise.reject();
+      }
+
+      if (this.readBlockCounter) {
+        return new Promise((resolve, reject) => {
+          this.readCaptureQueue.push({ capture, resolve });
+        });
       }
 
       let cache, promise;
