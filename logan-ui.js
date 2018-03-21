@@ -175,6 +175,9 @@
         $("#warnings").hide().empty();
         this.warnings = {};
         $("#results_section").empty();
+        for (let expander of Object.values(this.expanders)) {
+          expander("cleanup");
+        }
         this.expanders = {};
         this.display = {};
         $("#active_searches").empty();
@@ -558,6 +561,16 @@
               }
 
               expander = (expand, scrollanch = element) => {
+                if (expand === "cleanup") {
+                  for (let handler of ["scrollHandlerTop", "scrollHandlerBottom"]) {
+                    if (handler in obj) {
+                      obj[handler].remove();
+                      delete obj[handler];
+                    }
+                  }
+                  return;
+                }
+
                 let scrolloffset = scrollanch.offset().top - $(window).scrollTop();
                
                 // Must call in this order, since onExpansion wants to get the same color
@@ -565,7 +578,7 @@
                 this.objHighlighter(obj, obj, expand)();
                 this.onExpansion(obj, relation, element, placement, expand);
                 let spanselector = "span[objid='" + obj.id + "'";
-                if (expand) {
+                if (expand === true) {
                   if (includeSummary && obj.props.className) {
                     this.addSummary(obj);
                   }
@@ -583,7 +596,7 @@
                     spanselector = "span[objid='" + objid + "'";
                     $(spanselector).addClass("expanded");
                   }
-                } else {
+                } else if (expand === false) {
                   $(spanselector).removeClass("expanded");
                   if (includeSummary && obj.props.className) {
                     this.removeLine(this.position(obj.placement));
@@ -595,12 +608,7 @@
                   for (let capture of Object.values(obj._extraCaptures)) {
                     this.removeLine(this.position(capture));
                   }
-                  for (let handler of ["scrollHandlerTop", "scrollHandlerBottom"]) {
-                    if (handler in obj) {
-                      obj[handler].remove();
-                      delete obj[handler];
-                    }
-                  }
+                  expander("cleanup");
                 }
 
                 $(window).scrollTop(scrollanch.offset().top - scrolloffset);
