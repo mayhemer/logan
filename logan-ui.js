@@ -2,7 +2,7 @@
 
   // Configuration of the UI
   const LOAD_LINES_ON_SCROLL = true;
-  const ON_SCROLL_LINES_COUNT = 100;
+  const ON_SCROLL_LINES_COUNT = 20;
   // -----------------------
 
   function ensure(array, itemName, def = {}) {
@@ -535,6 +535,8 @@
             observer.data("nextid", id);
             observer.insertAfter(element);
           }
+
+          observer.trigger("custom");
         } // process()
 
         if (totop) {
