@@ -1095,7 +1095,7 @@ logan.schema("MOZ_LOG",
 
       module.rule("PollableEvent::Signal PR_Write %d", function(count) {
         count = parseInt(count);
-        this.service("PollableEvent").prop("signal-count", signal => signal + count, () => count > 0).capture();
+        this.service("PollableEvent").propIf("signal-count", signal => signal + count, () => count > 0).capture();
       });
       module.rule("PollableEvent::Signal PR_Read %d", function(count) {
         count = parseInt(count);
