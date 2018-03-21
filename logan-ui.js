@@ -335,7 +335,7 @@
         return input.replace(GREP_REGEXP, function(ptr) {
           let obj = logan.find(ptr, at);
           if (obj && obj !== ignore) {
-            return `<span class='obj-${obj.id} inline-revealer' onclick='window.logan_inlineExpand(this, ${obj.id});'>${ptr}</span>`;
+            return `<span class='obj-${obj.id} inline-revealer' onclick='window.logan_inlineExpand(this, ${obj.id}, ${at});'>${ptr}</span>`;
           }
           return ptr;
         }.bind(this));
@@ -549,78 +549,83 @@
         }
       },
 
+      objExpander: function(element, obj, placement, includeSummary, relation = {}) {
+        return function() {
+          let expander = this.expanders[obj.id];
+          if (expander) {
+            expander(false);
+            delete this.expanders[obj.id];
+            return;
+          }
+
+          expander = (expand, scrollanch = element) => {
+            if (expand === "cleanup") {
+              for (let handler of ["scrollHandlerTop", "scrollHandlerBottom"]) {
+                if (handler in obj) {
+                  obj[handler].remove();
+                  delete obj[handler];
+                }
+              }
+              return;
+            }
+
+            let scrolloffset = scrollanch.offset().top - $(window).scrollTop();
+
+            // Must call in this order, since onExpansion wants to get the same color
+            this.objColor(obj);
+            this.objHighlighter(obj, obj, expand)();
+            this.onExpansion(obj, relation, element, placement, expand);
+            let spanselector = "span[objid='" + obj.id + "'";
+            if (expand === true) {
+              if (includeSummary && obj.props.className) {
+                this.addSummary(obj);
+              }
+              element.addClass("checked");
+              logan.deferReadCapture();
+              try {
+                this.addCaptures(obj, placement.id);
+              } finally {
+                logan.commitReadCapture();
+              }
+
+              // Makes sure any newly added expanders on already expanded objects are checked
+              $(spanselector).addClass("expanded");
+              for (let objid in this.expanders) {
+                spanselector = "span[objid='" + objid + "'";
+                $(spanselector).addClass("expanded");
+              }
+            } else if (expand === false) {
+              $(spanselector).removeClass("expanded");
+              if (includeSummary && obj.props.className) {
+                this.removeLine(this.position(obj.placement));
+              }
+              element.removeClass("checked");
+              for (let capture of obj.captures) {
+                this.removeLine(this.position(capture));
+              }
+              for (let capture of Object.values(obj._extraCaptures)) {
+                this.removeLine(this.position(capture));
+              }
+              expander("cleanup");
+            }
+
+            $(window).scrollTop(scrollanch.offset().top - scrolloffset);
+          }
+
+          this.expanders[obj.id] = expander;
+          expander(true);
+        }.bind(this);
+      },
+
       addRevealer: function(obj, builder, placement = null, includeSummary = false, relation = {}) {
         placement = placement || obj.placement;
 
-        let element = $("<div>")
+        let element = $("<div>");
+        element
           .addClass("log_line")
           .addClass(() => includeSummary ? "" : "summary")
           .append($("<span>").attr("objid", obj.id).addClass("checker")
-            .click(function(event) {
-              let expander = this.expanders[obj.id];
-              if (expander) {
-                expander(false);
-                delete this.expanders[obj.id];
-                return;
-              }
-
-              expander = (expand, scrollanch = element) => {
-                if (expand === "cleanup") {
-                  for (let handler of ["scrollHandlerTop", "scrollHandlerBottom"]) {
-                    if (handler in obj) {
-                      obj[handler].remove();
-                      delete obj[handler];
-                    }
-                  }
-                  return;
-                }
-
-                let scrolloffset = scrollanch.offset().top - $(window).scrollTop();
-               
-                // Must call in this order, since onExpansion wants to get the same color
-                this.objColor(obj);
-                this.objHighlighter(obj, obj, expand)();
-                this.onExpansion(obj, relation, element, placement, expand);
-                let spanselector = "span[objid='" + obj.id + "'";
-                if (expand === true) {
-                  if (includeSummary && obj.props.className) {
-                    this.addSummary(obj);
-                  }
-                  element.addClass("checked");
-                  logan.deferReadCapture();
-                  try {
-                    this.addCaptures(obj, placement.id);
-                  } finally {
-                    logan.commitReadCapture();
-                  }
-
-                  // Makes sure any newly added expanders on already expanded objects are checked
-                  $(spanselector).addClass("expanded");
-                  for (let objid in this.expanders) {
-                    spanselector = "span[objid='" + objid + "'";
-                    $(spanselector).addClass("expanded");
-                  }
-                } else if (expand === false) {
-                  $(spanselector).removeClass("expanded");
-                  if (includeSummary && obj.props.className) {
-                    this.removeLine(this.position(obj.placement));
-                  }
-                  element.removeClass("checked");
-                  for (let capture of obj.captures) {
-                    this.removeLine(this.position(capture));
-                  }
-                  for (let capture of Object.values(obj._extraCaptures)) {
-                    this.removeLine(this.position(capture));
-                  }
-                  expander("cleanup");
-                }
-
-                $(window).scrollTop(scrollanch.offset().top - scrolloffset);
-              }
-
-              this.expanders[obj.id] = expander;
-              expander(true);              
-            }.bind(this))
+            .click(this.objExpander(element, obj, placement, includeSummary, relation))
           );
 
         builder(element);
@@ -974,20 +979,17 @@
       }
     }; // UI
   
-  window.logan_inlineExpand = (element, objid) => {
+  window.logan_inlineExpand = (element, objid, placementid) => {
+    element = $(element);
+
     let expander = UI.expanders[objid];
     if (expander) {
-      expander(false, $(element));
+      expander(false, element);
       delete UI.expanders[objid];
       return;
     }
 
-    element = $(element);
-    let scrolloffset = element.offset().top - $(window).scrollTop();
-
-    UI.addResult(logan.objects[objid]).children(".checker").click();
-
-    $(window).scrollTop(element.offset().top - scrolloffset);
+    UI.objExpander(element, logan.objects[objid], logan.captures[placementid], false)();
   };
 
   $(() => {
