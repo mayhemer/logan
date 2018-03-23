@@ -18,6 +18,34 @@
     return "rgba(" + parseInt(match[1], 16) + "," + parseInt(match[2], 16) + "," + parseInt(match[3], 16) + "," + alpha + ")";
   }
 
+  (function() {
+    var timeouts = [];
+    var messageName = "zero-timeout-message";
+
+    // Like setTimeout, but only takes a function argument.  There's
+    // no time argument (always zero) and no arguments (you have to
+    // use a closure).
+    function setZeroTimeout(fn) {
+      timeouts.push(fn);
+      window.postMessage(messageName, "*");
+    }
+
+    function handleMessage(event) {
+      if (event.source == window && event.data == messageName) {
+        event.stopPropagation();
+        if (timeouts.length > 0) {
+          var fn = timeouts.shift();
+          fn();
+        }
+      }
+    }
+
+    window.addEventListener("message", handleMessage, true);
+
+    // Add the one thing we want added to the window object.
+    window.setZeroTimeout = setZeroTimeout;
+  })();
+
   const entityMap = {
     '&': '&amp;',
     '<': '&lt;',
@@ -538,7 +566,7 @@
             observer.insertAfter(element);
           }
 
-          observer.trigger("custom");
+          setZeroTimeout(() => observer.trigger("custom"));
         } // process()
 
         if (totop) {
@@ -737,7 +765,7 @@
               .addClass(classification())
               .append(controller())
               .append(span);
-            
+
             logan.readCapture(capture).then((line) => {
               span.html(this.highlight(this.escapeHtml(line), capture.id, obj));
             });
@@ -780,7 +808,7 @@
           .append($("<span>").addClass("pre").html(this.highlight(
             this.escapeHtml(capture.what), capture.id, obj
           )));
-        
+
         return this.place(capture, element);
       },
 
@@ -978,7 +1006,7 @@
         }
       }
     }; // UI
-  
+
   window.logan_inlineExpand = (element, objid, placementid) => {
     element = $(element);
 
@@ -1038,7 +1066,7 @@
     });
 
     let search_By = $("#search_By").on("change", (event) => {
-      if (event.originalEvent) { 
+      if (event.originalEvent) {
         // a hacky way to recognize this is not a call to .change()
         // but that actually comes from a user interaction.
 
