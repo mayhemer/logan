@@ -1095,13 +1095,17 @@ logan.schema("MOZ_LOG",
 
       module.rule("PollableEvent::Signal PR_Write %d", function(count) {
         count = parseInt(count);
-        this.service("PollableEvent").propIf("unread-signals", signal => signal + count, () => count > 0).capture();
+        this.service("PollableEvent").propIf("unread-signals",
+          signal => signal + count,
+          () => count > 0
+        ).capture();
       });
       module.rule("PollableEvent::Signal PR_Read %d", function(count) {
         count = parseInt(count);
-        this.service("PollableEvent").propIf("unread-signals", signal => signal - count, (pe) => {
-          return pe.props["unread-signals"] && count > 0;
-        }).capture();
+        this.service("PollableEvent").propIf("unread-signals",
+          signal => (count < 0 ? 0 : (signal - count)),
+          pe => "unread-signals" in pe.props
+        ).capture();
       });
       module.rule("PollableEvent::%*$", function() {
         this.service("PollableEvent").capture();
