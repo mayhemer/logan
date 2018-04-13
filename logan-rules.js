@@ -450,7 +450,12 @@ logan.schema("MOZ_LOG",
         });
       });
       module.rule("HttpChannelParent::ConnectChannel: Looking for a registered channel [this=%p, id=%u]", function(ch, id) {
-        this.obj(ch).ipcid(id).capture().recv("HttpChannel::ConnectParent", (parent, child) => {
+        ch = this.obj(ch);
+        if (ch === this.thread.httpchannelparent) {
+          // This would otherwise leak to a following nsHttpChannel incorrectly
+          delete this.thread.httpchannelparent;
+        }
+        ch.ipcid(id).capture().recv("HttpChannel::ConnectParent", (parent, child) => {
           parent.httpchannelchild = child.link(parent);
         }).follow("  and it is %/HttpBaseChannel|nsHttpChannel/r %p", function(parent, ignore, httpch) {
           parent.capture().link(this.obj(httpch).ipcid(parent.ipcid()));
@@ -483,7 +488,7 @@ logan.schema("MOZ_LOG",
       module.rule("nsHttpChannel::Init [this=%p]", function(ptr) {
         this.thread.httpchannel_init = this.obj(ptr).capture();
       });
-      schema.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
+      module.ruleIf("nsHttpChannel::SetupReplacementChannel [this=%p newChannel=%p preserveMethod=%d]",
         proc => proc.thread.httpchannel_init,
         function(oldch, newch, presmethod, channel) {
           delete this.thread.httpchannel_init;
@@ -1100,7 +1105,7 @@ logan.schema("MOZ_LOG",
           () => count > 0
         ).capture();
       });
-      module.rule("PollableEvent::Signal PR_Read %d", function(count) {
+      module.rule("PollableEvent::%/Signal|Clear/r PR_Read %d", function(method, count) {
         count = parseInt(count);
         this.service("PollableEvent").propIf("unread-signals",
           signal => (count < 0 ? 0 : (signal - count)),
@@ -1109,6 +1114,9 @@ logan.schema("MOZ_LOG",
       });
       module.rule("PollableEvent::%*$", function() {
         this.service("PollableEvent").capture();
+      });
+      module.rule("Pollable event signalling failed/timed out", function() {
+        this.service("PollableEvent").capture().prop("restart-count", c => ++c);
       });
 
     }); // nsSocketTransport
