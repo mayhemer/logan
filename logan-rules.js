@@ -79,6 +79,19 @@ logan.schema("MOZ_LOG",
       UPSTREAM_COMPLETE: 4,
     });
 
+    schema.H2SESSION_STATE = new Enum({
+      BUFFERING_OPENING_SETTINGS: 0,
+      BUFFERING_FRAME_HEADER: 1,
+      BUFFERING_CONTROL_FRAME: 2,
+      PROCESSING_DATA_FRAME_PADDING_CONTROL: 3,
+      PROCESSING_DATA_FRAME: 4,
+      DISCARDING_DATA_FRAME_PADDING: 5,
+      DISCARDING_DATA_FRAME: 6,
+      PROCESSING_COMPLETE_HEADERS: 7,
+      PROCESSING_CONTROL_RST_STREAM: 8,
+      NOT_USING_NETWORK: 9,
+    });
+
     schema.module("DocumentLeak", (module) => {
 
       /******************************************************************************
@@ -869,6 +882,12 @@ logan.schema("MOZ_LOG",
         });
       module.rule("Http2Session::LogIO %p stream=%p id=%x [%*]", function(session, stream, id, what) {
         this.obj(session).class("Http2Session").capture();
+      });
+      module.rule("Http2Session::WriteSegments %p InternalState %u", function(session, state) {
+        this.obj(session).capture().capture(` state = ${schema.H2SESSION_STATE.$(state)}`);
+      });
+      module.rule("Http2Session::ChangeDownstreamState() %p from %u to %u", function(session, s1, s2) {
+        this.obj(session).capture().capture(` from = ${schema.H2SESSION_STATE.$(s1)}, to = ${schema.H2SESSION_STATE.$(s2)}`);
       });
       logan.summaryProps("Http2Session", ["key"]);
 
