@@ -1177,7 +1177,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
       result.raw = line;
       result.threadname = result.threadname || "default";
-      result.module = result.module || "default";
+      result.module = result.module || 0;
       return result;
     },
 

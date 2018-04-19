@@ -1268,7 +1268,7 @@ logan.schema("debug text console",
 
   (schema) => {
 
-    schema.module("default", (module) => {
+    schema.module(0, (module) => {
 
       module.rule("TEST-START | %s", function(test) {
         if (test === "Shutdown") {
@@ -1306,7 +1306,7 @@ logan.schema("debug text console",
         this.service("shutdown").capture();
       });
 
-    }); // default
+    }); // 0 module
   }
 ); // text console
 
