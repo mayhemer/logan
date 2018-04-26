@@ -725,7 +725,7 @@ logan.schema("MOZ_LOG",
           return line !== "]";
         });
       });
-      schema.ruleIf("nsHttpConnectionMgr::AtActiveConnectionLimit [ci=%s caps=%d,totalCount=%d, maxPersistConns=%d]",
+      schema.ruleIf("nsHttpConnectionMgr::AtActiveConnectionLimit [ci=%* caps=%d,totalCount=%d, maxPersistConns=%d]",
         proc => proc.thread.httptransaction, function(ci, caps, total, max, trans) {
           trans.capture().mention(ci);
         });
@@ -945,7 +945,7 @@ logan.schema("MOZ_LOG",
        * nsHalfOpenSocket
        ******************************************************************************/
 
-      module.rule("Creating nsHalfOpenSocket [this=%p trans=%p ent=%s key=%s]", function(ho, trans, ent, key) {
+      module.rule("Creating nsHalfOpenSocket [this=%p trans=%p ent=%s key=%*]", function(ho, trans, ent, key) {
         this.thread.halfopen = this.obj(ho).create("nsHalfOpenSocket").prop("key", key).mention(key).grep();
       });
       module.rule("nsHalfOpenSocket::SetupPrimaryStream [this=%p ent=%s rv=%x]", function(ho, ent, rv) {
@@ -983,13 +983,13 @@ logan.schema("MOZ_LOG",
        * connection manager
        ******************************************************************************/
 
-      module.rule("nsConnectionEntry::nsConnectionEntry this=%p key=%s", function(ptr, key) {
+      module.rule("nsConnectionEntry::nsConnectionEntry this=%p key=%*", function(ptr, key) {
         this.obj(ptr).create("nsConnectionEntry").alias(key).grep().prop("key", key);
       });
       module.rule("nsConnectionEntry::~nsConnectionEntry this=%p", function(ptr, key) {
         this.obj(ptr).destroy();
       });
-      module.rule("nsHttpConnectionMgr::OnMsgProcessPendingQ [ci=%s]", function(key) {
+      module.rule("nsHttpConnectionMgr::OnMsgProcessPendingQ [ci=%*]", function(key) {
         if (key === "nullptr") {
           return;
         }
@@ -1001,7 +1001,7 @@ logan.schema("MOZ_LOG",
           });
         });
       });
-      module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%s ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
+      module.rule("nsHttpConnectionMgr::ProcessPendingQForEntry [ci=%* ent=%p active=%d idle=%d urgent-start-queue=%d queued=%d]", function(ci, ent) {
         this.obj(ci).class("nsConnectionEntry").grep().capture().follow("  %p", (ci, trans) => {
           return ci.capture();
         }, (ci, line) => {
@@ -1010,7 +1010,7 @@ logan.schema("MOZ_LOG",
         });
       });
       module.rule("nsHttpConnectionMgr::TryDispatchTransaction without conn " +
-                  "[trans=%p halfOpen=%p conn=%p ci=%p ci=%s caps=%x tunnelprovider=%p " +
+                  "[trans=%p halfOpen=%p conn=%p ci=%p ci=%* caps=%x tunnelprovider=%p " +
                   "onlyreused=%d active=%u idle=%u]", function(trans, half, conn, ci, ci_key) {
           this.thread.httptransaction = this.obj(trans).capture("Attempt to dispatch on " + ci_key).mention(ci_key);
           this.thread.conn_info = this.obj(ci_key).capture().expect("   %*$").mention(trans).mention(conn);
