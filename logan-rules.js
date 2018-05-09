@@ -816,7 +816,11 @@ logan.schema("MOZ_LOG",
         conn = this.obj(conn).capture();
         trans = this.obj(trans).state("active").capture().link(conn);
         trans.httpconnection = conn;
+        this.thread.activatedhttptrans = trans;
         netcap(n => { n.transactionActive(trans) });
+      });
+      module.ruleIf("nsHttpConnection::AddTransaction for SPDY", proc => proc.thread.activatedhttptrans, function(trans) {
+        this.thread.httpspdytransaction = trans.capture();
       });
       module.rule("nsHttpConnection::SetUrgentStartOnly [this=%p urgent=%d]", function(conn, urgent) {
         this.obj(conn).prop("urgent", urgent === "1").capture();
@@ -1017,13 +1021,18 @@ logan.schema("MOZ_LOG",
         });
       schema.ruleIf("Spdy Dispatch Transaction via Activate(). Transaction host = %s, Connection host = %s",
         proc => proc.thread.httptransaction, function(trhost, conhost, tr) {
-          this.thread.httpspdytransaction = tr;
+          this.thread.httpspdytransaction = tr.capture();
         });
       module.rule("nsHttpConnectionMgr::TryDispatchTransactionOnIdleConn, ent=%p, trans=%p, urgent=%d", function(ent, trans, ur) {
         this.obj(trans).capture().follow("  %* [conn=%p]", (trans, message, conn) => {
           trans.capture().mention(conn);
         });
       });
+      module.rule("nsHttpConnectionMgr::DispatchTransaction [ent-ci=%s %p trans=%p caps=%d conn=%p priority=%d]",
+        function(ent, mngr, trans, caps) {
+          this.obj(trans).capture();
+        }
+      );
       logan.summaryProps("nsConnectionEntry", "key");
 
       /******************************************************************************
@@ -1168,6 +1177,9 @@ logan.schema("MOZ_LOG",
         this.service("nsHostResolver").capture();
       });
       module.rule("Resolving host [%s] - bypassing cache.\n", function(host) {
+        this.service("nsHostResolver").capture();
+      });
+      module.rule("%*$", function(host) {
         this.service("nsHostResolver").capture();
       });
     }); // nsHostResolver
