@@ -618,12 +618,16 @@ logan.schema("MOZ_LOG",
         netcap(n => { n.channelSuspend(ch) });
       });
       module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ch) {
-        ch = this.obj(ch).run("resume").prop("suspendcount", suspendcount => --suspendcount);
-        // The classification time is rather vague, this doesn't necessarily has
-        // to be the Resume() called by the classifier, it's just likely to be the one.
-        ch.propIf("classify-time", this.duration(ch.__classifystarttime), ch => ch.__classifystarttime);
+        ch = this
+          .obj(ch)
+          .run("resume")
+          .prop("suspendcount", suspendcount => --suspendcount)
+          // The classification time is rather vague, this doesn't necessarily has
+          // to be the Resume() called by the classifier, it's just likely to be the one.
+          .propIf("classify-time", (val, ch) => this.duration(ch.__classifystarttime), ch => ch.__classifystarttime)
+          .capture();
+
         delete ch.__classifystarttime;
-        ch.capture();
         netcap(n => { n.channelResume(ch) });
       });
       module.rule("nsHttpChannel::Cancel [this=%p status=%x]", function(ptr, status) {
