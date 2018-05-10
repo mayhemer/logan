@@ -166,7 +166,7 @@ div.log_line > span.line_controller {
   padding: 0 .5rem;
   display: none;
   user-select: none;
-  margin-top: -0.3em;
+  margin-top: -0.1em;
 }
 div.log_line:hover > span.line_controller {
   display: inline;
@@ -236,7 +236,7 @@ input.button.big.narrow {
   padding-left: 8px;
   padding-right: 8px;
 }
-input.button.icon:hover {
+input.button.icon:hover:not(.red) {
   text-decoration: underline;
 }
 input.button.icon {

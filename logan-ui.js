@@ -57,7 +57,7 @@
     '=': '&#x3D;'
   };
 
-  const CLOSE_CROSS = "\uD83D\uDDD9";
+  const CLOSE_CROSS = "\u274C"; // "\u2A2F" = VECTOR OR CROSS PRODUCT (too small?);
 
   let HIGHLIGHTSET = ['#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f', '#8dd3c7'];
   function nextHighlightColor() {
@@ -735,14 +735,14 @@
             .addClass("line_controller")
             .append($("<span>")
               .attr('title', 'Fetch previous line on this thread')
-              .text('\uD83D\uDF81')
+              .text('\u2303')
               .click(function() {
                 fetch(this, -1);
               })
             )
             .append($("<span>")
               .attr('title', 'Fetch next line on this thread')
-              .text('\uD83D\uDF83')
+              .text('\u2304')
               .click(function() {
                 fetch(this, +1);
               })
