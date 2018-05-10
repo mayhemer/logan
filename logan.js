@@ -610,6 +610,10 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this.prop("state", "partial").prop("missing-constructor", true);
   };
 
+  Obj.prototype.call = function(func) {
+    func.apply(logan._proc, [this].concat(Array.from(arguments).slice(1)));
+  };
+
   Obj.prototype.dispatch = function(target, name) {
     if (name === undefined) {
       target = this;

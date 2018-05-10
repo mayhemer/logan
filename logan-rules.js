@@ -1203,6 +1203,9 @@ logan.schema("MOZ_LOG",
           c.link(entry);
         });
       });
+      module.rule("CacheEntry::Load [this=%p, trunc=%d]", function(entry) {
+        this.thread.httpcacheentry = this.obj(entry).capture();
+      });
       module.rule("CacheEntryHandle::Dismiss %p", function(handle) {
         // compatibility for logs w/o ~CacheEntryHandle
         this.objIf(handle).capture().unalias();
@@ -1213,7 +1216,117 @@ logan.schema("MOZ_LOG",
       module.rule("CacheEntry::~CacheEntry [this=%p]", function(ptr) {
         this.obj(ptr).destroy();
       });
-      logan.summaryProps("CacheEntry", "key");
+      logan.summaryProps("CacheEntry", ["key"]);
+
+      /******************************************************************************
+       * CacheFile
+       ******************************************************************************/
+
+      module.rule("CacheFile::CacheFile() [this=%p]", function(ptr) {
+        ptr = this.obj(ptr).create("CacheFile").grep();
+        this.thread.on("httpcacheentry", entry => {
+          entry.link(ptr);
+        });
+      });
+      module.rule("CacheFile::Init() [this=%p, key=%s, createNew=%d, memoryOnly=%d, priority=%d, listener=%p]", function(file, key) {
+        this.thread.cachefile = this.obj(file).capture().prop("key", key);
+      });
+      module.rule("CacheFile::OnFileOpened() [this=%p, rv=0x%08x, handle=%p]", function(file, status, handle) {
+        this.thread.cachefile = this.obj(file).capture().link(handle);
+      });
+      function linkWithKey(file, sub) {
+        file.link(this.obj(sub).prop("key", file.props["key"]));
+      };
+      module.rule("CacheFile::OpenOutputStream() - Creating new output stream %p [this=%p]", function(stream, file) {
+        this.obj(file).capture().call(linkWithKey, stream);
+      });
+      module.rule("CacheFile::OpenAlternativeOutputStream() - Creating new output stream %p [this=%p]", function(stream, file) {
+        this.obj(file).capture().call(linkWithKey, stream);
+      });
+      module.rule("CacheFile::OpenInputStream() - Creating new input stream %p [this=%p]", function(stream, file) {
+        this.obj(file).capture().call(linkWithKey, stream);
+      });
+      module.rule("CacheFile::OpenAlternativeInputStream() - Creating new input stream %p [this=%p]", function(stream, file) {
+        this.obj(file).capture().call(linkWithKey, stream);
+      });
+      module.rule("CacheFile::GetChunkLocked() - Reading newly created chunk %p from the disk [this=%p]", function(chunk, file) {
+        this.obj(file).capture().call(linkWithKey, chunk);
+      });
+      module.rule("CacheFile::GetChunkLocked() - Created new empty chunk %p [this=%p]", function(chunk, file) {
+        this.obj(file).capture().call(linkWithKey, chunk);
+      });
+      module.rule("CacheFile::~CacheFile() [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+      logan.summaryProps("CacheFile", ["key"]);
+
+      /******************************************************************************
+       * CacheFileMetadata
+       ******************************************************************************/
+
+      function linkCacheFileMetadata(metadata) {
+        this.thread.on("cachefile", (file) => {
+          file.link(metadata.prop("key", file.props["key"]));
+        });
+      }
+      module.rule("CacheFileMetadata::CacheFileMetadata() [this=%p, handle=%p, key=%s]", function(ptr) {
+        this.obj(ptr).create("CacheFileMetadata").grep().call(linkCacheFileMetadata);
+      });
+      module.rule("CacheFileMetadata::CacheFileMetadata() [this=%p, key=%s]", function(ptr) {
+        this.obj(ptr).create("CacheFileMetadata").grep().call(linkCacheFileMetadata);
+      });
+      module.rule("CacheFileMetadata::CacheFileMetadata() [this=%p]", function(ptr) {
+        this.obj(ptr).create("CacheFileMetadata").grep().call(linkCacheFileMetadata);
+      });
+      module.rule("CacheFileMetadata::~CacheFileMetadata() [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+      /******************************************************************************
+       * CacheFileInputStream
+       ******************************************************************************/
+
+      module.rule("CacheFileInputStream::CacheFileInputStream() [this=%p]", function(ptr) {
+        this.obj(ptr).create("CacheFileInputStream").grep();
+      });
+      module.rule("CacheFileInputStream::~CacheFileInputStream() [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+      /******************************************************************************
+       * CacheFileOutputStream
+       ******************************************************************************/
+
+      module.rule("CacheFileOutputStream::CacheFileOutputStream() [this=%p]", function(ptr) {
+        this.obj(ptr).create("CacheFileOutputStream").grep();
+      });
+      module.rule("CacheFileOutputStream::~CacheFileOutputStream() [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+      /******************************************************************************
+       * CacheFileHandle
+       ******************************************************************************/
+
+      module.rule("CacheFileHandle::CacheFileHandle() [this=%p, %/hash|key/r=%s]", function(ptr, prop, key) {
+        this.obj(ptr).create("CacheFileHandle").grep().prop("key", key);
+      });
+      module.rule("CacheFileHandle::~CacheFileHandle() [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+      logan.summaryProps("CacheFileHandle", ["key"]);
+
+      /******************************************************************************
+       * CacheFileChunk
+       ******************************************************************************/
+
+      module.rule("CacheFileChunk::CacheFileChunk() [this=%p, index=%u, initByWriter=%d]", function(ptr, index) {
+        this.obj(ptr).create("CacheFileChunk").grep().prop("index", index)
+      });
+      module.rule("CacheFileChunk::~CacheFileChunk() [this=%p]", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+      logan.summaryProps("CacheFileChunk", ["key", "index"]);
 
     }); // cache2
 
