@@ -198,6 +198,10 @@ Obj (an object) methods:
   In case the corresponding send() has already been hit, the `handler` is called immediately.
 - `.class("name")`: gives a class name to objects that are not tracked (no rules defined for them) or are partial in the log (long-living) which has been started later during the session; calling this on an object that has not been `create()`ed will give it a class name "name" by which you can then search the object for, state is set to "partial" and "missing-constructor" property is set to `true`; calling this on an object that has been `create()`ed doesn't do anything
 - `.on("object_property", handler)`: see **this.thread.on** above for details, note this is working with JS properties you may have set directly on the *Obj* instance and not what has been set with the *.prop()* method!
+- `.call(function, ...)`: a convenience method to call a function with the following arguments:
+  * `this` being the processing state, same as in rule handling functions
+  * the first argument is always the object `call` is being called on
+  * additional arguments to `call` are passed as additional arguments to the function
 
 For convenience each of these methods (modulo documented exceptions) return back the object, so that they can be chained in the jQuery promise style.
 

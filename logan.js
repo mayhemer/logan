@@ -612,6 +612,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.call = function(func) {
     func.apply(logan._proc, [this].concat(Array.from(arguments).slice(1)));
+    return this;
   };
 
   Obj.prototype.dispatch = function(target, name) {
