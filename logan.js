@@ -329,7 +329,6 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.captures = [];
     this.aliases = {};
     this._grep = false;
-    this._dispatches = {};
 
     // This is used for placing the summary of the object (to generate
     // the unique ordered position, see UI.position.)
@@ -614,34 +613,6 @@ const EPOCH_1970 = new Date("1970-01-01");
     func.apply(logan._proc, [this].concat(Array.from(arguments).slice(1)));
     return this;
   };
-
-  Obj.prototype.dispatch = function(target, name) {
-    if (name === undefined) {
-      target = this;
-      name = target;
-    }
-
-    target = logan._proc.obj(target);
-
-    let dispatch = {};
-    this.capture({ dispatch: true }, dispatch);
-
-    ensure(target._dispatches, name, []).push(dispatch);
-    return this;
-  },
-
-  Obj.prototype.run = function(name) {
-    let origin = this._dispatches[name];
-    if (!origin) {
-      return this;
-    }
-
-    let dispatch = origin.shift();
-    if (!origin.length) {
-      delete this._dispatches[name];
-    }
-    return this.capture({ run: dispatch }); // dispatch = { capture, source, index }
-  },
 
   Obj.prototype.ipcid = function(id) {
     if (id === undefined) {

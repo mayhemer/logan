@@ -570,7 +570,6 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         this.obj(ch).class("nsHttpChannel")
-          .run("start")
           .prop("start-time", (val, ch) => this.duration(ch.__opentime))
           .state("started")
           .capture();
@@ -594,7 +593,6 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
         this.obj(ch).class("nsHttpChannel")
-          .run("data")
           .propIfNull("first-data-time", (val, ch) => this.duration(ch.__opentime))
           .prop("last-data-time", (val, ch) => this.duration(ch.__opentime))
           .state("data")
@@ -604,7 +602,6 @@ logan.schema("MOZ_LOG",
       module.rule("nsHttpChannel::OnStopRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         this.obj(ch).class("nsHttpChannel")
           .state("on-stop")
-          .run("stop")
           .prop("status", status, true)
           .prop("stop-time", (val, ch) => this.duration(ch.__opentime))
           .capture();
@@ -620,7 +617,6 @@ logan.schema("MOZ_LOG",
       module.rule("nsHttpChannel::ResumeInternal [this=%p]", function(ch) {
         ch = this
           .obj(ch)
-          .run("resume")
           .prop("suspendcount", suspendcount => --suspendcount)
           // The classification time is rather vague, this doesn't necessarily has
           // to be the Resume() called by the classifier, it's just likely to be the one.
@@ -747,9 +743,7 @@ logan.schema("MOZ_LOG",
         this.obj(trans).capture().follow("  %*$");
       });
       module.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
-        trans = this.obj(trans);
-        trans.dispatch(trans.httpchannel, "start");
-        this.thread.httptransaction = trans;
+        this.thread.httptransaction = this.obj(trans);
       });
       schema.ruleIf("http response [", proc => proc.thread.httptransaction, function(trans) {
         delete this.thread.httptransaction;
@@ -770,12 +764,11 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
         trans = this.obj(trans).prop("status", status).state("closed").capture();
-        trans.dispatch(trans.httpchannel, "stop");
         netcap(n => { n.transactionDone(trans) });
         this.thread.closedhttptransaction = trans;
       });
       module.rule("nsHttpTransaction::WritePipeSegment %p written=%u", function(trans, count) {
-        trans = this.obj(trans).capture().dispatch(trans.httpchannel, "data");
+        trans = this.obj(trans).capture();
         netcap(n => { n.transactionReceived(trans, parseInt(count)) });
       });
       module.rule("nsHttpTransaction::ReadRequestSegment %p read=%u", function(trans, count) {
