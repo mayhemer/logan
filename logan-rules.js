@@ -904,6 +904,13 @@ logan.schema("MOZ_LOG",
           stream.httptransaction = tr;
         });
       });
+      module.rule("Http2Stream::Http2Stream %p trans=%p atrans=%p", function(ptr, tr) {
+        let stream = this.obj(ptr).create("Http2Stream").grep();       
+        tr.link(stream);
+        stream.prop("url", tr.props["url"]);
+        stream.httptransaction = tr;
+        delete this.thread.httpspdytransaction;
+      });
       module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
         this.obj(ptr).destroy();
       });
