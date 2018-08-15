@@ -906,10 +906,10 @@ logan.schema("MOZ_LOG",
       });
       module.rule("Http2Stream::Http2Stream %p trans=%p atrans=%p", function(ptr, tr) {
         let stream = this.obj(ptr).create("Http2Stream").grep();
-        tr = this.obj(tr);
-        tr.link(stream);
-        stream.prop("url", tr.props["url"]);
-        stream.httptransaction = tr;
+        this.obj(tr).link(stream).call(tr => {
+          stream.prop("url", tr.props["url"]);
+          stream.httptransaction = tr;
+        });
         delete this.thread.httpspdytransaction;
       });
       module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
