@@ -229,27 +229,33 @@ logan.schema("MOZ_LOG",
        ******************************************************************************/
 
       module.rule("LOADGROUP [%p]: Created.\n", function(ptr) {
-        this.thread.loadgroup = this.obj(ptr).create("nsLoadGroup").prop("requests", 0).prop("foreground-requests", 0).grep();
+        this.thread.loadgroup = this.obj(ptr).create("nsLoadGroup").grep().prop("requests", 0);
       });
       module.rule("LOADGROUP [%p]: Destroyed.\n", function(ptr) {
         this.obj(ptr).destroy();
       });
-      module.rule("LOADGROUP [%p]: Adding request %p %s (count=%d).\n", function(lg, req, name, count) {
+      module.rule("LOADGROUP [%p]: Adding request %p %s (count=%d).\n", function(lg, req, name) {
         this.thread.on("httpchannelchild", ch => { ch.alias(req); });
         this.thread.on("wyciwigchild", ch => { ch.alias(req); });
         this.thread.on("imagerequestproxy", ch => { ch.alias(req); });
         this.thread.on("imagerequest", ch => { ch.alias(req); });
 
         this.obj(req).class("unknown request").prop("in-load-group", lg, true);
-        this.obj(lg).prop("requests", count => ++count).prop("foreground-requests", parseInt(count) + 1).capture().link(req);
+        this.obj(lg).prop("requests", count => ++count).capture().link(req);
       });
-      module.rule("LOADGROUP [%p]: Removing request %p %s status %x (count=%d).\n", function(lg, req, name, status, count) {
+      module.rule("LOADGROUP [%p]: Removing request %p %s status %x (count=%d).\n", function(lg, req, name, status) {
         this.obj(req).class("unknown request").prop("in-load-group");
-        this.obj(lg).prop("requests", count => --count).prop("foreground-requests", count).capture();
+        this.obj(lg).prop("requests", count => --count).capture();
       });
       module.rule("LOADGROUP [%p]: Unable to remove request %p. Not in group!\n", function(lg, req) {
         this.obj(req).class("unknown request").prop("not-found-in-loadgroup", true);
         this.obj(lg).prop("requests", count => ++count).capture();
+      });
+      module.rule("LOADGROUP [%p]: Firing OnStartRequest for request %p.(foreground count=%d).\n", function(lg, req, fgcnt) {
+        this.obj(lg).prop("foreground-requests", fgcnt).capture();
+      });
+      module.rule("LOADGROUP [%p]: Firing OnStopRequest for request %p.(foreground count=%d).\n", function(lg, req, fgcnt) {
+        this.obj(lg).prop("foreground-requests", fgcnt).capture();
       });
       module.rule("nsLoadGroup::SetDefaultLoadRequest this=%p default-request=%p", function(lg, req) {
         // TODO - alias the request?

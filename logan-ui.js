@@ -400,7 +400,7 @@
           if (["className", "pointer", "state"].indexOf(prop) < 0) {
             summary += prop + "=";
           }
-          summary += source.props[prop] || "n/a";
+          summary += source.props[prop] == undefined ? "n/a" : source.props[prop];
         }
         return summary;
       }) {
