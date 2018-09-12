@@ -531,7 +531,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     logan._proc._pending_follow = capture;
     return this;
-  }
+  };
 
   Obj.prototype.prop = function(name, value, merge = false) {
     ensure(logan.searchProps, this.props.className)[name] = true;
@@ -620,7 +620,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     }
     this.ipc_id = id;
     return this.prop("ipc-id", id);
-  },
+  };
 
   Obj.prototype.send = function(message) {
     if (!logan._proc._ipc) {
@@ -666,9 +666,9 @@ const EPOCH_1970 = new Date("1970-01-01");
     logan._proc.restore(proc);
 
     return this;
-  },
+  };
 
-  Obj.prototype.recv = function(message, func = () => {}) {
+  Obj.prototype.recv = function(message, func = () => { }) {
     if (!logan._proc._ipc) {
       return this;
     }
@@ -708,11 +708,10 @@ const EPOCH_1970 = new Date("1970-01-01");
     func(this, sync.sender);
 
     return this;
-  },
+  };
 
 
-  // export
-  logan = {
+  let loganImpl = {
     // processing state sub-object, passed to rule consumers
     _proc: {
       _obj: function(ptr, store) {
@@ -1467,5 +1466,8 @@ const EPOCH_1970 = new Date("1970-01-01");
       return null;
     },
   }; // logan impl
+
+  // export
+  logan = loganImpl;
 
 })();
