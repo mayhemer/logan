@@ -258,7 +258,7 @@ logan.schema("MOZ_LOG",
         this.obj(lg).prop("foreground-requests", fgcnt).capture();
       });
       module.rule("nsLoadGroup::SetDefaultLoadRequest this=%p default-request=%p", function(lg, req) {
-        // TODO - alias the request?
+        // Note that the request is already aliased, since AddRequest is called before SetDefault..
         this.obj(lg).capture().link(this.obj(req).class("unknown default request"));
       });
       module.rule("nsLoadGroup::OnEndPageLoad this=%p default-request=%p", function(lg, dch) {
