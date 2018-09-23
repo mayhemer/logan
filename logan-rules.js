@@ -412,13 +412,14 @@ logan.schema("MOZ_LOG",
        ******************************************************************************/
 
       module.rule("Creating HttpChannelChild @%p", function(ptr) {
-        this.thread.httpchannelchild = this.obj(ptr).create("HttpChannelChild").grep();
+        this.thread.httpchannelchild = this.obj(ptr).create("HttpChannelChild").grep()
+          .expect("uri=%s", (ch, uri) => { ch.prop("url", uri); });
       });
       module.rule("Destroying HttpChannelChild @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
       module.rule("HttpChannelChild::AsyncOpen [this=%p uri=%s]", function(ptr, uri) {
-        this.thread.httpchannelchild = this.obj(ptr).prop("url", uri).state("open").capture();
+        this.thread.httpchannelchild = this.obj(ptr).state("open").capture();
       });
       module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u topwinid=%x", function(ch, gid, winid) {
         this.obj(ch).prop("top-win-id", winid).capture().ipcid(gid).send("HttpChannel");
@@ -436,14 +437,9 @@ logan.schema("MOZ_LOG",
           ch.state("data").capture();
         });
       });
-      module.rule("HttpChannelChild::OnStopRequest [this=%p]", function(ptr) {
+      module.rule("HttpChannelChild::OnStopRequest [this=%p status=%x]", function(ptr, status) {
         this.obj(ptr).recv("HttpChannel::Stop", ch => {
-          ch.state("finished").capture();
-        });
-      });
-      module.rule("HttpChannelChild::DoOnStopRequest [this=%p]", function(ptr) {
-        this.obj(ptr).recv("HttpChannel::Stop", ch => {
-          ch.state("finished").capture();
+          ch.state("finished").prop("status", status).capture();
         });
       });
       module.rule("HttpChannelChild %p ClassOfService=%u", function(ch, cos) {
