@@ -484,6 +484,17 @@ logan.schema("MOZ_LOG",
       });
 
       /******************************************************************************
+       * HttpChannelParentListener
+       ******************************************************************************/
+
+      module.rule("HttpChannelParentListener::HttpChannelParentListener [this=%p, next=%p]", function(listener, nextlistener) {
+        this.obj(listener).create("HttpChannelParentListener").link(nextlistener).grep();
+      });
+      module.rule("HttpChannelParentListener::~HttpChannelParentListener", function(listener) {
+        this.obj(listener).destroy();
+      });
+
+      /******************************************************************************
        * nsHttpChannel
        ******************************************************************************/
 
@@ -755,7 +766,7 @@ logan.schema("MOZ_LOG",
         });
       });
       module.rule("nsHttpTransaction %p SetRequestContext %p", function(trans, rc) {
-        this.obj(rc).link(trans);
+        this.obj(rc).link(this.obj(trans).capture());
       });
       module.rule("   blocked by request context: [rc=%p trans=%p blockers=%d]", function(rc, trans) {
         this.obj(trans).state("blocked").capture();
