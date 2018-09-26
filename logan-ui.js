@@ -508,10 +508,9 @@
         let process = (origin, up, handlername) => {
           let filter = (captures, extra) => {
             let index = captures.findIndex(c => c.id > origin);
-            if (index < 0) {
-              return [];
-            }
-            let slice = up ? captures.slice(0, index) : captures.slice(index);
+            let slice = up
+              ? captures.slice(0, index < 0 ? (captures.length - 1) : index)
+              : captures.slice(index < 0 ? captures.length : index);
             return slice.map(capture => ({ capture, extra }));
           } // filter()
 
