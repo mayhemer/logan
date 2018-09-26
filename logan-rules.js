@@ -688,7 +688,7 @@ logan.schema("MOZ_LOG",
           ch.state("redirected");
         }
       });
-      logan.summaryProps("nsHttpChannel", ["http-status", "url", "status"]);
+      logan.summaryProps("nsHttpChannel", ["status", "http-status", "url"]);
 
       /******************************************************************************
        * nsHttpChannelAuthProvider
