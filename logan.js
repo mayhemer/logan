@@ -928,9 +928,11 @@ const EPOCH_1970 = new Date("1970-01-01");
       fetch(url, { mode: 'cors', credentials: 'omit', }).then(function(response) {
         return response.blob();
       }).then(function(blob) {
-        blob.name = "_net_"
+        blob.name = url;
         this.consumeFiles(UI, [blob]);
-      }.bind(this));
+      }.bind(this)).catch((reason) => {
+        window.onerror(reason);
+      });
     },
 
     consumeFiles: function(UI, files, cache = false) {

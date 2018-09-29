@@ -34,10 +34,14 @@
   <input type="file" id="files" multiple />
   <span class="hide-top min-width-default">
     <input type="checkbox" id="cache" title=
-"Unchecked: don't keep the files' content in memory and load lines only when they are about to display on screen. Saves memory, but when the log files are overwritten, the results will cross-mix without any warning. 
+"Unchecked: don't keep the files' content in memory and load lines only when they are about to display on screen. Saves memory, but when the log files are overwritten, the results will cross-mix without any warning.
 
 Checked: load everything into memory, so that you will work with a snapshot at the time of load. This eats a lot of memory and can cause OOM or significant slowdown with large log files."
     /><label for="cache">Cache in memory</label>
+    <p>
+      <input type="text" id="url" class="URL" placeholder="Or, specify a URL of a log somewhere on the Web (plain, CORS enabled)." />
+      <input id="load_url" type="button" value="Load the URL" style="padding: 0; margin: 0.5em 0 0 0"/>
+    </p>
   </span>
   <span id="warnings"></span>
   <div id="load_progress" class="load_progress"></div>

@@ -268,11 +268,16 @@ select {
   margin: 0.25em;
 }
 
-input[type=text]{
+input[type=text] {
   width: 15em;
 }
 select:not(.narrow) {
   width: 12em;
+}
+
+input.URL {
+  margin: 0;
+  width: 100%;
 }
 
 div.flow_root {

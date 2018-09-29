@@ -1065,14 +1065,14 @@
 
     consume = () => {
       var files = $("#files").get()[0].files;
-      if (files.length) {
-        UI.clearResultsView();
-        UI.setSearchView(true);
-        logan.consumeFiles(UI, files, $("#cache").prop("checked"));
-      } else if (location.search) {
+      if (location.search) {
         UI.clearResultsView();
         UI.setSearchView(true);
         logan.consumeURL(UI, location.search.substr(1))
+      } else if (files.length) {
+        UI.clearResultsView();
+        UI.setSearchView(true);
+        logan.consumeFiles(UI, files, $("#cache").prop("checked"));
       } else {
         UI.setInitialView();
       }
@@ -1103,6 +1103,10 @@
       UI.clearResultsView();
       UI.setSearchView(true);
       logan.consumeFiles(UI, event.target.files, $("#cache").prop("checked"));
+    });
+
+    $("#load_url").click((event) => {
+      location.search = $("#url").val();
     });
 
     let search_By = $("#search_By").on("change", (event) => {
