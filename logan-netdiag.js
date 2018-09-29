@@ -655,7 +655,7 @@ const NET_DIAG_ENABLED = false;
               UI.setResultsView();
               UI.addSearch({
                 className: result.obj.props.className,
-                propName: "logid",
+                propName: "ordernum",
                 value: result.obj.id,
                 matching: "==",
               });

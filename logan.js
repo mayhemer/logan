@@ -325,7 +325,8 @@ const EPOCH_1970 = new Date("1970-01-01");
   function Obj(ptr) {
     this.id = logan.objects.length;
     // NOTE: when this list is enhanced, UI.summary has to be updated the "collect properties manually" section
-    this.props = new Bag({ pointer: ptr, className: null, logid: this.id });
+    // NOTE: ordernum is only temporary
+    this.props = new Bag({ pointer: ptr, className: null, ordernum: this.id + 1000000 });
     this.captures = [];
     this.aliases = {};
     this._grep = false;
@@ -336,6 +337,13 @@ const EPOCH_1970 = new Date("1970-01-01");
     // that would lead to complicated duplications.
     this.placement = new Capture({ placement: this });
     this.placement.time = logan._proc.timestamp;
+
+    this._class = function(className) {
+      ensure(logan.searchProps, className, { pointer: true, state: true, ordernum: 0 });
+
+      this.props.className = className;
+      this.props.ordernum = logan.searchProps[className].ordernum++;
+    };
 
     logan.objects.push(this);
   }
@@ -371,9 +379,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       return logan._proc.obj(this.__most_recent_accessor).create(className, capture);
     }
 
-    ensure(logan.searchProps, className, { pointer: true, state: true, logid: true });
-
-    this.props.className = className;
+    this._class(className);
     this.prop("state", "created");
 
     if (capture) {
@@ -424,7 +430,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     }
 
     if (className) {
-      this.props.className = className;
+      this._class(className);
     }
 
     let alias = Obj.prototype.isPrototypeOf(obj)
@@ -620,9 +626,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       return this;
     }
 
-    ensure(logan.searchProps, className, { pointer: true, state: true, logid: true });
-
-    this.props.className = className;
+    this._class(className);
     return this.prop("state", "partial").prop("missing-constructor", true);
   };
 
