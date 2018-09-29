@@ -916,6 +916,7 @@ logan.schema("MOZ_LOG",
           stream.prop("url", tr.props["url"]);
           stream.httptransaction = tr;
         });
+        this.thread.h2stream = stream;
       });
       module.rule("Http2Stream::Http2Stream %p trans=%p atrans=%p", function(ptr, tr) {
         let stream = this.obj(ptr).create("Http2Stream").grep();
@@ -924,6 +925,7 @@ logan.schema("MOZ_LOG",
           stream.httptransaction = tr;
         });
         delete this.thread.httpspdytransaction;
+        this.thread.h2stream = stream;
       });
       module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
         this.obj(ptr).destroy();
@@ -958,10 +960,23 @@ logan.schema("MOZ_LOG",
           netcap(n => { n.transactionReceived(stream.httptransaction, -parseInt(count)) });
         }
       });
+      module.rule("Http2Stream::ParseHttpRequestHeaders %p avail=%d state=%x", function(stream, avail, state) {
+        this.obj(stream).capture().follow("Pushed Stream Match located %p id=%x key=%*$", (stream, pushed) => {
+          stream.prop("pushed", true).link(pushed);
+        });
+      });
       module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
         this.obj(stream).state("closed").prop("status", result).capture();
       });
       logan.summaryProps("Http2Stream", ["status", "url"]);
+
+      /******************************************************************************
+       * Http2PushedStream
+       ******************************************************************************/
+
+      module.rule("Http2PushedStream ctor this=%p 0x%X\n", function(stream, id) {
+        this.obj(stream).inherites(this.thread.h2stream, "Http2PushedStream").prop("pushed-id", id);
+      });
 
       /******************************************************************************
        * nsHalfOpenSocket

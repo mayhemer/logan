@@ -418,6 +418,20 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
+  Obj.prototype.inherites = function(obj, className) {
+    if (!obj) {
+      return this.create(className);
+    }
+
+    if (className) {
+      this.props.className = className;
+    }
+
+    let alias = Obj.prototype.isPrototypeOf(obj)
+      ? obj.__most_recent_accessor : obj;
+    return this.alias(alias).capture();
+  };
+
   Obj.prototype.destroy = function(ifClassName, capture = true) {
     if (ifClassName && this.props.className !== ifClassName) {
       return this;
@@ -582,6 +596,9 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.link = function(that) {
     that = logan._proc.obj(that);
+    if (that.nullptr || this.nullptr) {
+      return this;
+    }
     let capture = new Capture({ linkFrom: this, linkTo: that }, this);
     this.capture(capture);
     that.capture(capture);
@@ -737,6 +754,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
 
         obj.__most_recent_accessor = ptr;
+        obj.nullptr = ptr === "0";
         return obj;
       },
 
