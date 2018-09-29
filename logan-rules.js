@@ -975,7 +975,7 @@ logan.schema("MOZ_LOG",
        ******************************************************************************/
 
       module.rule("Http2PushedStream ctor this=%p 0x%X\n", function(stream, id) {
-        this.obj(stream).inherites(this.thread.h2stream, "Http2PushedStream").prop("pushed-id", id);
+        this.obj(stream).inherits(this.thread.h2stream, "Http2PushedStream").prop("pushed-id", id);
       });
 
       /******************************************************************************

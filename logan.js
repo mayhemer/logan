@@ -424,7 +424,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
-  Obj.prototype.inherites = function(obj, className) {
+  Obj.prototype.inherits = function(obj, className) {
     if (!obj) {
       return this.create(className);
     }
