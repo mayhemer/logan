@@ -106,7 +106,6 @@
       loadWhole: new Set(),
       warnings: {},
       display: {},
-      map: {},
       dynamicStyle: {},
       activeRevealeres: 0,
       objColors: {},
@@ -235,8 +234,6 @@
         this.searches = [];
         $("#breadcrumbs > #list").empty();
         this.breadcrumbs = [];
-        $("#breadcrumbs > #map").empty();
-        this.map = { data: { nodes: new vis.DataSet(), edges: new vis.DataSet() } };
         $("#dynamic_style").empty();
         this.dynamicStyle = {};
 
@@ -293,15 +290,22 @@
       loaded: function() {
         let show = parseHash().show;
         if (show) {
+          let highlight = 0;
           this.setResultsView();
           for (let rec of show) {
             for (let obj of logan.objects) {
               if (obj.props.className === rec.name && obj.props.ordernum === rec.on) {
+                let index = HIGHLIGHTSET.indexOf(rec.clr) + 1;
+                highlight = Math.max(index, highlight);
+
                 this.objColors[obj.id] = rec.clr;
                 let element = this.addResult(obj);
                 element.children(".checker").click();
               }
             }
+          }
+          while (highlight--) {
+            nextHighlightColor();
           }
         }
       },
@@ -859,19 +863,6 @@
         }
       },
 
-      ensureMap: function() {
-        if (this.map.map) {
-          return;
-        }
-        let mapElement = $("#map").get()[0];
-        let options = {
-          nodes: { shape: "box", shapeProperties: { borderRadius: 0, } },
-          edges: { arrows: { to: { enabled: true, scaleFactor: 1, type: 'arrow' } } },
-          interaction: { zoomView: false },
-        };
-        this.map.map = new vis.Network(mapElement, this.map.data, options);
-      },
-
       relationId: function(relation) {
         if (!relation.from) {
           return 0;
@@ -884,14 +875,6 @@
       addBreadcrumb: function(expand, obj, relation, capture) {
         if (expand) {
           expand.refs++;
-
-          if (relation.from) {
-            this.map.data.edges.add({
-              id: this.relationId(expand.relation),
-              from: expand.relation.from.id,
-              to: expand.relation.to.id,
-            });
-          }
           return;
         }
 
@@ -958,23 +941,6 @@
 
         $("#list").append(expand.element);
         this.breadcrumbs.push(expand);
-
-        if (this.breadcrumbs.length) {
-          // The graph is broken and incomplete, never used that before.  Keep hidden until fixed.
-          // $("#show_map").show();
-        }
-        this.map.data.nodes.add({
-          id: expand.obj.id,
-          label: this.quick(expand.obj),
-          color: this.objColor(expand.obj),
-        });
-        if (relation.from) {
-          this.map.data.edges.add({
-            id: this.relationId(expand.relation),
-            from: expand.relation.from.id,
-            to: expand.relation.to.id,
-          });
-        }
       },
 
       removeBreadcrumb: function(expand, obj) {
@@ -991,11 +957,6 @@
           this.breadcrumbs.remove(item => item.obj === expand.obj);
         }
 
-        this.map.data.nodes.remove(expand.obj.id);
-        let relationId = this.relationId(expand.relation);
-        if (relationId) {
-          this.map.data.edges.remove(relationId);
-        }
         if (!this.breadcrumbs.length) {
           $("#show_map").hide();
         }
@@ -1167,13 +1128,6 @@
     });
     $("#seek_to_tail").click((event) => {
       UI.seekTo(0);
-    });
-
-    $("#show_map").click((event) => {
-      $("#map").toggle();
-      if ($("#map").is(":visible")) {
-        UI.ensureMap();
-      }
     });
 
     let escapeHandler = (event) => {
