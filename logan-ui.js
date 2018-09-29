@@ -667,7 +667,7 @@
               .text(this.summary(obj, (props) => {
                 // This prepends the property we searched the object by
                 let result = this.summaryProps(props);
-                if (searchProp && result.indexOf(searchProp) < 0) {
+                if (searchProp && result.indexOf(searchProp) < 0 && searchProp !== CAPTURED_LINE_LABEL) {
                   result.unshift(searchProp);
                 }
                 return result;
