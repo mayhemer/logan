@@ -1347,6 +1347,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       UI.fillClassNames(this.searchProps);
       UI.fillSearchBy();
       UI.searchingEnabled(true);
+      UI.loaded();
     },
 
     search: async function(UI, className, propName, matchValue, match, seekId, coloring) {

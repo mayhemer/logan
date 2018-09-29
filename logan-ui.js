@@ -76,6 +76,27 @@
   let SEARCH_INDEXER = 0;
   let BREADCRUMB_INDEXER = 0;
 
+  function parseHash() {
+    let hash = unescape(location.hash.substr(1));
+    try {
+      return json = JSON.parse(hash);
+    } catch (ex) {
+      return {};
+    }
+  }
+  function updateHash(json) {
+    let hash = parseHash();
+    for (let prop in json) {
+      hash[prop] = json[prop];
+    }
+    location.hash = escape(JSON.stringify(hash));
+  }
+  function clearHash(name) {
+    let hash = parseHash();
+    delete hash[name];
+    location.hash = escape(JSON.stringify(hash));
+  }
+
   let UI =
     {
       searches: [],
@@ -268,6 +289,22 @@
 
         select.val(use);
       },
+      
+      loaded: function() {
+        let show = parseHash().show;
+        if (show) {
+          this.setResultsView();
+          for (let rec of show) {
+            for (let obj of logan.objects) {
+              if (obj.props.className === rec.name && obj.props.ordernum === rec.on) {
+                this.objColors[obj.id] = rec.clr;
+                let element = this.addResult(obj);
+                element.children(".checker").click();
+              }
+            }
+          }
+        }
+      },
 
       closeDetails: function() {
         if (this.bc_details) {
@@ -335,24 +372,21 @@
 
       redoSearches: function() {
         let searches = this.searches.slice();
-        let breadcrumbs = this.breadcrumbs.slice();
+        let expanders = this.expanders;
 
         this.clearResultsView();
         for (search of searches) {
           this.addSearch(search);
         }
-        for (let expand of breadcrumbs.sort((a, b) => a.index - b.index)) {
-          let capture = this.display[expand.capture.id];
-          if (capture) {
-            capture.children("input[type=checkbox]").click();
-          }
+
+        this.expanders = expanders;
+        for (let expander of Object.values(expanders)) {
+          expander(true);
         }
       },
 
       objColor: function(obj) {
-        return ensure(this.objColors, obj.id, function() {
-          return nextHighlightColor();
-        });
+        return ensure(this.objColors, obj.id, nextHighlightColor);
       },
 
       highlight: function(input, at = 0, ignore = null) {
@@ -418,7 +452,7 @@
           props: {
             className: obj.props.className,
             pointer: obj.props.pointer,
-            logid: obj.props.logid,
+            ordernum: obj.props.ordernum,
           },
           placement: obj.placement,
         };
@@ -580,8 +614,8 @@
         return function() {
           let expander = this.expanders[obj.id];
           if (expander) {
-            expander(false);
             delete this.expanders[obj.id];
+            expander(false);
             return;
           }
 
@@ -637,6 +671,13 @@
             }
 
             $(window).scrollTop(scrollanch.offset().top - scrolloffset);
+
+            updateHash({
+              show: Object.keys(this.expanders).map(function(id) {
+                let obj = logan.objects[id];
+                return { name: obj.props.className, on: obj.props.ordernum, clr: this.objColor(obj) };
+              }, this)
+            });
           }
 
           this.expanders[obj.id] = expander;
@@ -873,8 +914,8 @@
               .click(function(event) {
                 let expander = this.expanders[obj.id];
                 if (expander) {
-                  expander(false);
                   delete this.expanders[obj.id];
+                  expander(false);
                 }
               }.bind(this))
             )
@@ -1011,8 +1052,8 @@
 
     let expander = UI.expanders[objid];
     if (expander) {
-      expander(false, element);
       delete UI.expanders[objid];
+      expander(false, element);
       return;
     }
 
@@ -1038,7 +1079,7 @@
     }
 
     let select_schema = $("#select_schema").change((select) => {
-      location.hash = escape(select_schema.val());
+      updateHash({ schema: select_schema.val() });
       logan.activeSchema(select_schema.val());
       consume();
     });
@@ -1046,7 +1087,7 @@
       select_schema.append($("<option>").attr("value", schema).text(schema));
     }
 
-    let schema_name = unescape(location.hash.substr(1));
+    let schema_name = parseHash().schema;
     let active_schema = logan.activeSchema(schema_name);
     if (!active_schema) {
       alert("There is no schema '" + schema_name + "'");
@@ -1079,7 +1120,7 @@
     }).change();
 
     $("#search_className").on("change", (event) => {
-      let props = logan.searchProps[event.target.value] || { logid: true };
+      let props = logan.searchProps[event.target.value];
       UI.fillSearchBy(props);
     });
 
