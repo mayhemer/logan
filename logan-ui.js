@@ -1029,7 +1029,7 @@
       if (location.search) {
         UI.clearResultsView();
         UI.setSearchView(true);
-        logan.consumeURL(UI, location.search.substr(1))
+        logan.consumeURL(UI, unescape(location.search.substr(1)));
       } else if (files.length) {
         UI.clearResultsView();
         UI.setSearchView(true);
@@ -1067,7 +1067,7 @@
     });
 
     $("#load_url").click((event) => {
-      location.search = $("#url").val();
+      location.search = escape($("#url").val());
     });
 
     let search_By = $("#search_By").on("change", (event) => {
