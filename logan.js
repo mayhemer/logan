@@ -458,7 +458,11 @@ const EPOCH_1970 = new Date("1970-01-01");
       logan._proc.update_alias_regexp();
     }
 
-    return capture ? this.capture() : this;
+    if (capture) {
+      this.capture();
+    }
+
+    return this.capture({ destroyed: true });
   };
 
   function Capture(what, obj = null) {
@@ -741,7 +745,8 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
 
         ptr = pointerTrim(ptr);
-        if (ptr === "0") {
+        let nullptr = ptr.match(NULLPTR_REGEXP);
+        if (nullptr) {
           store = false;
         }
 
@@ -758,7 +763,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
 
         obj.__most_recent_accessor = ptr;
-        obj.nullptr = ptr === "0";
+        obj.nullptr = nullptr;
         return obj;
       },
 
@@ -1470,7 +1475,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     find: function(pointer, seekId) {
       pointer = pointerTrim(pointer);
-      if (pointer === "0") {
+      if (pointer.match(NULLPTR_REGEXP)) {
         return null;
       }
 
@@ -1478,13 +1483,25 @@ const EPOCH_1970 = new Date("1970-01-01");
         if (!obj.captures.length) {
           continue;
         }
-        if (obj.captures[0].id > seekId || obj.captures.last().id < seekId) {
+        if (obj.captures[0].id > seekId) {
           continue;
         }
-        // The object lives around the seek point
+        let last = obj.captures.last();
+        if (last.id < seekId) {
+          if (last.destroyed) {
+            continue;
+          }
+        }
+        // The object lives around the seek point or has not been destroyed
+        // till this point (not having the ending "destroyed" capture)
 
         if (obj.props.pointer === pointer) {
           return obj;
+        }
+        for (let alias of Object.keys(obj.aliases)) {
+          if (alias === pointer) {
+            return obj;
+          }
         }
       }
 
