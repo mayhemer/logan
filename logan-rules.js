@@ -240,7 +240,7 @@ logan.schema("MOZ_LOG",
         this.thread.on("imagerequestproxy", ch => { ch.alias(req); });
         this.thread.on("imagerequest", ch => { ch.alias(req); });
 
-        this.obj(req).class("unknown request").prop("in-load-group", lg, true);
+        this.obj(req).class("unknown request").prop("in-load-group", lg, true).grep();
         this.obj(lg).prop("requests", count => ++count).capture().link(req);
       });
       module.rule("LOADGROUP [%p]: Removing request %p %s status %x (count=%d).\n", function(lg, req, name, status) {
@@ -259,7 +259,10 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsLoadGroup::SetDefaultLoadRequest this=%p default-request=%p", function(lg, req) {
         // Note that the request is already aliased, since AddRequest is called before SetDefault..
-        this.obj(lg).capture().link(this.obj(req).class("unknown default request"));
+        req = this.obj(req).class("unknown default request");
+        if (!req.nullptr) {
+          this.obj(lg).prop("default-url", req.props.url, true).capture().link(req);
+        }
       });
       module.rule("nsLoadGroup::OnEndPageLoad this=%p default-request=%p", function(lg, dch) {
         lg = this.obj(lg).capture();
