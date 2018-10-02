@@ -1487,10 +1487,8 @@ const EPOCH_1970 = new Date("1970-01-01");
           continue;
         }
         let last = obj.captures.last();
-        if (last.id < seekId) {
-          if (last.destroyed) {
-            continue;
-          }
+        if (last.id < seekId && last.destroyed) {
+          continue;
         }
         // The object lives around the seek point or has not been destroyed
         // till this point (not having the ending "destroyed" capture)
