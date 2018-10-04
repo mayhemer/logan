@@ -493,7 +493,7 @@ logan.schema("MOZ_LOG",
       module.rule("HttpChannelParentListener::HttpChannelParentListener [this=%p, next=%p]", function(listener, nextlistener) {
         this.obj(listener).create("HttpChannelParentListener").link(nextlistener).grep();
       });
-      module.rule("HttpChannelParentListener::~HttpChannelParentListener", function(listener) {
+      module.rule("HttpChannelParentListener::~HttpChannelParentListener %p", function(listener) {
         this.obj(listener).destroy();
       });
 
