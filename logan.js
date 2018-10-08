@@ -335,8 +335,9 @@ const EPOCH_1970 = new Date("1970-01-01");
     // the unique ordered position, see UI.position.)
     // Otherwise there would be no other way than to use the first capture
     // that would lead to complicated duplications.
-    this.placement = new Capture({ placement: this });
+    this.placement = new Capture({ placement: this, });
     this.placement.time = logan._proc.timestamp;
+    this.placement.file = logan._proc.file;
 
     this._class = function(className) {
       ensure(logan.searchProps, className, { pointer: true, state: true, ordernum: 0 });
