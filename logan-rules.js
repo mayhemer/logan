@@ -1242,10 +1242,6 @@ logan.schema("MOZ_LOG",
       module.rule("CacheEntry::Load [this=%p, trunc=%d]", function(entry) {
         this.thread.httpcacheentry = this.obj(entry).capture();
       });
-      module.rule("CacheEntryHandle::Dismiss %p", function(handle) {
-        // compatibility for logs w/o ~CacheEntryHandle
-        this.objIf(handle).capture().unalias();
-      });
       module.rule("CacheEntryHandle::~CacheEntryHandle %p", function(handle) {
         this.objIf(handle).capture().unalias();
       });
