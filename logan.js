@@ -322,8 +322,9 @@ const EPOCH_1970 = new Date("1970-01-01");
   };
 
 
-  function Obj(ptr) {
-    this.id = logan.objects.length;
+  function Obj(ptr, factual) {
+    this.factual = factual;
+    this.id = this.factual ? logan.objects.length : -1;
     // NOTE: when this list is enhanced, UI.summary has to be updated the "collect properties manually" section
     // NOTE: ordernum is only temporary
     this.props = new Bag({ pointer: ptr, className: null, ordernum: this.id + 1000000 });
@@ -346,7 +347,9 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.props.ordernum = logan.searchProps[className].ordernum++;
     };
 
-    logan.objects.push(this);
+    if (this.factual) {
+      logan.objects.push(this);
+    }
   }
 
   Obj.prototype.on = Bag.prototype.on;
@@ -753,14 +756,13 @@ const EPOCH_1970 = new Date("1970-01-01");
 
         let obj = this.objs[ptr];
         if (!obj) {
-          obj = new Obj(ptr);
+          obj = new Obj(ptr, store);
           if (store) {
             this.objs[ptr] = obj;
             if (!ptr.match(POINTER_REGEXP)) {
               logan._proc.update_alias_regexp();
             }
           }
-          obj.factual = store;
         }
 
         obj.__most_recent_accessor = ptr;
