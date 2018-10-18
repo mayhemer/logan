@@ -441,7 +441,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.destroy = function(ifClassName, capture = true) {
     if (ifClassName && this.props.className !== ifClassName) {
-      return this;
+      return;
     }
 
     delete logan._proc.objs[this.props.pointer];
@@ -463,7 +463,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.capture();
     }
 
-    return this.capture({ destroyed: true });
+    this.capture({ destroyed: true });
   };
 
   function Capture(what, obj = null) {
