@@ -3,6 +3,8 @@
   // Configuration of the UI
   const LOAD_LINES_ON_SCROLL = true;
   const ON_SCROLL_LINES_COUNT = 20;
+  const AUTO_FETCH_INITIAL_DELAY = 250;
+  const AUTO_FETCH_DELAY_DECAY = 32;
   // -----------------------
 
   function ensure(array, itemName, def = {}) {
@@ -112,6 +114,9 @@
     currentProgress: 0,
     searchDisableCount: 0,
     searchByCache: null,
+    mousedown: false,
+    lastIncrement: 0,
+    autoFetchDelay: AUTO_FETCH_INITIAL_DELAY,
 
     escapeHtml: function(string) {
       return String(string).replace(/[&<>"'`=\/]/g, function(s) {
@@ -742,6 +747,9 @@
 
       let controller = () => {
         let fetch = (element, increment) => {
+          // To loop
+          UI.lastIncrement = increment;
+
           let fromTop = $(element).parents(".log_line").offset().top - $(window).scrollTop();
           fromTop |= 1; // to fix the jumping effect in Firefox
 
@@ -779,22 +787,36 @@
           }
         }
 
+        let up = $("<span>")
+          .attr('title', 'Fetch previous line on this thread')
+          .text('\u2303')
+          .mousedown(function() {
+            fetch(this, -1);
+          });
+                
+        let down = $("<span>")
+          .attr('title', 'Fetch next line on this thread')
+          .text('\u2304')
+          .mousedown(function() {
+            fetch(this, +1);
+          });
+        
+        if (UI.mousedown) {
+          setTimeout(() => {
+            if (UI.mousedown && UI.lastIncrement != 0) {
+              let target = UI.lastIncrement > 0 ? down : up;
+              fetch(target, UI.lastIncrement);
+
+              UI.autoFetchDelay -= AUTO_FETCH_DELAY_DECAY;
+              if (UI.autoFetchDelay < 0) UI.autoFetchDelay = 0;
+            }
+          }, UI.autoFetchDelay);
+        }
+
         return $("<span>")
           .addClass("line_controller")
-          .append($("<span>")
-            .attr('title', 'Fetch previous line on this thread')
-            .text('\u2303')
-            .click(function() {
-              fetch(this, -1);
-            })
-          )
-          .append($("<span>")
-            .attr('title', 'Fetch next line on this thread')
-            .text('\u2304')
-            .click(function() {
-              fetch(this, +1);
-            })
-          )
+          .append(up)
+          .append(down)
           .mousedown((e) => {
             e.preventDefault();
           })
@@ -1150,6 +1172,18 @@
       } finally {
         logan.commitReadCapture();
       }
+    });
+
+    window.addEventListener("mousedown", (e) => {
+      UI.mousedown = e.buttons == 1;
+      if (UI.mousedown) {
+        UI.autoFetchDelay = AUTO_FETCH_INITIAL_DELAY;
+      }
+    }, true);
+
+    $(window).mouseup((e) => {
+      UI.mousedown = false;
+      UI.lastIncrement = 0;
     });
 
     consume();
