@@ -723,6 +723,17 @@ logan.schema("MOZ_LOG",
       });
 
       /******************************************************************************
+       * nsHttpAuthNode
+       ******************************************************************************/
+
+      module.rule("Creating nsHttpAuthNode @%p", function(node) {
+        this.obj(node).create("nsHttpAuthNode").grep();
+      });
+      module.rule("Destroying nsHttpAuthNode @%p", function(node) {
+        this.obj(node).destroy();
+      });
+
+      /******************************************************************************
        * nsHttpTransaction
        ******************************************************************************/
 
