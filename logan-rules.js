@@ -532,6 +532,12 @@ logan.schema("MOZ_LOG",
         }
         netcap(n => { n.channelAsyncOpen(channel) });
       });
+      module.rule("nsHttpChannel::ResolveProxy [this=%p]", function(ptr) {
+        this.obj(ptr).capture().__resolveproxytime = this.timestamp;
+      });
+      module.rule("nsHttpChannel::OnProxyAvailable [this=%p pi=%p status=%x mStatus=%x]", function(ptr) {
+        this.obj(ptr).capture().prop("proxy-resolve-time", (val, ch) => this.duration(ch.__resolveproxytime));
+      });
       module.rule("nsHttpChannel [%p] created nsChannelClassifier [%p]", function(ch, clas) {
         this.obj(ch).link(clas).capture();
       });
