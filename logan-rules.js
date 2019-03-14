@@ -1589,6 +1589,16 @@ logan.schema("treeherder log",
       };
     }
 
+    /* 0:07.17 GECKO(14256) 2019-03-14 12:08:57.535000 UTC - [(null) 14112: Main Thread]: V/... */
+    match = line.match(/^\s*\d+:\d+\.\d+ (\w+)\((\d+)\) (.*)$/);
+    if (match) {
+      let [all, process_name, pid, text] = match;
+      return {
+        text: text,
+        forward: { "debug text console": text },
+      };
+    }
+
     return undefined;
   },
 
