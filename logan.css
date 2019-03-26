@@ -355,6 +355,11 @@ div#breadcrumbs:has(.breadcrumb_details) {
 }
 */
 
+#breadcrumbs span.delete-all {
+  margin-left: .5em;
+  cursor: pointer;
+}
+
 #breadcrumbs span.branch {
   display: inline-block;
   padding: 0 0 0 0.5em;

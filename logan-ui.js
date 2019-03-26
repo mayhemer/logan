@@ -228,9 +228,7 @@
       $("#breadcrumbs").hide();
     },
 
-    clearResultsView: function() {
-      $("#warnings").hide().empty();
-      this.warnings = {};
+    resetResultsView: function() {
       $("#results_section").empty();
       for (let expander of Object.values(this.expanders)) {
         expander("cleanup");
@@ -238,6 +236,12 @@
       this.expanders = {};
       this.loadWhole = new Set();
       this.display = {};
+    },
+
+    clearResultsView: function() {
+      $("#warnings").hide().empty();
+      this.warnings = {};
+      this.resetResultsView();
       $("#active_searches").empty();
       this.searches = [];
       $("#breadcrumbs > #list").empty();
@@ -965,6 +969,17 @@
           }.bind(this)),
       };
 
+      if (this.breadcrumbs.length === 0) {
+        $("#list").append(
+          $("<span>").addClass('red delete-all').html("&#x232b;").attr('title', `Close all expanded objectes and remove coloring`).click(() => {
+            this.objColors = {};
+            this.resetResultsView();
+            clearHash("show");
+            this.redoSearches();
+          })
+        );
+      }
+
       $("#list").append(expand.element);
       this.breadcrumbs.push(expand);
     },
@@ -985,6 +1000,7 @@
 
       if (!this.breadcrumbs.length) {
         $("#show_map").hide();
+        $("#list span.delete-all").remove();
       }
     },
 
