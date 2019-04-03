@@ -794,14 +794,14 @@
 
         let up = $("<span>")
           .attr('title', 'Fetch previous line on this thread')
-          .text('\u2303')
+          .text('\u02c4')
           .mousedown(function() {
             fetch(this, -1);
           });
                 
         let down = $("<span>")
           .attr('title', 'Fetch next line on this thread')
-          .text('\u2304')
+          .text('\u02c5')
           .mousedown(function() {
             fetch(this, +1);
           });
