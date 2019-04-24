@@ -984,6 +984,7 @@ const EPOCH_1970 = new Date("1970-01-01");
             }
             Promise.all(data).then((data) => {
               this.consumeFiles(UI, data);
+              UI.searchingEnabled(true);
             });
           });
         },
