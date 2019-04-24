@@ -406,7 +406,19 @@ logan.schema("MOZ_LOG",
         this.obj(clas).class("nsChannelClassifier").capture();
       });
 
-    });
+    }); // nsChannelClassifier
+
+    schema.module("nsWebSocket", (module) => {
+      module.rule("WebSocketChannel::WebSocketChannel() %p", function(ptr) {
+        this.obj(ptr).create("WebSocketChannel").grep();
+      });
+      module.rule("WebSocketChannel::WebSocketChannel() %p", function(ptr) {
+        this.obj(ptr).create("WebSocketChannel").grep();
+      });
+      module.rule("WebSocketChannel::AsyncOpen() %p", function(ptr) {
+        this.thread.openingwebsocket = this.obj(ptr).capture();
+      });
+    }); // nsWebSocket
 
     schema.module("nsHttp", (module) => {
 
@@ -509,6 +521,9 @@ logan.schema("MOZ_LOG",
           ch.ipcid(parent.ipcid());
           parent.link(ch);
           ch.httpparentchannel = parent;
+        });
+        this.thread.on("openingwebsocket", ws => {
+          ws.link(ch).prop("url", ch.props.url);
         });
       });
       module.rule("Destroying nsHttpChannel [this=%p]", function(ptr) {
