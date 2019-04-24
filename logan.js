@@ -130,7 +130,7 @@ const EPOCH_1970 = new Date("1970-01-01");
   let IF_RULE_INDEXER = 0;
 
   function isChildFile(file) {
-    return file.name.match(/\.child-\d+(?:\.\d+)?$/);
+    return file.name.match(/[-\.]child[-\.]/);
   }
 
   function isRotateFile(file) {
@@ -144,6 +144,10 @@ const EPOCH_1970 = new Date("1970-01-01");
     }
 
     return file.name;
+  }
+
+  function isZipFile(file) {
+    return file.name.match(/\.zip$/);
   }
 
   function escapeRegexp(s) {
@@ -893,6 +897,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this._proc._sync = {};
       delete this._proc.nonPtrAliases;
 
+      let zips = {};
       let parents = {};
       let children = {};
       let bases = {};
@@ -907,6 +912,9 @@ const EPOCH_1970 = new Date("1970-01-01");
         if (isChildFile(file)) {
           file.__is_child = true;
           children[basename] = true;
+        } else if (isZipFile(file)) {
+          file.__is_zip = true;
+          zips[basename] = true;
         } else {
           parents[basename] = true;
         }
@@ -914,11 +922,12 @@ const EPOCH_1970 = new Date("1970-01-01");
 
       parents = Object.keys(parents).length;
       children = Object.keys(children).length;
+      zips = Object.keys(zips).length;
 
       if (parents > 1) {
         UI.warn("More than one parent log - is that what you want?");
       }
-      if (parents == 0 && children > 1) {
+      if (parents == 0 && children > 1 && zips == 0) {
         UI.warn("Loading orphan child logs - is that what you want?");
       }
 
@@ -933,14 +942,55 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.seekId = 0;
       this.initProc(UI);
 
+      let contentType = '';
       fetch(url, { mode: 'cors', credentials: 'omit', }).then(function(response) {
+        if (response.headers.has('content-type')) {
+          contentType = response.headers.get('content-type');
+        }
         return response.blob();
       }).then(function(blob) {
-        blob.name = url;
-        this.consumeFiles(UI, [blob]);
+        if (contentType.match("zip")) {
+          this.consumeZIP(UI, blob);
+        } else {
+          blob.name = url;
+          this.consumeFiles(UI, [blob]);
+        }
       }.bind(this)).catch((reason) => {
         window.onerror(reason);
       });
+    },
+
+    consumeZIP: function(UI, blob) {
+      UI.searchingEnabled(false);
+
+      zip.createReader(new zip.BlobReader(blob),
+        (reader) => {
+          reader.getEntries((entries) => {
+            let data = [];
+            for (let entry of entries) {
+              data.push(new Promise((resolve) => {
+                entry.getData(
+                  new zip.BlobWriter(),
+                  (blob) => {
+                    blob.name = entry.filename;
+                    resolve(blob);
+                  },
+                  (progress, total) => {
+                    UI.maxProgress = total;
+                    UI.loadProgress(progress);
+                  }
+                );
+              }));
+            }
+            Promise.all(data).then((data) => {
+              this.consumeFiles(UI, data);
+            });
+          });
+        },
+        (error) => {
+          UI.warn(error);
+        }
+      );
     },
 
     consumeFiles: function(UI, files, cache = false) {
@@ -954,11 +1004,26 @@ const EPOCH_1970 = new Date("1970-01-01");
       UI.resetProgress();
 
       files = [];
+      zips = [];
       for (let file of this.files) {
+        if (file.__is_zip) {
+          if (zips.length) {
+            throw "Please load only one zip at a time";
+          }
+          zips.push(file);
+          break;
+        }
         if (!file.__is_child) {
           UI.title(file.__base.name);
         }
         files.push(this.readFile(UI, file));
+      }
+
+      if (zips.length) {
+        this.consumeZIP(UI, zips[0]);
+        // consumeZIP() disables search as well.
+        UI.searchingEnabled(true);
+        return;
       }
 
       Promise.all(files).then((files) => {

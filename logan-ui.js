@@ -1070,6 +1070,10 @@
   };
 
   $(() => {
+    zip.workerScripts = {
+      inflater: ['zip/z-worker.js', 'zip/inflate.js']
+    };
+
     logan.init();
 
     consume = () => {
