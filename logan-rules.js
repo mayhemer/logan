@@ -436,6 +436,9 @@ logan.schema("MOZ_LOG",
       module.rule("HttpChannelChild::AsyncOpen [this=%p uri=%s]", function(ptr, uri) {
         this.thread.httpchannelchild = this.obj(ptr).state("open").capture();
       });
+      module.rule("HttpChannelChild::AsyncOpen failed [this=%p rv=0x%08x blocking-reason=%u]\n", function(ptr, rv, br) {
+        this.obj(ptr).state("failed-open").prop("async-open-result", rv).prop("blocking-reason", br).capture();
+      });
       module.rule("HttpChannelChild::ContinueAsyncOpen this=%p gid=%u topwinid=%x", function(ch, gid, winid) {
         this.obj(ch).prop("top-win-id", winid).capture().ipcid(gid).send("HttpChannel");
       });
