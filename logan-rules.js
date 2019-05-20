@@ -92,6 +92,17 @@ logan.schema("MOZ_LOG",
       NOT_USING_NETWORK: 9,
     });
 
+    schema.CACHE_OPEN_FLAGS = new Flags({
+      OPEN_NORMALLY: 0,
+      OPEN_TRUNCATE: 1 << 0,
+      OPEN_READONLY: 1 << 1,
+      OPEN_PRIORITY: 1 << 2,
+      OPEN_BYPASS_IF_BUSY: 1 << 3,
+      CHECK_MULTITHREADED: 1 << 4,
+      OPEN_SECRETLY: 1 << 5,
+      OPEN_INTERCEPTED: 1 << 6,
+    });
+
     schema.module("DocumentLeak", (module) => {
 
       /******************************************************************************
@@ -1273,6 +1284,9 @@ logan.schema("MOZ_LOG",
         this.thread.on("cacheentryconsumer", c => {
           c.link(entry);
         });
+      });
+      module.rule("CacheEntry::AsyncOpen [this=%p, state=%s, flags=%d, callback=%p]", function(ptr, st, fl, cb) {
+        this.obj(ptr).capture().capture(`  flags=${schema.CACHE_OPEN_FLAGS.$(fl)}`).link(cb);
       });
       module.rule("CacheEntry::Load [this=%p, trunc=%d]", function(entry) {
         this.thread.httpcacheentry = this.obj(entry).capture();
