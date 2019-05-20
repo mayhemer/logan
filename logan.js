@@ -1426,117 +1426,144 @@ const EPOCH_1970 = new Date("1970-01-01");
       UI.loaded();
     },
 
-    search: async function(UI, className, propName, matchValue, match, seekId, coloring) {
+    search: async function(UI, className, queries, seekId, coloring) {
       UI.searchingEnabled(false);
 
-      var matchFunc;
-      propToString = (prop) => (prop === undefined ? "" : prop.toString());
-      switch (match) {
-        case "==": {
-          if (propName === "pointer") {
-            matchFunc = prop => pointerTrim(matchValue) == prop;
-          } else {
-            matchFunc = prop => matchValue == propToString(prop);
+      const resultSets = [];
+
+      let propName;
+      for (const query of queries) {
+        propName = query.search_By;
+        const matchValue = query.search_PropValue;
+        const match = query.search_Matching;
+
+        const set = new Set();
+        resultSets.push(set);
+
+        let addResult = (obj) => {
+          if (obj.factual) {
+            set.add(obj);
           }
-          break;
         }
-        case "!!": {
-          matchFunc = prop => prop !== undefined;
-          break;
-        }
-        case "!": {
-          matchFunc = prop => prop === undefined;
-          break;
-        }
-        case ">": {
-          matchFunc = prop => prop > matchValue;
-          break;
-        }
-        case "<": {
-          matchFunc = prop => prop < matchValue;
-          break;
-        }
-        case "contains": {
-          let contains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = prop => propToString(prop).match(contains);
-          break;
-        }
-        case "!contains": {
-          let ncontains = new RegExp(escapeRegexp(matchValue), "g");
-          matchFunc = prop => !propToString(prop).match(ncontains);
-          break;
-        }
-        case "rx": {
-          let regexp = new RegExp(matchValue, "g");
-          matchFunc = prop => propToString(prop).match(regexp);
-          break;
-        }
-        case "!rx": {
-          let nregexp = new RegExp(matchValue, "g");
-          matchFunc = prop => !propToString(prop).match(nregexp);
-          break;
-        }
-        default:
-          throw "Unexpected match operator";
-      }
 
-      let addResult = (obj) => {
-        if (obj.factual) {
-          UI.addResult(obj, propName).addClass("result").css("color", coloring);
-        }
-      }
-
-      if (propName === CAPTURED_LINE_LABEL) {
-        for (let capture of this.captures) {
-          if (seekId && capture.id > seekId) {
+        let matchFunc;
+        propToString = (prop) => (prop === undefined ? "" : prop.toString());
+        switch (match) {
+          case "==": {
+            if (propName === "pointer") {
+              matchFunc = prop => pointerTrim(matchValue) == prop;
+            } else {
+              matchFunc = prop => matchValue == propToString(prop);
+            }
             break;
           }
-          if (!capture.obj || (className !== '*' && className != capture.obj.props.className)) {
-            continue;
+          case "!!": {
+            matchFunc = prop => prop !== undefined;
+            break;
           }
-
-          if (capture.what.file) {
-            let line = await this.readCapture(capture);
-            if (matchFunc(line)) {
+          case "!": {
+            matchFunc = prop => prop === undefined;
+            break;
+          }
+          case ">": {
+            matchFunc = prop => prop > matchValue;
+            break;
+          }
+          case "<": {
+            matchFunc = prop => prop < matchValue;
+            break;
+          }
+          case "contains": {
+            let contains = new RegExp(escapeRegexp(matchValue), "g");
+            matchFunc = prop => propToString(prop).match(contains);
+            break;
+          }
+          case "!contains": {
+            let ncontains = new RegExp(escapeRegexp(matchValue), "g");
+            matchFunc = prop => !propToString(prop).match(ncontains);
+            break;
+          }
+          case "rx": {
+            let regexp = new RegExp(matchValue, "g");
+            matchFunc = prop => propToString(prop).match(regexp);
+            break;
+          }
+          case "!rx": {
+            let nregexp = new RegExp(matchValue, "g");
+            matchFunc = prop => !propToString(prop).match(nregexp);
+            break;
+          }
+          default:
+            throw "Unexpected match operator";
+        }
+  
+        if (propName === CAPTURED_LINE_LABEL) {
+          for (let capture of this.captures) {
+            if (seekId && capture.id > seekId) {
+              break;
+            }
+            if (!capture.obj || (className !== '*' && className != capture.obj.props.className)) {
+              continue;
+            }
+  
+            if (capture.what.file) {
+              let line = await this.readCapture(capture);
+              if (matchFunc(line)) {
+                addResult(capture.obj);
+              }
+            } else if (typeof capture.what === "string" && matchFunc(capture.what)) {
               addResult(capture.obj);
             }
-          } else if (typeof capture.what === "string" && matchFunc(capture.what)) {
-            addResult(capture.obj);
+          }
+        } else {
+          for (let obj of this.objects) {
+            if (className !== '*' && className != obj.props.className) {
+              continue;
+            }
+            if (!obj.captures.length) {
+              continue;
+            }
+            if (seekId && obj.captures[0].id > seekId) {
+              continue;
+            }
+  
+            if (seekId && obj.captures.last().id >= seekId) {
+              // The object lives around the cutting point, find the prop value
+              var prop = "";
+              let capture = obj.captures.find(capture => {
+                if (capture.id > seekId) {
+                  return true;
+                }
+                if (typeof capture.what === "object" && capture.what.prop == propName) {
+                  prop = capture.what.value;
+                }
+                return false;
+              }, this);
+            } else {
+              var prop = obj.props[propName];
+            }
+            if (!matchFunc(prop)) {
+              continue;
+            }
+  
+            addResult(obj);
           }
         }
-      } else {
-        for (let obj of this.objects) {
-          if (className !== '*' && className != obj.props.className) {
-            continue;
-          }
-          if (!obj.captures.length) {
-            continue;
-          }
-          if (seekId && obj.captures[0].id > seekId) {
-            continue;
-          }
+      }
 
-          if (seekId && obj.captures.last().id >= seekId) {
-            // The object lives around the cutting point, find the prop value
-            var prop = "";
-            let capture = obj.captures.find(capture => {
-              if (capture.id > seekId) {
-                return true;
-              }
-              if (typeof capture.what === "object" && capture.what.prop == propName) {
-                prop = capture.what.value;
-              }
-              return false;
-            }, this);
-          } else {
-            var prop = obj.props[propName];
+      // Intersect all results sets (logical 'and')
+      while (resultSets.length > 1) {
+        const first = resultSets.shift();
+        const next = resultSets[0];
+        for (const obj of next) {
+          if (!first.has(obj)) {
+            next.delete(obj);
           }
-          if (!matchFunc(prop)) {
-            continue;
-          }
-
-          addResult(obj);
         }
+      }
+      
+      for (const obj of resultSets[0]) {
+        UI.addResult(obj, propName).addClass("result").css("color", coloring);
       }
 
       UI.searchingEnabled(true);

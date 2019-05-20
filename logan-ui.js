@@ -113,7 +113,6 @@
     maxProgress: 0,
     currentProgress: 0,
     searchDisableCount: 0,
-    searchByCache: null,
     mousedown: false,
     lastIncrement: 0,
     autoFetchDelay: AUTO_FETCH_INITIAL_DELAY,
@@ -180,6 +179,7 @@
       $("#netdiag_section").hide();
       $("#seek").hide();
       $("#breadcrumbs").hide();
+      this.createQueryForm();
     },
 
     setSearchView: function(reset) {
@@ -192,7 +192,7 @@
       $("#breadcrumbs").hide();
       if (reset) {
         $("#search_className").empty();
-        $("#search_By").empty();
+        $(".search_By").empty();
         $("#results_section").empty();
         this.seekTo(0);
         this.objColors = {};
@@ -215,7 +215,7 @@
       $("#netdiag_section").hide();
       $("#seek").show();
       $("#breadcrumbs").show();
-      $("#search_By").change();
+      $(".search_By").change();
     },
 
     setDiagnoseView: function() {
@@ -255,6 +255,79 @@
       netdiagUI.reset();
     },
 
+    addQueryRow: function(form, first = false) {
+      const row = $("<span>");
+      form.append(row);
+
+      const label =
+        $("<label>").text("having");
+      
+      const search_By =
+        $("<select>").addClass("search_By").on("change", (event) => {
+          if (event.originalEvent) {
+            // a hacky way to recognize this is not a call to .change()
+            // but that actually comes from a user interaction.
+
+            search_By.data('cache', search_By.val());
+          }
+        }).change();
+      
+      const search_Matching =
+        $("<select>").addClass("search_Matching").addClass("narrow")
+          .append($("<option>").attr("value", '!!').text('present'))
+          .append($("<option>").attr("value", '!').text('not present'))
+          .append($("<option>").attr("value", '==').text('exactly'))
+          .append($("<option>").attr("value", '<').text('greater than'))
+          .append($("<option>").attr("value", '>').text('less than'))
+          .append($("<option>").attr("value", 'contains').text('containing'))
+          .append($("<option>").attr("value", '!contains').text('not containing'))
+          .append($("<option>").attr("value", 'rx').text('regexp'))
+          .append($("<option>").attr("value", '!rx').text('not regexp'));
+      
+      const search_PropValue =
+        $("<input>").addClass("search_PropValue").attr("type", "text");
+      
+      const add_Query =
+        $("<input>").attr("type", "button").addClass("button icon")
+          .attr("value", "+").attr("title", "Add condition").click(() => {
+            if (this.searchDisableCount) return;
+            this.addQueryRow(form);
+          });
+      
+      const remove_Query =
+        $("<input>").attr("type", "button").addClass("button icon")
+          .attr("value", "-").attr("title", "Remove condition").click(() => {
+            if (this.searchDisableCount) return;
+            row.remove();
+            if (form.children().length == 0) {
+              this.addQueryRow(form);
+            }
+          });
+      
+      const br = $("<br>");
+
+      search_Matching.on("change", (event) => {
+        (event.target.value === "!!" || event.target.value === "!")
+          ? search_PropValue.hide() : search_PropValue.show();
+      }).change();
+
+      [label, search_By, search_Matching, search_PropValue, add_Query, remove_Query, br].forEach((el, index) => {
+        if (el) {
+          row.append(el);
+          row.append(" ");
+        }
+      });
+
+      if (!first) {
+        this.fillSearchBy();
+      }
+    },
+
+    createQueryForm: function() {
+      const form = $("#query_form").empty();
+      this.addQueryRow(form, true);      
+    },
+
     seekTo: function(seekId) {
       if (seekId) {
         $("#seek_to_tail").show();
@@ -278,9 +351,6 @@
     },
 
     fillSearchBy: function(props) {
-      let select = $("#search_By");
-      select.empty();
-
       if (!props) {
         props = logan.searchProps[$("#search_className").val()] || {};
       }
@@ -288,16 +358,20 @@
         Object.keys(props).concat([CAPTURED_LINE_LABEL, "pointer", "state"])
       )).sort();
 
-      let use = "state";
-      for (let prop of props) {
-        select.append($("<option>").attr("value", prop).text(prop));
+      $(".search_By").each(function() {
+        const select = $(this).empty();
 
-        if (prop == this.searchByCache) {
-          use = prop;
+        let use = "state";
+        for (let prop of props) {
+          select.append($("<option>").attr("value", prop).text(prop));
+
+          if (prop == select.data('cache')) {
+            use = prop;
+          }
         }
-      }
 
-      select.val(use);
+        select.val(use);
+      });
     },
     
     loaded: function() {
@@ -344,13 +418,22 @@
       }
 
       let descr = search.className;
-      if (search.matching === "!!") {
-        descr = "!!" + descr + "." + search.propName;
-      } else if (search.matching === "!") {
-        descr = "!" + descr + "." + search.propName;
-      } else {
-        descr += "." + search.propName + " " + search.matching + " " + search.value;
+      let queryDescr = "";
+      for (const query of search.queries) {
+        console.log(query);
+        if (queryDescr) {
+          queryDescr += ' && ';
+        }
+
+        if (query.search_Matching === "!!") {
+          queryDescr += `has ${query.search_By}`;
+        } else if (query.search_Matching === "!") {
+          queryDescr += `without ${query.search_By}`;
+        } else {
+          queryDescr += `${query.search_By} ${query.search_Matching} '${query.search_PropValue}'`;
+        }
       }
+      descr += ` {${queryDescr}}`;
       if (search.seekId !== 0) {
         descr += " @ " + search.seekTime;
       }
@@ -370,9 +453,7 @@
       logan.search(
         this,
         search.className,
-        search.propName,
-        search.value,
-        search.matching,
+        search.queries,
         search.seekId,
         search.color
       );
@@ -1077,6 +1158,7 @@
     logan.init();
 
     consume = () => {
+      UI.createQueryForm();
       var files = $("#files").get()[0].files;
       if (location.search) {
         UI.clearResultsView();
@@ -1122,20 +1204,6 @@
       location.search = escape($("#url").val());
     });
 
-    let search_By = $("#search_By").on("change", (event) => {
-      if (event.originalEvent) {
-        // a hacky way to recognize this is not a call to .change()
-        // but that actually comes from a user interaction.
-
-        UI.searchByCache = search_By.val();
-      }
-    }).change();
-
-    $("#search_Matching").on("change", (event) => {
-      (event.target.value === "!!" || event.target.value === "!")
-        ? $("#search_PropValue").hide() : $("#search_PropValue").show();
-    }).change();
-
     $("#search_className").on("change", (event) => {
       let props = logan.searchProps[event.target.value];
       UI.fillSearchBy(props);
@@ -1146,11 +1214,18 @@
         return;
       }
       UI.setResultsView();
+
+      const queries = [];
+      ["search_By", "search_PropValue", "search_Matching"].forEach((element) => {
+        $(`.${element}`).each(function(index) {
+          ensure(queries, index, {})[element] = $(this).val().trim();
+        });
+      });
+      console.log(queries);
+
       UI.addSearch({
         className: $("#search_className").val(),
-        propName: $("#search_By").val(),
-        value: $("#search_PropValue").val().trim(),
-        matching: $("#search_Matching").val(),
+        queries,
       });
     }.bind(this));
 
