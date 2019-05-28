@@ -957,6 +957,20 @@ logan.schema("MOZ_LOG",
       logan.summaryProps("Http2Session", ["key"]);
 
       /******************************************************************************
+       * SpdyConnectTransaction
+       ******************************************************************************/
+
+      module.rule("SpdyConnectTransaction ctor %p\n", function(ptr) {
+        this.obj(ptr).create("SpdyConnectTransaction").grep();
+      });
+      module.rule("SpdyConnectTransaction %p new httpconnection %p %*$", function(ptr, conn) {
+        this.obj(ptr).capture().link(conn);
+      });
+      module.rule("SpdyConnectTransaction dtor %p\n", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+      /******************************************************************************
        * Http2Stream
        ******************************************************************************/
 
