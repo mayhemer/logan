@@ -64,6 +64,16 @@ class Backtrack {
     this.startupmarkers = [];
   }
 
+  assert(cond, msg) {
+    if (!cond) {
+      throw new Error(msg || "Assertion failure");
+    }
+  }
+
+  assertNot(cond, msg) {
+    this.assert(!cond, msg);
+  }
+
   processLine(line, process) {
     let fullLine = line;
 
