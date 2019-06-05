@@ -964,12 +964,12 @@
               this.escapeHtml(text)
             ));
           
-          capture.what.decorate(element);
-          element.click(() => {
+          const action = capture.what.decorator();
+          element.append(action.addClass("line-action").click(() => {
             let scrolloffset = element.offset().top - $(window).scrollTop();
             capture.what.action(this);
             $(window).scrollTop(element.offset().top - scrolloffset);
-          });
+          }));
           return this.place(capture, element);
         }
 

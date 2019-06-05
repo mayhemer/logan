@@ -1513,12 +1513,12 @@ logan.schema("MOZ_LOG",
         capture.what = {
           generator: () => {
             const dependent = (marker.rooted && (marker.type == MarkerType.REDISPATCH_BEGIN || marker.type == MarkerType.EXECUTE_BEGIN || marker.type == MarkerType.RESPONSE_BEGIN))
-              ? ' DEPENDENT ' : '';
+              ? 'DEPENDENT ' : '';
             let text = `${preamble} ${dependent}${MarkerType.$(marker.type)} "${marker.names.join("|")}"`;
             return text;
           },
-          decorate: (element) => {
-            element.append($("<span>").text("backtrack").addClass("line-action"));
+          decorator: () => {
+            return $("<span>").text("track back");
           },
           action: (UI) => {
             const obj = this.service("backtrack");
