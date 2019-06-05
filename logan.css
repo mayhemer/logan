@@ -455,4 +455,5 @@ div.netd-result > div {
   background: white;
   color: black;
   padding: 0 2em;
+  border: solid 1px black;
 }

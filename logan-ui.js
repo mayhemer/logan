@@ -963,7 +963,13 @@
             .append($("<span>").addClass("pre").html(
               this.escapeHtml(text)
             ));
-          capture.what.action(element, this);
+          
+          capture.what.decorate(element);
+          element.click(() => {
+            let scrolloffset = element.offset().top - $(window).scrollTop();
+            capture.what.action(this);
+            $(window).scrollTop(element.offset().top - scrolloffset);
+          });
           return this.place(capture, element);
         }
 
