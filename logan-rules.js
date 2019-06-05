@@ -1470,6 +1470,58 @@ logan.schema("MOZ_LOG",
 
     }); // proxy
 
+    schema.module("bt", module => {
+      const bt = new Backtrack();
+
+      module.beforeProcessing = () => {
+        bt.cacheForwardtrail();
+      };
+
+      module.rule("%*$", function(line) {
+        const process = ensure(this.file, "__bt_process", {});
+        const marker = bt.processLine(line, process);
+        if (!marker) {
+          this.dontCapture();
+          return;
+        }
+
+        const preamble = this.raw.slice(0, this.raw.length - line.length);
+        const capture = logan.capture({
+          generator: () => {            
+            let text = `${preamble} BACKTRACK: ${MarkerType.$(marker.type)} "${marker.names.join("|")}"`;
+            if (marker.rooted) {
+              text += ` dependent`;
+            }
+            return text;
+          },
+          action: (element, UI) => {
+            element.append($("<span>").text("backtrack").addClass("line-action").click(() => {
+              const obj = this.service("backtrack");
+
+              for (let capture of obj.captures) {
+                UI.removeLine(UI.position(capture));
+              }
+              obj.captures = [];
+
+              const path = bt.backtrack(marker.tid, marker.id, 0, 0);
+              obj.customColor = 'linear-gradient(to right, rgba(255,0,0,1) 0%,rgba(255,255,255,1) 16%,rgba(255,255,255,1) 100%,rgba(255,255,255,1) 100%);';
+              obj.update = (lineCount) => {
+                for (let i = 0; i < lineCount; ++i) {
+                  const step = path.next();
+                  if (step.done) {
+                    return;
+                  }
+                  obj.captures.unshift(step.value.capture);
+                }
+              };
+            }));
+          }
+        })
+
+        marker.capture = capture;
+      });
+    }); // backtrack (bt)
+
   }
 ); // MOZ_LOG
 
