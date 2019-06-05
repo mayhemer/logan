@@ -292,6 +292,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.name = name;
     this.rules_flat = [];
     this.rules_tree = {};
+    this.beforeProcessing = () => { };
 
     this.set_rule = function(rule, input) {
       if (USE_RULES_TREE_OPTIMIZATION) {
@@ -335,6 +336,10 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.captures = [];
     this.aliases = {};
     this._grep = false;
+
+    // This method is invoked before we load captures in UI.addCaptures
+    // handlers, can be used to dynamically update captures on scroll.
+    this.update = () => { };
 
     // This is used for placing the summary of the object (to generate
     // the unique ordered position, see UI.position.)
@@ -791,6 +796,10 @@ const EPOCH_1970 = new Date("1970-01-01");
           return undefined;
         }
         return this.timestamp.getTime() - timestamp.getTime();
+      },
+
+      dontCapture: function() {
+        this._dont_capture = true;
       },
 
       // private
@@ -1256,7 +1265,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     capture: function(what, obj) {
       if (!what) {
-        if (!this._raw_capture) {
+        if (!this._raw_capture && !this._proc._dont_capture) {
           // 'undefined' means to store file offset reference and reload when put on screen
           this._raw_capture = new Capture(this.cache ? this._proc.raw : undefined, obj);
         }
@@ -1301,6 +1310,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this._proc.linenumber = prepared.linenumber;
       this._proc.filebinaryoffset = prepared.filebinaryoffset;
       this._proc.thread = this.ensureThread(consume.file, prepared);
+      this._proc._dont_capture = false;
 
       let module = schema.modules[prepared.module];
       if (module && this.processLine(module.get_rules(prepared.text), consume.file, prepared)) {
@@ -1416,6 +1426,12 @@ const EPOCH_1970 = new Date("1970-01-01");
         if (sync.receiver) {
           UI.warn("Missing some IPC synchronization points fulfillment, check web console");
           console.log(`file ${sync.proc.file.name} '${sync.proc.raw}', never received '${sync_id}'`);
+        }
+      }
+
+      for (let schema of Object.values(this._schemes)) {
+        for (let module of Object.values(schema.modules)) {
+          module.beforeProcessing();
         }
       }
 

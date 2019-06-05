@@ -484,7 +484,7 @@
     },
 
     objColor: function(obj) {
-      return ensure(this.objColors, obj.id, nextHighlightColor);
+      return ensure(this.objColors, obj.id, () => (obj.customColor || nextHighlightColor()));
     },
 
     highlight: function(input, at = 0, ignore = null) {
@@ -505,7 +505,7 @@
       source = source || obj;
 
       let color = this.objColor(source);
-      let style = ".obj-" + obj.id + " { background-color: " + color + " !important}";
+      let style = ".obj-" + obj.id + " { background: " + color + " !important}";
 
       return function(event) {
         if (set === true) {
@@ -646,6 +646,8 @@
             : captures.slice(index < 0 ? captures.length : index);
           return slice.map(capture => ({ capture, extra }));
         } // filter()
+
+        obj.update(ON_SCROLL_LINES_COUNT);
 
         let regular = filter(obj.captures, false);
         let extra = filter(Object.values(obj._extraCaptures), true);
@@ -951,6 +953,18 @@
               //.addClass("obj-" + obj.id)
               .append($("<span>").addClass("pre").html(this.quick(expose)))
           }, capture, true);
+        }
+
+        let generator = capture.what.generator;
+        if (generator) {
+          const text = generator();
+          let element = $("<div>")
+            .append(controller())
+            .append($("<span>").addClass("pre").html(
+              this.escapeHtml(text)
+            ));
+          capture.what.action(element, this);
+          return this.place(capture, element);
         }
 
         // An empty or unknown capture is just ignored.

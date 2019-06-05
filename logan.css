@@ -447,3 +447,12 @@ div.netd-result > div {
 #netdiag_section h3 > a > span {
   color: blue;
 }
+
+.line-action {
+  position: absolute;
+  right: 1em;
+  z-index: 999;
+  background: white;
+  color: black;
+  padding: 0 2em;
+}
