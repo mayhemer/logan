@@ -450,10 +450,18 @@ div.netd-result > div {
 
 .line-action {
   position: absolute;
-  right: 1em;
+  left: 2.8em;
   z-index: 999;
   background: white;
   color: black;
-  padding: 0 2em;
+  padding: 0 .2em;
+  cursor: pointer;
   border: solid 1px black;
+}
+
+.bt-nested > span.pre {
+  color: gray !important;
+}
+.bt-nested > span.pre:after {
+  content: ' NESTED';
 }
