@@ -1496,10 +1496,10 @@ logan.schema("MOZ_LOG",
             let text = `${preamble} ${dependent}${MarkerType.$(marker.type)} "${marker.names.join("|")}"`;
             return text;
           },
-          decorator: () => {
+          action: () => {
             return $("<span>").text("track back");
           },
-          action: (UI) => {
+          handler: (UI) => {
             const obj = this.service("backtrack");
 
             for (let capture of obj.captures) {
@@ -1509,7 +1509,11 @@ logan.schema("MOZ_LOG",
 
             const path = bt.backtrack(marker.tid, marker.id, 0, 0);
             obj.customColor = 'linear-gradient(to right, rgba(255,0,0,1) 0%,rgba(255,255,255,1) 16%,rgba(255,255,255,1) 100%,rgba(255,255,255,1) 100%);';
-            obj.update = (lineCount) => {
+            obj.update = (lineCount, up) => {
+              if (!up) {
+                return;
+              }
+              
               for (let i = 0; i < lineCount; ++i) {
                 const step = path.next();
                 if (step.done) {

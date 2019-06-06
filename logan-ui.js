@@ -639,6 +639,8 @@
       }
 
       let process = (origin, up, handlername) => {
+        obj.update(ON_SCROLL_LINES_COUNT, up);
+
         let filter = (captures, extra) => {
           let index = captures.findIndex(c => c.id > origin);
           let slice = up
@@ -646,8 +648,6 @@
             : captures.slice(index < 0 ? captures.length : index);
           return slice.map(capture => ({ capture, extra }));
         } // filter()
-
-        obj.update(ON_SCROLL_LINES_COUNT);
 
         let regular = filter(obj.captures, false);
         let extra = filter(Object.values(obj._extraCaptures), true);
@@ -964,12 +964,14 @@
               this.escapeHtml(text)
             ));
           
-          const action = capture.what.decorator();
-          element.append(action.addClass("line-action").click(() => {
-            let scrolloffset = element.offset().top - $(window).scrollTop();
-            capture.what.action(this);
-            $(window).scrollTop(element.offset().top - scrolloffset);
-          }));
+          const action = capture.what.action();
+          if (action) {
+            element.append(action.addClass("line-action").click(() => {
+              let scrolloffset = element.offset().top - $(window).scrollTop();
+              capture.what.handler(this);
+              $(window).scrollTop(element.offset().top - scrolloffset);
+            }));
+          }
           return this.place(capture, element);
         }
 
