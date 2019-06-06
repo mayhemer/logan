@@ -79,7 +79,7 @@ div.load_progress {
 div.section {
   background-color: #fefefd;
   display: none;
-  margin: 15%;
+  margin: 10% 15% 0;
   padding: 2em;
   align-self: center;
   border: solid 1px;
