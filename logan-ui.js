@@ -664,7 +664,7 @@
         // Can't use the observer, since it's moving up as we add new capture lines
         let scrollanchor = observer.next(".log_line");
         scrollanchor = scrollanchor.length && $(scrollanchor[0]);
-        let scrolloffset = scrollanchor && (scrollanchor.offset().top - $(window).scrollTop());
+        const revertScroll = this.saveScroll(scrollanchor);
 
         let id, element;
         let count = ON_SCROLL_LINES_COUNT;
@@ -690,8 +690,8 @@
         }
 
         if (up) {
-          if (totop != tobottom && scrollanchor) {
-            $(window).scrollTop(scrollanchor.offset().top - scrolloffset);
+          if (totop != tobottom) {
+            revertScroll();
           }
           observer.insertBefore(element);
           observer.data("nextid", id - 1);
@@ -709,6 +709,15 @@
       if (tobottom) {
         process(captureid, false, "scrollHandlerBottom");
       }
+    },
+
+    saveScroll: function(scrollanch, adjust = 0) {
+      if (!scrollanch) return () => { };
+
+      const scrolloffset = (scrollanch.offset().top - $(window).scrollTop()) | adjust;
+      return (target = scrollanch) => {
+        $(window).scrollTop(target.offset().top - scrolloffset)
+      };
     },
 
     objExpander: function(element, obj, placement, includeSummary, relation = {}) {
@@ -731,7 +740,7 @@
             return;
           }
 
-          let scrolloffset = scrollanch.offset().top - $(window).scrollTop();
+          const revertScroll = this.saveScroll(scrollanch);
 
           // Must call in this order, since onExpansion wants to get the same color
           this.objColor(obj);
@@ -771,7 +780,7 @@
             expander("cleanup");
           }
 
-          $(window).scrollTop(scrollanch.offset().top - scrolloffset);
+          revertScroll();
 
           updateHash({
             show: Object.keys(this.expanders).map(function(id) {
@@ -838,15 +847,15 @@
           // To loop
           UI.lastIncrement = increment;
 
-          let fromTop = $(element).parents(".log_line").offset().top - $(window).scrollTop();
-          fromTop |= 1; // to fix the jumping effect in Firefox
+          // adjust the offset by '| 1' to fix the jumping effect in Firefox
+          const revertScroll = this.saveScroll($(element).parents(".log_line"), 1);
 
           let id = capture.id + increment;
           let next;
 
           // Next on the same thread.
           while ((next = logan.captures[id])) {
-            if ((next.what.file || (typeof next.what === "string")) && next.thread === capture.thread) {
+            if ((next.what.file || next.what.generator || (typeof next.what === "string")) && next.thread === capture.thread) {
               break;
             }
             id += increment;
@@ -870,7 +879,7 @@
           } else {
             element = this.addCapture(obj, next, true);
             if (increment > 0) {
-              $(window).scrollTop(element.offset().top - fromTop);
+              revertScroll(element);
             }
           }
         }
@@ -959,19 +968,14 @@
         if (generator) {
           const text = generator();
           let element = $("<div>")
+            .addClass("log_line expanded")
+            .addClass(classification())
             .append(controller())
             .append($("<span>").addClass("pre").html(
               this.escapeHtml(text)
             ));
           
-          const action = capture.what.action();
-          if (action) {
-            element.append(action.addClass("line-action").click(() => {
-              let scrolloffset = element.offset().top - $(window).scrollTop();
-              capture.what.handler(this);
-              $(window).scrollTop(element.offset().top - scrolloffset);
-            }));
-          }
+          capture.what.action(this, element);
           return this.place(capture, element);
         }
 

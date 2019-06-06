@@ -1472,59 +1472,75 @@ logan.schema("MOZ_LOG",
 
     schema.module("bt", module => {
       const bt = new Backtrack();
+      let unique_counter = 0;
 
       module.beforeProcessing = () => {
         bt.cacheForwardtrail();
       };
 
       module.rule("%*$", function(line) {
-        const process = ensure(this.file, "__bt_process", {});
+        const process = ensure(this.file, "__bt_process", { name: '' });
         const marker = bt.processLine(line, process);
         if (!marker) {
           this.dontCapture();
           return;
         }
 
+        const dependent = marker.rooted && (marker.type == MarkerType.REDISPATCH_BEGIN || marker.type == MarkerType.EXECUTE_BEGIN || marker.type == MarkerType.RESPONSE_BEGIN);
         const preamble = this.raw.slice(0, this.raw.length - line.length);
-        const capture = logan.capture();
 
-        marker.capture = capture;
+        let capture = logan.capture();
         capture.what = {
           generator: () => {
-            const dependent = (marker.rooted && (marker.type == MarkerType.REDISPATCH_BEGIN || marker.type == MarkerType.EXECUTE_BEGIN || marker.type == MarkerType.RESPONSE_BEGIN))
-              ? 'DEPENDENT ' : '';
-            let text = `${preamble} ${dependent}${MarkerType.$(marker.type)} "${marker.names.join("|")}"`;
+            const dep = dependent ? 'DEP ' : '';
+            let text = `${preamble} ${process.name} ${dep}${MarkerType.$(marker.type)} "${marker.names.join("|")}"`;
             return text;
-          },
-          action: () => {
-            return $("<span>").text("track back");
-          },
-          handler: (UI) => {
-            const obj = this.service("backtrack");
-
-            for (let capture of obj.captures) {
-              UI.removeLine(UI.position(capture));
+          }, // generator
+          action: (UI, element) => {
+            if (capture.nested) {
+              element.addClass("bt-nested");
+            } else {
+              element.removeClass("bt-nested");
             }
-            obj.captures = [];
 
-            const path = bt.backtrack(marker.tid, marker.id, 0, 0);
-            obj.customColor = 'linear-gradient(to right, rgba(255,0,0,1) 0%,rgba(255,255,255,1) 16%,rgba(255,255,255,1) 100%,rgba(255,255,255,1) 100%);';
-            obj.update = (lineCount, up) => {
-              if (!up) {
-                return;
-              }
-              
-              for (let i = 0; i < lineCount; ++i) {
-                const step = path.next();
-                if (step.done) {
-                  return;
+            const action = dependent ? "track dep" : "track back";
+            element.append($("<span>").addClass("line-action").text(action).click(() => {
+              const revertScroll = UI.saveScroll(element);
+
+              const obj = this.obj(`backtrack-${++unique_counter}`).create("bt");
+              obj.captures = [capture]; // delete the default placement capture
+              UI.objColor(obj);
+              UI.objHighlighter(obj, obj, true)();
+
+              const from = dependent ? bt.prev(marker) : marker;
+              let path = bt.backtrack(from.tid, from.id, 0, 0);
+              obj.update = (lineCount, up) => {
+                if (!up ||! path) return;
+
+                for (let i = 0; i < lineCount; ++i) {
+                  const step = path.next();
+                  if (step.done || step.value.exposed) {
+                    path = null;
+                    return;
+                  }
+
+                  const capture = step.value.marker.capture;
+                  capture.nested = step.value.className == 'span';
+                  obj.captures.unshift(capture);
+                  // when dependent paths hit an already exposed path; not perfect, I know...
+                  step.value.exposed = true;
                 }
-                obj.captures.unshift(step.value.capture);
-              }
-            };
-          }
-        };
-      });
+              };
+
+              UI.addCaptures(obj, capture.id);
+
+              revertScroll();
+            })).prop('title', `tid:id = ${marker.tid}:${marker.id}`);
+          }, // action
+        }; // capture.what
+
+        marker.capture = capture;
+      }); // "%*$" rule
     }); // backtrack (bt)
 
   }

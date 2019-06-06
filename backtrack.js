@@ -74,6 +74,10 @@ class Backtrack {
     this.assert(!cond, msg);
   }
 
+  parseTime(timeString) {
+    return parseFloat(timeString.replace(",", ".")) * 1000;
+  }
+
   processLine(line, process) {
     let fullLine = line;
 
@@ -370,7 +374,7 @@ class Backtrack {
     }
   }
 
-  *backtrack(tid, id, break_tid, break_id) {
+  *backtrack(tid, id, break_tid, break_id, skipNestedBlock = false) {
     let marker = this.get({ tid, id });
     const stop = this.get({ tid: break_tid, id: break_id });
 
@@ -425,9 +429,9 @@ class Backtrack {
         case MarkerType.RESPONSE_END:
         case MarkerType.LABEL_END:
         case MarkerType.INPUT_END:
-          if (!OMIT_NESTED_BLOCKS) yield result(marker, { className: "span" });
+          if (!skipNestedBlock) yield result(marker, { className: "span" });
           marker = this.backtrail(marker);
-          if (!OMIT_NESTED_BLOCKS) yield result(marker, { className: "span" });
+          if (!skipNestedBlock) yield result(marker, { className: "span" });
           marker = this.prev(marker);
           break;
         case MarkerType.ACCEPT:
