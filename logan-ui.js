@@ -925,7 +925,6 @@
       if (typeof capture.what == "object") {
         let file = capture.what.file;
         if (file) {
-          let offset = capture.what.offset;
           let span = $("<span>").addClass("pre").text(" loading...");
           let element = $("<div>")
             .addClass("log_line expanded")
@@ -964,9 +963,8 @@
           }, capture, true);
         }
 
-        let generator = capture.what.generator;
-        if (generator) {
-          const text = generator();
+        if (capture.what.generator) {
+          const text = capture.what.generator();
           let element = $("<div>")
             .addClass("log_line expanded")
             .addClass(classification())

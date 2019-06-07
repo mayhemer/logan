@@ -344,7 +344,7 @@ div#breadcrumbs {
   font-size: 12px;
   position: sticky;
   top: 0px;
-  z-index: 1;
+  z-index: 10;
   background: rgba(255,255,255,0.8);
   border-top: solid 1px gray;
   margin-top: -1px;
@@ -452,12 +452,13 @@ div.netd-result > div {
 .line-action {
   position: absolute;
   left: 2.8em;
-  z-index: 999;
+  z-index: 2;
   background: white;
   color: black;
   padding: 0 .2em;
   cursor: pointer;
   border: solid 1px black;
+  border-radius: 0.7em;
 }
 
 .bt-nested > span.pre {

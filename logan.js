@@ -122,8 +122,8 @@ const EPOCH_1970 = new Date("1970-01-01");
 (function() {
 
   // Configuration of the internals
-  const FILE_SLICE = 1 * 1024 * 1024;
-  const USE_RULES_TREE_OPTIMIZATION = true;
+  const FILE_SLICE = .250 * (1024 * 1024);
+  const USE_RULES_TREE_OPTIMIZATION = false;
   const ALLOW_NON_POINTER_ALIAS_GREPING = true;
   // ------------------------------
 
@@ -293,9 +293,10 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.rules_flat = [];
     this.rules_tree = {};
     this.beforeProcessing = () => { };
+    this.dont_optimize = false;
 
     this.set_rule = function(rule, input) {
-      if (USE_RULES_TREE_OPTIMIZATION) {
+      if (USE_RULES_TREE_OPTIMIZATION && !this.dont_optimize) {
         let mapping = ruleMappingGrade2(input);
         if (mapping.grade2) {
           let grade2 = ensure(this.rules_tree, mapping.grade1, {});
@@ -310,7 +311,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     };
 
     this.get_rules = function(input) {
-      if (USE_RULES_TREE_OPTIMIZATION) {
+      if (USE_RULES_TREE_OPTIMIZATION && !this.dont_optimize) {
         // logan.init() converts rules_tree to array.
         return (this.rules_tree[ruleMappingGrade1(input)] || []).concat(this.rules_flat);
       }
@@ -1238,7 +1239,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
         this.consumeLine(this._schema, consume, consume.prepared);
         consume.previous = consume.prepared;
-        delete consume.prepared;
+        consume.prepared = null;
       }
 
       this.processEOS(UI);
@@ -1429,10 +1430,14 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
       }
 
-      for (let schema of Object.values(this._schemes)) {
-        for (let module of Object.values(schema.modules)) {
-          module.beforeProcessing();
+      try {
+        for (let schema of Object.values(this._schemes)) {
+          for (let module of Object.values(schema.modules)) {
+            module.beforeProcessing();
+          }
         }
+      } catch (exception) {
+        throw this.exceptionParse(exception);
       }
 
       UI.loadProgress(0);
