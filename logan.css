@@ -8,20 +8,6 @@ body {
   font-family: Verdana, Geneva, Tahoma, sans-serif;
 }
 
-#file_load_section.topbar div.logo {
-  display: none;
-}
-div.logo {
-  width: 100%;
-  text-align: center;
-}
-img.logan {
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 3em;
-  margin-top: 1em;
-}
-
 pre {
   font-family: Courier New, Courier, monospace;
 }
@@ -79,7 +65,7 @@ div.load_progress {
 div.section {
   background-color: #fefefd;
   display: none;
-  margin: 10% 15% 0;
+  margin: 15% 15% 0;
   padding: 2em;
   align-self: center;
   border: solid 1px;
