@@ -56,6 +56,57 @@ class PlaceholderMarker {
   }
 }
 
+class Thread {
+  constructor(tid, process) {
+    this.tid = tid;
+    this.process = process;
+    this.last = null;
+    this.markers = [];
+    this.rooting = [false];
+  }
+
+  addmarker(id, marker) {
+    marker.id = parseInt(id);
+    marker.names = [];
+    marker.rooted = this.rooted();
+
+    this.last = marker;
+    this.markers.push(this.last);
+
+    switch (marker.type) {
+      case undefined:
+        throw "No marker type?";
+      case MarkerType.STARTUP:
+      case MarkerType.EXECUTE_BEGIN:
+      case MarkerType.RESPONSE_BEGIN:
+      case MarkerType.REDISPATCH_BEGIN:
+      case MarkerType.INPUT_BEGIN:
+      case MarkerType.ROOT_BEGIN:
+        this.rooting.push(true);
+        break;
+      case MarkerType.LOOP_BEGIN:
+        this.rooting.push(false);
+        break;
+      case MarkerType.EXECUTE_END:
+      case MarkerType.RESPONSE_END:
+      case MarkerType.REDISPATCH_END:
+      case MarkerType.INPUT_END:
+      case MarkerType.ROOT_END:
+        this.rooting.pop();
+        break;
+      case MarkerType.LOOP_END:
+        this.rooting.pop();
+        break;
+
+    }
+    return marker;
+  }
+
+  rooted() {
+    return this.rooting.last() === true;
+  }
+}
+
 class Backtrack {
   constructor() {
     this.objectives = [];
@@ -104,60 +155,7 @@ class Backtrack {
       return;
     }
 
-    let bt = this;
-    let new_thread = (tid) => {
-      return {
-        tid,
-        process,
-        last: null,
-        markers: [],
-        rooting: [false],
-        addmarker: function(id, marker) {
-          bt.assertNot(this.last && id == 1, "Two threads with the same id!");
-          marker.id = parseInt(id);
-          marker.names = [];
-          marker.rooted = this.rooted();
-
-          this.last = marker;
-          this.markers.push(this.last);
-          bt.assert(marker.id === this.markers.length, `Missing marker? ${marker.id}!=${this.markers.length} "${fullLine}"`);
-
-          switch (marker.type) {
-            case undefined:
-              bt.assert(false, "No marker type?");
-              break;
-            case MarkerType.STARTUP:
-            case MarkerType.EXECUTE_BEGIN:
-            case MarkerType.RESPONSE_BEGIN:
-            case MarkerType.REDISPATCH_BEGIN:
-            case MarkerType.INPUT_BEGIN:
-            case MarkerType.ROOT_BEGIN:
-              this.rooting.push(true);
-              break;
-            case MarkerType.LOOP_BEGIN:
-              this.rooting.push(false);
-              break;
-            case MarkerType.EXECUTE_END:
-            case MarkerType.RESPONSE_END:
-            case MarkerType.REDISPATCH_END:
-            case MarkerType.INPUT_END:
-            case MarkerType.ROOT_END:
-              bt.assert(this.rooting.pop() === true, "rooting not true");
-              break;
-            case MarkerType.LOOP_END:
-              bt.assert(this.rooting.pop() === false, "rooting not false");
-              break;
-          }
-
-          return marker;
-        },
-        rooted: function() {
-          return this.rooting.last() === true;
-        },
-      }
-    };
-
-    let thread = ensure(this.threads, tid, () => new_thread(tid));
+    let thread = ensure(this.threads, tid, () => { return new Thread(tid, process); });
     let result;
 
     if (id === "NT") {

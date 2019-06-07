@@ -1471,16 +1471,33 @@ logan.schema("MOZ_LOG",
     }); // proxy
 
     schema.module("bt", module => {
+      // Only one rule for everything
+      module.dont_optimize = true;
+      
       const bt = new Backtrack();
       let unique_counter = 0;
 
       module.beforeProcessing = () => {
-        bt.cacheForwardtrail();
+        try {
+          bt.cacheForwardtrail();
+        } catch (exception) {
+          throw "The log contains backtrack data, but a referred marker cannot be found.  Did you load logs from all processes?";
+        }
       };
 
       module.rule("%*$", function(line) {
-        const process = ensure(this.file, "__bt_process", { name: '' });
-        const marker = bt.processLine(line, process);
+        if (0) {
+          this.dontCapture();
+          return; // test...
+        }
+
+        const process = ensure(this.file, "__bt_process", () => ({ name: '' }));
+        let marker;
+        try {
+          marker = bt.processLine(line, process);
+        } catch (exception) {
+          throw "The log contains backtrack data, but a referred marker cannot be found.  Did you load logs from all processes?";
+        }
         if (!marker) {
           this.dontCapture();
           return;
@@ -1491,28 +1508,34 @@ logan.schema("MOZ_LOG",
 
         let capture = logan.capture();
         capture.what = {
-          generator: () => {
-            const dep = dependent ? 'DEP ' : '';
-            let text = `${preamble} ${process.name} ${dep}${MarkerType.$(marker.type)} "${marker.names.join("|")}"`;
+          bt: {
+            dependent,
+            preamble,
+            marker,
+            process,
+          },
+          generator: function() {
+            const dep = this.bt.dependent ? '(DEP) ' : '';
+            let text = `${this.bt.preamble} ${this.bt.process.name} ${dep}${MarkerType.$(this.bt.marker.type)} "${this.bt.marker.names.join("|")}"`;
             return text;
           }, // generator
-          action: (UI, element) => {
+          action: function(UI, element) {
             if (capture.nested) {
               element.addClass("bt-nested");
             } else {
               element.removeClass("bt-nested");
             }
 
-            const action = dependent ? "track dep" : "track back";
+            const action = this.bt.dependent ? "track dep" : "track back";
             element.append($("<span>").addClass("line-action").text(action).click(() => {
               const revertScroll = UI.saveScroll(element);
 
-              const obj = this.obj(`backtrack-${++unique_counter}`).create("bt");
+              const obj = logan._proc.obj(`backtrack-${++unique_counter}`).create("bt");
               obj.captures = [capture]; // delete the default placement capture
               UI.objColor(obj);
               UI.objHighlighter(obj, obj, true)();
 
-              const from = dependent ? bt.prev(marker) : marker;
+              const from = this.bt.dependent ? bt.prev(this.bt.marker) : this.bt.marker;
               let path = bt.backtrack(from.tid, from.id, 0, 0);
               obj.update = (lineCount, up) => {
                 if (!up ||! path) return;
@@ -1535,7 +1558,7 @@ logan.schema("MOZ_LOG",
               UI.addCaptures(obj, capture.id);
 
               revertScroll();
-            })).prop('title', `tid:id = ${marker.tid}:${marker.id}`);
+            })).prop('title', `tid:id = ${this.bt.marker.tid}:${this.bt.marker.id}`);
           }, // action
         }; // capture.what
 
