@@ -1486,11 +1486,6 @@ logan.schema("MOZ_LOG",
       };
 
       module.rule("%*$", function(line) {
-        if (0) {
-          this.dontCapture();
-          return; // test...
-        }
-
         const process = ensure(this.file, "__bt_process", () => ({ name: '' }));
         let marker;
         try {
@@ -1503,14 +1498,11 @@ logan.schema("MOZ_LOG",
           return;
         }
 
-        const dependent = marker.rooted && (marker.type == MarkerType.REDISPATCH_BEGIN || marker.type == MarkerType.EXECUTE_BEGIN || marker.type == MarkerType.RESPONSE_BEGIN);
-        const preamble = this.raw.slice(0, this.raw.length - line.length);
-
-        let capture = logan.capture();
+        const capture = logan.capture();
         capture.what = {
           bt: {
-            dependent,
-            preamble,
+            dependent: marker.rooted && (marker.type == MarkerType.REDISPATCH_BEGIN || marker.type == MarkerType.EXECUTE_BEGIN || marker.type == MarkerType.RESPONSE_BEGIN),
+            preamble: this.raw.slice(0, this.raw.length - line.length),
             marker,
             process,
           },
@@ -1527,18 +1519,20 @@ logan.schema("MOZ_LOG",
             }
 
             const action = this.bt.dependent ? "track dep" : "track back";
-            element.append($("<span>").addClass("line-action").text(action).click(() => {
+            const button = $("<span>").addClass("line-action").text(action).click(function() {
+              button.off("click");
+
               const revertScroll = UI.saveScroll(element);
 
               const obj = logan._proc.obj(`backtrack-${++unique_counter}`).create("bt");
               obj.captures = [capture]; // delete the default placement capture
-              UI.objColor(obj);
+              const color = UI.objColor(obj);
               UI.objHighlighter(obj, obj, true)();
 
               const from = this.bt.dependent ? bt.prev(this.bt.marker) : this.bt.marker;
               let path = bt.backtrack(from.tid, from.id, 0, 0);
               obj.update = (lineCount, up) => {
-                if (!up ||! path) return;
+                if (!up || !path) return;
 
                 for (let i = 0; i < lineCount; ++i) {
                   const step = path.next();
@@ -1557,8 +1551,11 @@ logan.schema("MOZ_LOG",
 
               UI.addCaptures(obj, capture.id);
 
+              button.addClass("bt-triggered").css("background", color);
+
               revertScroll();
-            })).prop('title', `tid:id = ${this.bt.marker.tid}:${this.bt.marker.id}`);
+            }.bind(this));
+            element.append(button).prop('title', `tid:id = ${this.bt.marker.tid}:${this.bt.marker.id}`);
           }, // action
         }; // capture.what
 
