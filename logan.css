@@ -460,6 +460,10 @@ div.netd-result > div {
   border: solid 1px black;
   border-radius: 0.7em;
 }
+.line-action.bt-triggered {
+  text-decoration: line-through;
+  color: gray;
+}
 
 .bt-nested > span.pre {
   color: gray !important;
