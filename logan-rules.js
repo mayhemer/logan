@@ -920,6 +920,9 @@ logan.schema("MOZ_LOG",
         this.obj(conn).prop("npn", proto).capture();
         this.thread.spdyconnentrykey = entry; // we want the key
       });
+      module.rule("nsHttpConnection %p SetupSecondaryTLS %s %d aSpdyConnectTransaction=%p\n", function(conn) {
+        this.thread.httpconn_secondarytlssetup = this.obj(conn).capture();
+      });
       module.rule("Destroying nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
@@ -1041,6 +1044,21 @@ logan.schema("MOZ_LOG",
 
       module.rule("Http2PushedStream ctor this=%p 0x%X\n", function(stream, id) {
         this.obj(stream).inherits(this.thread.h2stream, "Http2PushedStream").prop("pushed-id", id);
+      });
+
+      /******************************************************************************
+       * Http2PushedStream
+       ******************************************************************************/
+
+      module.rule("TLSFilterTransaction ctor %p\n", function(ptr) {
+        this.obj(ptr).create("TLSFilterTransaction").grep().call(tft => {
+          this.thread.on("httpconn_secondarytlssetup", conn => {
+            conn.link(tft);
+          });
+        });
+      });
+      module.rule("TLSFilterTransaction dtor %p\n", function(ptr) {
+        this.obj(ptr).destroy();
       });
 
       /******************************************************************************
