@@ -960,20 +960,6 @@ logan.schema("MOZ_LOG",
       logan.summaryProps("Http2Session", ["key"]);
 
       /******************************************************************************
-       * SpdyConnectTransaction
-       ******************************************************************************/
-
-      module.rule("SpdyConnectTransaction ctor %p\n", function(ptr) {
-        this.obj(ptr).create("SpdyConnectTransaction").grep();
-      });
-      module.rule("SpdyConnectTransaction %p new httpconnection %p %*$", function(ptr, conn) {
-        this.obj(ptr).capture().link(conn);
-      });
-      module.rule("SpdyConnectTransaction dtor %p\n", function(ptr) {
-        this.obj(ptr).destroy();
-      });
-
-      /******************************************************************************
        * Http2Stream
        ******************************************************************************/
 
@@ -1047,7 +1033,21 @@ logan.schema("MOZ_LOG",
       });
 
       /******************************************************************************
-       * Http2PushedStream
+       * SpdyConnectTransaction
+       ******************************************************************************/
+
+      module.rule("SpdyConnectTransaction ctor %p\n", function(ptr) {
+        this.obj(ptr).create("SpdyConnectTransaction").grep();
+      });
+      module.rule("SpdyConnectTransaction %p new httpconnection %p %*$", function(ptr, conn) {
+        this.obj(ptr).capture().link(conn);
+      });
+      module.rule("SpdyConnectTransaction dtor %p\n", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+
+      /******************************************************************************
+       * TLSFilterTransaction
        ******************************************************************************/
 
       module.rule("TLSFilterTransaction ctor %p\n", function(ptr) {
@@ -1056,6 +1056,9 @@ logan.schema("MOZ_LOG",
             conn.link(tft);
           });
         });
+      });
+      module.rule("TLSFilterTransaction::OnWriteSegment %p max=%d\n", function(ptr) {
+        this.obj(ptr).capture().follow("TLSFilterTransaction::FilterInput %*$", tft => tft.capture());
       });
       module.rule("TLSFilterTransaction dtor %p\n", function(ptr) {
         this.obj(ptr).destroy();
