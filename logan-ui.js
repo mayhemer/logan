@@ -1020,7 +1020,7 @@
             }
             let element = $("<div>")
               .addClass("breadcrumb_details")
-              .css("background-color", withAlpha(this.objColor(obj), 0.4))
+              .css("background-color", withAlpha(this.objColor(obj), 0.8))
               .append($("<input>").attr("type", "button").addClass("button icon close").val(CLOSE_CROSS)
                 .click(function() {
                   if (this.bc_details) {
