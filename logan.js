@@ -941,11 +941,12 @@ const EPOCH_1970 = new Date("1970-01-01");
     consumeURL: function(UI, url) {
       this.seekId = 0;
       this.initProc(UI);
+      UI.searchingEnabled(false);
 
       let contentType = '';
+      UI.loadPhase("requesting...");
       fetch(url, { mode: 'cors', credentials: 'omit', }).then(function(response) {
         UI.loadPhase("fetching...");
-        UI.searchingEnabled(false);
         if (response.headers.has('content-type')) {
           contentType = response.headers.get('content-type');
         }
