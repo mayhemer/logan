@@ -131,6 +131,7 @@
       this.maxProgress = 0;
       this.currentProgress = 0;
       this.loadProgress(0);
+      $("#load_progress").text('');
     },
 
     addToMaxProgress: function(size) {
@@ -144,10 +145,15 @@
 
     loadProgress: function(prog) {
       if (prog && this.maxProgress) {
-        $("#load_progress").show().css("width", (prog * 100.0 / this.maxProgress) + "%");
+        $("#load_progress").removeClass("phase")
+          .show().css("width", (prog * 100.0 / this.maxProgress) + "%");
       } else {
         $("#load_progress").hide();
       }
+    },
+
+    loadPhase: function(phase) {
+      $("#load_progress").addClass("phase").text(phase);
     },
 
     title: function(title) {

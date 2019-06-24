@@ -54,11 +54,15 @@ span#introduction {
 
 div.load_progress {
   background-color: #008CBA;
-  display: block;
   width: 0;
-  height: 1em;
+  height: 1.5em;
   display: none;
   margin-top: 4px;
+  font-size: 10px;
+  color: yellow;
+}
+div.load_progress.phase {
+  display: block;
 }
 
 div.section {

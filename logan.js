@@ -944,6 +944,8 @@ const EPOCH_1970 = new Date("1970-01-01");
 
       let contentType = '';
       fetch(url, { mode: 'cors', credentials: 'omit', }).then(function(response) {
+        UI.loadPhase("fetching...");
+        UI.searchingEnabled(false);
         if (response.headers.has('content-type')) {
           contentType = response.headers.get('content-type');
         }
@@ -955,13 +957,16 @@ const EPOCH_1970 = new Date("1970-01-01");
           blob.name = url;
           this.consumeFiles(UI, [blob]);
         }
+        UI.searchingEnabled(true);
       }.bind(this)).catch((reason) => {
         window.onerror(reason);
+        UI.searchingEnabled(true);
       });
     },
 
     consumeZIP: function(UI, blob) {
       UI.searchingEnabled(false);
+      UI.loadPhase("unzipping...");
 
       zip.createReader(new zip.BlobReader(blob),
         (reader) => {
@@ -1003,6 +1008,7 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.initProc(UI);
 
       UI.resetProgress();
+      UI.loadPhase("parsing...");
 
       files = [];
       zips = [];
@@ -1419,7 +1425,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
       }
 
-      UI.loadProgress(0);
+      UI.resetProgress();
       UI.fillClassNames(this.searchProps);
       UI.fillSearchBy();
       UI.searchingEnabled(true);
