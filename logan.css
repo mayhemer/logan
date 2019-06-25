@@ -53,16 +53,18 @@ span#introduction {
 }
 
 div.load_progress {
-  background-color: #008CBA;
+  background-color: rgb(71, 255, 126);
   width: 0;
   height: 1.5em;
   display: none;
   margin-top: 4px;
   font-size: 10px;
-  color: yellow;
+  font-weight: bold;
+  padding-left: .5em;
 }
 div.load_progress.phase {
   display: block;
+  padding: 0;
 }
 
 div.section {
