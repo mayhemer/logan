@@ -1060,6 +1060,9 @@ logan.schema("MOZ_LOG",
       module.rule("TLSFilterTransaction::OnWriteSegment %p max=%d\n", function(ptr) {
         this.obj(ptr).capture().follow("TLSFilterTransaction::FilterInput %*$", tft => tft.capture());
       });
+      module.rule("TLSFilterTransaction %p NudgeTunnel timer started", function(ptr) {
+        this.obj(ptr).capture().prop("nugde-count", n => ++n);
+      });
       module.rule("TLSFilterTransaction dtor %p\n", function(ptr) {
         this.obj(ptr).destroy();
       });
