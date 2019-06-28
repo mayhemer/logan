@@ -945,8 +945,8 @@ logan.schema("MOZ_LOG",
       });
       module.rule("Http2Session::AddStream session=%p stream=%p serial=%u NextID=0x%X (tentative)",
         function(session, stream, serial, id) {
-          stream = this.obj(stream).prop("id", id);
-          session = this.obj(session).class("Http2Session").grep().link(stream);
+          stream = this.obj(stream).capture().prop("id", id);
+          session = this.obj(session).class("Http2Session").capture().grep().link(stream);
         });
       module.rule("Http2Session::LogIO %p stream=%p id=%x [%*]", function(session, stream, id, what) {
         this.obj(session).class("Http2Session").capture();
@@ -956,6 +956,11 @@ logan.schema("MOZ_LOG",
       });
       module.rule("Http2Session::ChangeDownstreamState() %p from %u to %u", function(session, s1, s2) {
         this.obj(session).capture().capture(` from = ${schema.H2SESSION_STATE.$(s1)}, to = ${schema.H2SESSION_STATE.$(s2)}`);
+      });
+      // The log is wrong in the code, this is actually a method of Http2Session
+      module.rule("Http2Stream::RegisterTunnel %p stream=%p tunnels=%d [%s]", function(session, str) {
+        this.obj(session).capture();
+        this.obj(str).capture().prop("is-tunnel", true);
       });
       logan.summaryProps("Http2Session", ["key"]);
 
