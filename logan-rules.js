@@ -923,6 +923,9 @@ logan.schema("MOZ_LOG",
       module.rule("nsHttpConnection %p SetupSecondaryTLS %s %d aSpdyConnectTransaction=%p\n", function(conn) {
         this.thread.httpconn_secondarytlssetup = this.obj(conn).capture();
       });
+      module.rule("nsHttpConnection::MakeConnectString for transaction=%p [", function(trans) {
+        this.obj(trans).capture().expect("]", trans => { trans.capture() }, trans => trans.capture() );
+      });
       module.rule("Destroying nsHttpConnection @%p", function(ptr) {
         this.obj(ptr).destroy();
       });
@@ -958,7 +961,7 @@ logan.schema("MOZ_LOG",
         this.obj(session).capture().capture(` from = ${schema.H2SESSION_STATE.$(s1)}, to = ${schema.H2SESSION_STATE.$(s2)}`);
       });
       // The log is wrong in the code, this is actually a method of Http2Session
-      module.rule("Http2Stream::RegisterTunnel %p stream=%p tunnels=%d [%s]", function(session, str) {
+      module.rule("Http2Stream::RegisterTunnel %p stream=%p tunnels=%d [%*]", function(session, str) {
         this.obj(session).capture();
         this.obj(str).capture().prop("is-tunnel", true);
       });
