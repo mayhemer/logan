@@ -962,8 +962,7 @@ logan.schema("MOZ_LOG",
       });
       // The log is wrong in the code, this is actually a method of Http2Session
       module.rule("Http2Stream::RegisterTunnel %p stream=%p tunnels=%d [%*]", function(session, str) {
-        this.obj(session).capture();
-        this.obj(str).capture().prop("is-tunnel", true);
+        this.obj(session).capture().link(this.obj(str).prop("is-tunnel", true));
       });
       logan.summaryProps("Http2Session", ["key"]);
 
