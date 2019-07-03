@@ -993,7 +993,7 @@ logan.schema("MOZ_LOG",
         this.obj(ptr).destroy();
       });
       module.rule("Http2Stream %p Stream ID 0x%X [session=%p] for URI %s\n", function(stream, id, session, uri) {
-        this.obj(stream).prop("url", uri).capture();
+        this.obj(stream).propIfNull("url", uri).capture();
       });
       module.rule("Http2Stream::ChangeState() %p from %d to %d", function(stream, oldst, newst) {
         let state = schema.H2STREAM_STATE.$(newst);
