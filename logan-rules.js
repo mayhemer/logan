@@ -882,6 +882,7 @@ logan.schema("MOZ_LOG",
       });
       module.ruleIf("nsHttpConnection::AddTransaction for SPDY", proc => proc.thread.activatedhttptrans, function(trans) {
         this.thread.httpspdytransaction = trans.capture();
+        this.thread.activatedhttptrans = null;
       });
       module.rule("nsHttpConnection::SetUrgentStartOnly [this=%p urgent=%d]", function(conn, urgent) {
         this.obj(conn).prop("urgent", urgent === "1").capture();
@@ -962,7 +963,7 @@ logan.schema("MOZ_LOG",
       });
       // The log is wrong in the code, this is actually a method of Http2Session
       module.rule("Http2Stream::RegisterTunnel %p stream=%p tunnels=%d [%*]", function(session, str) {
-        this.obj(session).capture().link(this.obj(str).prop("is-tunnel", true));
+        this.obj(session).capture().link(this.obj(str).prop("is-tunnel", true).capture());
       });
       logan.summaryProps("Http2Session", ["key"]);
 
@@ -990,6 +991,9 @@ logan.schema("MOZ_LOG",
       });
       module.rule("Http2Stream::~Http2Stream %p", function(ptr) {
         this.obj(ptr).destroy();
+      });
+      module.rule("Http2Stream %p Stream ID 0x%X [session=%p] for URI %s\n", function(stream, id, session, uri) {
+        this.obj(stream).prop("url", uri).capture();
       });
       module.rule("Http2Stream::ChangeState() %p from %d to %d", function(stream, oldst, newst) {
         let state = schema.H2STREAM_STATE.$(newst);
