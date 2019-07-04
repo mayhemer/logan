@@ -826,6 +826,9 @@ logan.schema("MOZ_LOG",
         this.obj(trans).prop("blocking", true).capture();
         this.obj(rc).capture();
       });
+      module.rule("nsHttpTransaction %p chunked decoder created\n", function(trans) {
+        this.obj(trans).prop("chunked", true).capture();
+      });
       module.rule("nsHttpTransaction::Close [this=%p reason=%d]", function(trans, status) {
         trans = this.obj(trans).prop("status", status).state("closed").capture();
         netcap(n => { n.transactionDone(trans) });
