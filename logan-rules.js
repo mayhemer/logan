@@ -1054,7 +1054,7 @@ logan.schema("MOZ_LOG",
         this.obj(ptr).create("SpdyConnectTransaction").grep();
       });
       module.rule("SpdyConnectTransaction %p new httpconnection %p %*$", function(ptr, conn) {
-        this.obj(ptr).capture().link(conn);
+        this.obj(ptr).capture().link(this.obj(conn).prop("is-tunneling", true));
       });
       module.rule("SpdyConnectTransaction dtor %p\n", function(ptr) {
         this.obj(ptr).destroy();
