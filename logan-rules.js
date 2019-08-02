@@ -1036,6 +1036,10 @@ logan.schema("MOZ_LOG",
       module.rule("Http2Session::CloseStream %p %p 0x%x %X", function(sess, stream, streamid, result) {
         this.obj(stream).state("closed").prop("status", result).capture();
       });
+      module.rule("Http2Session::UnRegisterTunnel %p stream=%p tunnels=%d [%*]", function(sess, stream) {
+        this.obj(stream).prop("unregister-count", c => ++c).capture();
+        this.obj(sess).capture();
+      });
       logan.summaryProps("Http2Stream", ["status", "url"]);
 
       /******************************************************************************
