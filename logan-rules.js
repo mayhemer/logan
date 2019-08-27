@@ -955,6 +955,10 @@ logan.schema("MOZ_LOG",
           stream = this.obj(stream).capture().prop("id", id);
           session = this.obj(session).class("Http2Session").capture().grep().link(stream);
         });
+      module.rule("Http2Session::AddStream session=%p trans=%p OnTunnel",
+        function(session, trans) {
+          this.obj(session).class("Http2Session").capture();
+        });
       module.rule("Http2Session::LogIO %p stream=%p id=%x [%*]", function(session, stream, id, what) {
         this.obj(session).class("Http2Session").capture();
       });
