@@ -1010,7 +1010,7 @@ logan.schema("MOZ_LOG",
         this.obj(stream).state("sent").capture();
       });
       module.rule("Http2Stream::ConvertResponseHeaders %p response code %d", function(stream, code) {
-        this.obj(stream).state("headers").capture();
+        this.obj(stream).state("headers").capture().prop("http-code", code);
       });
       module.rule("Start Processing Data Frame. Session=%p Stream ID %X Stream Ptr %p Fin=%d Len=%d", function(sess, streamid, stream, fin, len) {
         this.obj(stream).state("data").capture();
