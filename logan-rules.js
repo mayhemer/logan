@@ -524,12 +524,45 @@ logan.schema("MOZ_LOG",
       });
 
       /******************************************************************************
+       * ParentChannelListener
+       ******************************************************************************/
+
+      module.rule("ParentChannelListener::ParentChannelListener [this=%p, next=%p]", function(listener, nextlistener) {
+        this.obj(listener).create("HttpChannelParentListener").grep().call(listener => {
+          this.thread.on("httpchannel_init", httpchannel => httpchannel.link(listener));
+        });
+      });
+      module.rule("ParentChannelListener::~ParentChannelListener %p", function(listener) {
+        this.obj(listener).destroy();
+      });
+
+      /******************************************************************************
+       * HttpBaseChannel
+       ******************************************************************************/
+
+      module.rule("Creating HttpBaseChannel @%p", function(channel) {
+        this.thread.httpbasechannel = this.obj(channel).create("HttpBaseChannel").grep();
+      });
+      module.rule("HttpBaseChannel::Init [this=%p]", function(channel) {
+        this.thread.httpchannel_init = this.obj(channel).capture();
+      });
+      module.rule("Destroying HttpBaseChannel @%p\n", function(channel) {
+        this.obj(channel).destroy();
+      });
+
+      /******************************************************************************
        * nsHttpChannel
        ******************************************************************************/
 
       module.rule("Creating nsHttpChannel [this=%p]", function(ch) {
-        ch = this.obj(ch).create("nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
-          ch.prop("url", uri).capture();
+        this.thread.on("httpbasechannel", httpbasechannel => {
+          ch = this.obj(ch).inherits(httpbasechannel, "nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
+            ch.prop("url", uri).capture();
+          });
+        }, () => {
+          ch = this.obj(ch).create("nsHttpChannel").grep().expect("uri=%s", (ch, uri) => {
+            ch.prop("url", uri).capture();
+          });
         });
         this.thread.on("httpchannelparent", parent => {
           ch.ipcid(parent.ipcid());
