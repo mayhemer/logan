@@ -1149,10 +1149,11 @@ logan.schema("MOZ_LOG",
       module.rule("nsHalfOpenSocket::StartFastOpen [this=%p]", function(ho) {
         this.thread.halfopen = this.obj(ho).capture();
       });
-      schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p", proc => proc.thread.halfopen, function(conn, ho) {
+      schema.ruleIf("nsHalfOpenSocket::SetupConn Created new nshttpconnection %p%*$", proc => proc.thread.halfopen, function(conn, ishttp3, ho) {
         delete this.thread.halfopen;
         this.thread.on("networksocket", st => {
-          conn = this.obj(conn).link(st);
+          console.log(typeof ishttp3);
+          conn = this.obj(conn).link(st.propIf("is-http3", true, _ => ishttp3.match("http3")));
           conn.networksocket = st;
         });
         ho.link(conn).capture();
