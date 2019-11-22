@@ -51,9 +51,9 @@ function Bag(def = {}) {
 Bag.prototype.on = function(prop, handler, elseHandler) {
   if (!this[prop]) {
     if (elseHandler) {
-      elseHandler();
+      return elseHandler();
     }
-    return;
+    return undefined;
   }
   let val = handler(this[prop], this);
   if (val) {

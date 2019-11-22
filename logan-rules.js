@@ -644,6 +644,8 @@ logan.schema("MOZ_LOG",
         netcap(n => { n.channelPrio(ch, parseInt(prio)) });
       });
       module.rule("nsHttpChannel %p created nsHttpTransaction %p", function(ch, tr) {
+        // Overrule transaction argument with whatever has been stored on the current thread
+        tr = this.thread.on("httptransaction", trans => trans, _ => tr);
         ch = this.obj(ch).capture().link(tr = this.obj(tr).prop("url", this.obj(ch).props["url"]));
         tr.httpchannel = ch;
         netcap(n => { n.channelCreatesTrans(ch, tr) });
@@ -808,7 +810,7 @@ logan.schema("MOZ_LOG",
        ******************************************************************************/
 
       module.rule("Creating nsHttpTransaction @%p", function(trans) {
-        this.thread.httptransaction = (trans = this.obj(trans).create("nsHttpTransaction").grep());
+        this.thread.httptransaction = this.obj(trans).create("nsHttpTransaction").grep();
       });
       module.rule("nsHttpTransaction::Init [this=%p caps=%x]", function(trans) {
         this.obj(trans).capture().follow("  window-id = %x", function(trans, id) {
