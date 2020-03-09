@@ -842,7 +842,7 @@ logan.schema("MOZ_LOG",
         this.obj(trans).capture().follow("  %*$");
       });
       module.rule("nsHttpTransaction::HandleContentStart [this=%p]", function(trans) {
-        this.thread.httptransaction = this.obj(trans);
+        this.thread.httptransaction = this.obj(trans).capture();
       });
       schema.ruleIf("http response [", proc => proc.thread.httptransaction, function(trans) {
         delete this.thread.httptransaction;
