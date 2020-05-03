@@ -922,6 +922,10 @@ logan.schema("MOZ_LOG",
         this.thread.httpspdytransaction = trans.capture();
         this.thread.activatedhttptrans = null;
       });
+      module.ruleIf("nsHttpConnection::AddTransaction [this=%p] for %s", proc => proc.thread.activatedhttptrans, function(conn, proto, trans) {
+        this.thread.httpspdytransaction = trans.capture();
+        this.thread.activatedhttptrans = null;
+      });
       module.rule("nsHttpConnection::SetUrgentStartOnly [this=%p urgent=%d]", function(conn, urgent) {
         this.obj(conn).prop("urgent", urgent === "1").capture();
       });
@@ -940,6 +944,12 @@ logan.schema("MOZ_LOG",
         this.thread.on("networksocket", st => {
           conn.mention(st);
           return st;
+        });
+      });
+      module.rule("nsHttpConnection::OnHeadersAvailable [this=%p trans=%p response-head=%p]", function(conn, trans) {
+        this.obj(conn).capture().follow("proxy CONNECT %s! endtoendssl=%d onlyconnect=%d", function(conn, result, endtoendssl, onlyconnect) {
+          const success = result == "succeeded";
+          conn.prop("proxy-connect-succeess", success).propIf("onlyconnect", true, _ => onlyconnect == "1").capture();
         });
       });
       module.rule("nsHttpConnection::CloseTransaction[this=%p trans=%p reason=%x]", function(conn, trans, rv) {
@@ -1551,6 +1561,15 @@ logan.schema("MOZ_LOG",
       });
 
     }); // proxy
+
+    schema.module("ScriptLoader", module => {
+      module.rule("ScriptLoader::ScriptLoader %p", function(ptr) {
+        this.obj(ptr).create("ScriptLoader").grep();
+      });
+      module.rule("ScriptLoader::~ScriptLoader %p", function(ptr) {
+        this.obj(ptr).destroy();
+      });
+    });
 
   }
 ); // MOZ_LOG
