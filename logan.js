@@ -387,13 +387,14 @@ const EPOCH_1970 = new Date("1970-01-01");
       return logan._proc.obj(this.__most_recent_accessor).create(className, capture);
     }
 
-    return this.createOrReuse(className, capture);
+    return this.createOrReuse(className, null, capture);
   }
 
-  Obj.prototype.createOrReuse = function(className, capture = true) {
+  Obj.prototype.createOrReuse = function(className, onCreate = null, capture = true) {
     if (!this.props.className && !this.captures.length) {
       this._class(className);
       this.prop("state", "created");
+      onCreate && onCreate(this);
     }
 
     if (capture) {

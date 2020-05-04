@@ -203,7 +203,8 @@ Obj (an object) methods:
   * `this` being the processing state, same as in rule handling functions
   * the first argument is always the object `call` is being called on
   * additional arguments to `call` are passed as additional arguments to the function
-- `.createOrReuse(className)`: behave the same way as `create()` when the object doesn't exist already, but will just do nothing (except capturing the log line by default) when the object already exists
+- `.createOrReuse(className[, onCreate])`: behave the same way as `create()` when the object doesn't exist already, but will just do nothing (except capturing the log line by default) when the object already exists
+  * `onCreate` is an optional function called when the object is actually created or ignored when already existing and being reused, it has only one argument: the object
 
 For convenience each of these methods (modulo documented exceptions) return back the object, so that they can be chained in the jQuery promise style.
 
