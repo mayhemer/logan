@@ -1573,19 +1573,31 @@ logan.schema("MOZ_LOG",
     schema.module("events", module => {
       module.rule("DISP %p", function(e) {
         // createOrReuse: an event can be re-dispatched from within itself.
-        this.obj(e).createOrReuse("Event").__ts = this.timestamp;
+        this.obj(e).createOrReuse("Event", e => {
+          e.__dispatch_count = 0;
+        }).call(e => {
+          e.__ts = this.timestamp
+          // One DONE per DISP expected.  We need to count because of re-dispatch from itself.
+          ++e.__dispatch_count;
+        });
       });
       module.rule("EXEC %p", function(e) {
         this.thread._event_stack.push(
-          this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => e.__ts = this.timestamp)
+          this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
+            e.__ts = this.timestamp;
+          })
         );
       });
       module.rule("INTERRUPTED %p", function(e) {
-        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).__ts = this.timestamp;
+        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).capture().call(e => {
+          e.__ts = this.timestamp;
+        });
         this.thread._event_stack.pop();
       });
       module.rule("DONE %p", function(e) {
-        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).destroy();
+        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).call(e => {
+          (e.__dispatch_count && --e.__dispatch_count) ? e.capture() : e.destroy();
+        });
         this.thread._event_stack.pop();
       });
     }); // events
