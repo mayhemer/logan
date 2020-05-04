@@ -361,7 +361,7 @@ const EPOCH_1970 = new Date("1970-01-01");
 
   Obj.prototype.create = function(className, capture = true) {
     if (this.props.className) {
-      // console.warn(logan.exceptionParse(`object already exists (${this.props.className}@${this.props.pointer} - ${this.props.state}), recreting automatically from scratch`));
+      console.warn(logan.exceptionParse(`object already exists (${this.props.className}@${this.props.pointer} - ${this.props.state}), recreting automatically from scratch`));
     }
 
     if (this.props.className || this.captures.length) {
@@ -387,14 +387,20 @@ const EPOCH_1970 = new Date("1970-01-01");
       return logan._proc.obj(this.__most_recent_accessor).create(className, capture);
     }
 
-    this._class(className);
-    this.prop("state", "created");
+    return this.createOrReuse(className, capture);
+  }
+
+  Obj.prototype.createOrReuse = function(className, capture = true) {
+    if (!this.props.className && !this.captures.length) {
+      this._class(className);
+      this.prop("state", "created");
+    }
 
     if (capture) {
       this.capture();
     }
     return this;
-  };
+  }
 
   Obj.prototype.alias = function(alias) {
     if (logan._proc.objs[alias] === this) {
