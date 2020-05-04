@@ -489,6 +489,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.thread = logan._proc.thread;
     this.obj = obj;
     this.what = what;
+    this.eventspan = logan._proc.thread._event_stack.last();
 
     logan.captures.push(this);
   }
@@ -1295,7 +1296,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     ensureThread: function(file, prepared) {
       return ensure(this._proc.threads,
         file.__base.name + "|" + prepared.threadname,
-        () => new Bag({ name: prepared.threadname, _engaged_follows: {} }));
+        () => new Bag({ name: prepared.threadname, _engaged_follows: {}, _event_stack: [] }));
     },
 
     consumeLineByRules: function(schema, consume, prepared) {

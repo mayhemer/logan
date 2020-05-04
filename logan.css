@@ -169,10 +169,13 @@ span.checker.expanded:before {
 div.log_line > span.line_controller {
   cursor: pointer;
   position: absolute;
-  padding: 0 .5rem;
+  padding: 0 .3rem;
   display: none;
   user-select: none;
   margin-top: -0.1em;
+}
+div.log_line > span.line_controller > span {
+  padding: 0 1px;
 }
 div.log_line:hover > span.line_controller {
   display: inline;

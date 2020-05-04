@@ -147,7 +147,7 @@ logan.schema("MOZ_LOG",
         this.obj(ps).__init_time = this.timestamp;
       });
       module.rule("PresShell::ScheduleBeforeFirstPaint this=%p", function(ps) {
-        ps = this.obj(ps).prop("first-paint-time-ms", (val, ps) => this.duration(ps.__init_time)).capture();
+        ps = this.obj(ps).prop("first-paint-time-ms", (_, ps) => this.duration(ps.__init_time)).capture();
         netcap(n => { n.FirstPaint(ps.docshell) });
       });
     }); // PresShell
@@ -346,10 +346,10 @@ logan.schema("MOZ_LOG",
           .capture();
       });
       module.rule("%d [this=%p] imgRequest::OnDataAvailable (count=\"%d\") {ENTER}", function(now, ptr, count) {
-        this.obj(ptr).propIfNull("open-to-first-data", (val, request) => this.duration(request.__opentime)).capture();
+        this.obj(ptr).propIfNull("open-to-first-data", (_, request) => this.duration(request.__opentime)).capture();
       });
       module.rule("%d [this=%p] imgRequest::OnStopRequest", function(now, ptr) {
-        this.obj(ptr).prop("open-to-stop", (val, request) => this.duration(request.__opentime)).capture();
+        this.obj(ptr).prop("open-to-stop", (_, request) => this.duration(request.__opentime)).capture();
       });
       module.rule("%d [this=%p] imgRequest::~imgRequest() (keyuri=\"%s\")", function(now, ptr, key) {
         this.obj(ptr).destroy();
@@ -599,7 +599,7 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpChannel::OnProxyAvailable [this=%p pi=%p status=%x mStatus=%x]", function(ptr, proxy) {
         this.obj(ptr).capture()
-          .prop("proxy-resolve-time", (val, ch) => this.duration(ch.__resolveproxytime))
+          .prop("proxy-resolve-time", (_, ch) => this.duration(ch.__resolveproxytime))
           .prop("has-proxy", parseInt(proxy, 16) != 0);
       });
       module.rule("nsHttpChannel [%p] created nsChannelClassifier [%p]", function(ch, clas) {
@@ -658,7 +658,7 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpChannel::OnStartRequest [this=%p request=%p status=%x]", function(ch, pump, status) {
         this.obj(ch).class("nsHttpChannel")
-          .prop("start-time", (val, ch) => this.duration(ch.__opentime))
+          .prop("start-time", (_, ch) => this.duration(ch.__opentime))
           .state("started")
           .capture();
       });
@@ -681,8 +681,8 @@ logan.schema("MOZ_LOG",
       });
       module.rule("nsHttpChannel::OnDataAvailable [this=%p request=%p offset=%d count=%d]", function(ch, pump) {
         this.obj(ch).class("nsHttpChannel")
-          .propIfNull("first-data-time", (val, ch) => this.duration(ch.__opentime))
-          .prop("last-data-time", (val, ch) => this.duration(ch.__opentime))
+          .propIfNull("first-data-time", (_, ch) => this.duration(ch.__opentime))
+          .prop("last-data-time", (_, ch) => this.duration(ch.__opentime))
           .state("data")
           .capture()
           .send("HttpChannel::Data");
@@ -691,7 +691,7 @@ logan.schema("MOZ_LOG",
         this.obj(ch).class("nsHttpChannel")
           .state("on-stop")
           .prop("status", status, true)
-          .prop("stop-time", (val, ch) => this.duration(ch.__opentime))
+          .prop("stop-time", (_, ch) => this.duration(ch.__opentime))
           .capture();
       });
       module.rule("nsHttpChannel %p calling OnStopRequest\n", function(ch) {
@@ -708,7 +708,7 @@ logan.schema("MOZ_LOG",
           .prop("suspendcount", suspendcount => --suspendcount)
           // The classification time is rather vague, this doesn't necessarily has
           // to be the Resume() called by the classifier, it's just likely to be the one.
-          .propIf("classify-time", (val, ch) => this.duration(ch.__classifystarttime), ch => ch.__classifystarttime)
+          .propIf("classify-time", (_, ch) => this.duration(ch.__classifystarttime), ch => ch.__classifystarttime)
           .capture();
 
         delete ch.__classifystarttime;
@@ -1529,7 +1529,7 @@ logan.schema("MOZ_LOG",
         this.obj(ptr).create("Proxy::AsyncApplyFilters").grep().__creation_time = this.timestamp;
       });
       module.rule("~AsyncApplyFilters %p", function(ptr) {
-        this.obj(ptr).prop("lifetime", (val, applier) => this.duration(applier.__creation_time)).destroy();
+        this.obj(ptr).prop("lifetime", (_, applier) => this.duration(applier.__creation_time)).destroy();
       });
       module.rule("AsyncApplyFilters::ProcessNextFilter %p ENTER pi=%p", function(ptr) {
         this.obj(ptr).capture().follow("  %*$");
@@ -1546,7 +1546,7 @@ logan.schema("MOZ_LOG",
         this.obj(filter).create("Proxy::FilterLink").alias(target).grep().__creation_time = this.timestamp;
       });
       module.rule("nsProtocolProxyService::FilterLink::~FilterLink %p", function(filter) {
-        this.obj(filter).prop("lifetime", (val, filter) => this.duration(filter.__creation_time)).destroy();
+        this.obj(filter).prop("lifetime", (_, filter) => this.duration(filter.__creation_time)).destroy();
       });
 
       /******************************************************************************
@@ -1569,7 +1569,27 @@ logan.schema("MOZ_LOG",
       module.rule("ScriptLoader::~ScriptLoader %p", function(ptr) {
         this.obj(ptr).destroy();
       });
-    });
+    }); // ScriptLoader
+
+    schema.module("events", module => {
+      module.rule("DISP %p", function(e) {
+        // TODO?: an event can be redipatched from-itself
+        this.obj(e).create("Event").__ts = this.timestamp;
+      });
+      module.rule("EXEC %p", function(e) {
+        this.thread._event_stack.push(
+          this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => e.__ts = this.timestamp)
+        );
+      });
+      module.rule("INTERRUPTED %p", function(e) {
+        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).__ts = this.timestamp;
+        this.thread._event_stack.pop();
+      });
+      module.rule("DONE %p", function(e) {
+        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).destroy();
+        this.thread._event_stack.pop();
+      });
+    }); // events
 
   }
 ); // MOZ_LOG

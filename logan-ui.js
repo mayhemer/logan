@@ -893,6 +893,22 @@
             fetch(this, +1);
           });
         
+        let eventspan = capture.eventspan && $("<span>")
+          .attr('title', 'Expand the event this is executed within')
+          .text('e')
+          .mousedown(function() {
+            const event = capture.eventspan;
+            if (!event) {
+              alert("Sorry, no event tracked calling this line; we don't know them all yet.");
+              return;
+            }
+            if (!UI.expanders[event.id]) {
+              UI.addResult(event).find(".checker").click();
+            } else {
+              alert(`ALREADY OPEN: event ${event.props.pointer.toUpperCase()}`);
+            }
+          });
+        
         if (UI.mousedown) {
           setTimeout(() => {
             if (UI.mousedown && UI.lastIncrement != 0) {
@@ -909,6 +925,7 @@
           .addClass("line_controller")
           .append(up)
           .append(down)
+          .append(eventspan)
           .mousedown((e) => {
             e.preventDefault();
           })
