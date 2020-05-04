@@ -857,6 +857,10 @@
         return next && capture.obj !== next.obj && !(next.id in this.display);
       }
 
+      let showEvent = (capture) => {
+        return capture.eventspan && capture.eventspan !== capture.obj;
+      }
+
       let controller = () => {
         let fetch = (element, increment) => {
           // To loop
@@ -909,7 +913,7 @@
             this.remove();
           });
         
-        let eventspan = capture.eventspan && $("<span>")
+        let eventspan = showEvent(capture) && $("<span>")
           .attr('title', 'Expand the event this is executed within')
           .text('e')
           .mousedown(function() {
