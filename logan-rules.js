@@ -1572,8 +1572,8 @@ logan.schema("MOZ_LOG",
 
     schema.module("events", module => {
       module.rule("DISP %p", function(e) {
-        // TODO?: an event can be redipatched from-itself
-        this.obj(e).create("Event").__ts = this.timestamp;
+        // createOrReuse: an event can be re-dispatched from within itself.
+        this.obj(e).createOrReuse("Event").__ts = this.timestamp;
       });
       module.rule("EXEC %p", function(e) {
         this.thread._event_stack.push(
