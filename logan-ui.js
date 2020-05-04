@@ -837,6 +837,26 @@
         return;
       }
 
+      let nextOnThread = (id, increment) => {
+        // Next on the same thread.
+        id += increment;
+        let next;
+        while ((next = logan.captures[id])) {
+          if ((next.what.file || (typeof next.what === "string")) && next.thread === capture.thread) {
+            break;
+          }
+          id += increment;
+          next = null;
+        }
+
+        return next;
+      }
+
+      let showArrow = (capture, increment) => {
+        const next = nextOnThread(capture.id, increment);
+        return next && capture.obj !== next.obj && !(next.id in this.display);
+      }
+
       let controller = () => {
         let fetch = (element, increment) => {
           // To loop
@@ -845,17 +865,8 @@
           let fromTop = $(element).parents(".log_line").offset().top - $(window).scrollTop();
           fromTop |= 1; // to fix the jumping effect in Firefox
 
-          let id = capture.id + increment;
-          let next;
-
-          // Next on the same thread.
-          while ((next = logan.captures[id])) {
-            if ((next.what.file || (typeof next.what === "string")) && next.thread === capture.thread) {
-              break;
-            }
-            id += increment;
-            next = null;
-          }
+          let id = capture.id;
+          let next = nextOnThread(id, increment);
           if (!next) {
             return;
           }
@@ -871,26 +882,31 @@
           if (position in this.display) {
             // Already on the screen, but added via a different path, add a ref
             this.place(next, this.display[position]);
-          } else {
-            element = this.addCapture(obj, next, true);
-            if (increment > 0) {
-              $(window).scrollTop(element.offset().top - fromTop);
-            }
+            return;
+          } 
+
+          element = this.addCapture(obj, next, true);
+          if (increment > 0) {
+            $(window).scrollTop(element.offset().top - fromTop);
           }
+
+          return position;
         }
 
-        let up = $("<span>")
+        let up = showArrow(capture, -1) && $("<span>")
           .attr('title', 'Fetch previous line on this thread')
           .text('\u02c4')
           .mousedown(function() {
             fetch(this, -1);
+            this.remove();
           });
                 
-        let down = $("<span>")
+        let down = showArrow(capture, +1) && $("<span>")
           .attr('title', 'Fetch next line on this thread')
           .text('\u02c5')
           .mousedown(function() {
             fetch(this, +1);
+            this.remove();
           });
         
         let eventspan = capture.eventspan && $("<span>")
@@ -911,21 +927,23 @@
         
         if (UI.mousedown) {
           setTimeout(() => {
-            if (UI.mousedown && UI.lastIncrement != 0) {
+            if (UI.lastIncrement != 0) {
               let target = UI.lastIncrement > 0 ? down : up;
-              fetch(target, UI.lastIncrement);
-
-              UI.autoFetchDelay -= AUTO_FETCH_DELAY_DECAY;
-              if (UI.autoFetchDelay < 0) UI.autoFetchDelay = 0;
+              if (target && UI.mousedown) {
+                fetch(target, UI.lastIncrement);
+                target.remove();
+                UI.autoFetchDelay -= AUTO_FETCH_DELAY_DECAY;
+                if (UI.autoFetchDelay < 0) UI.autoFetchDelay = 0;
+              } 
             }
           }, UI.autoFetchDelay);
         }
 
         return $("<span>")
           .addClass("line_controller")
+          .append(eventspan)
           .append(up)
           .append(down)
-          .append(eventspan)
           .mousedown((e) => {
             e.preventDefault();
           })
@@ -1303,6 +1321,9 @@
       if (UI.mousedown) {
         UI.autoFetchDelay = AUTO_FETCH_INITIAL_DELAY;
       }
+    }, true);
+
+    window.addEventListener("mouseup", (e) => {
     }, true);
 
     $(window).mouseup((e) => {
