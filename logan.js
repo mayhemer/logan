@@ -387,19 +387,28 @@ const EPOCH_1970 = new Date("1970-01-01");
       return logan._proc.obj(this.__most_recent_accessor).create(className, capture);
     }
 
-    return this.createOrReuse(className, null, capture);
-  }
-
-  Obj.prototype.createOrReuse = function(className, onCreate = null, capture = true) {
-    if (!this.props.className && !this.captures.length) {
-      this._class(className);
-      this.prop("state", "created");
-      onCreate && onCreate(this);
-    }
+    this._class(className);
+    this.prop("state", "created");
 
     if (capture) {
       this.capture();
     }
+
+    return this;
+  }
+
+  Obj.prototype.createOrReuse = function(className, onCreate = null, capture = true) {
+    if (this.props.className || this.captures.length) {
+      if (capture) {
+        this.capture();
+      }
+    } else {
+      this.create(className, capture);
+      if (onCreate) {
+        onCreate(this);
+      }
+    }
+
     return this;
   }
 
