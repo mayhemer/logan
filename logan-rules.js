@@ -1581,19 +1581,25 @@ logan.schema("MOZ_LOG",
 
     schema.module("events", module => {
       module.rule("DISP %p", function(e) {
-        // createOrReuse: an event can be re-dispatched from within itself.
+        // createOrReuse: an event can be re-dispatched from within itself or multiple times.
         this.obj(e).createOrReuse("Event", e => {
           e.__dispatch_count = 0;
+          e.__running = false;
         }).call(e => {
           e.__ts = this.timestamp
-          // One DONE per DISP expected.  We need to count because of re-dispatch from itself.
-          ++e.__dispatch_count;
+          if (e.__running || e.__dispatch_count == 0) {
+            // One DONE per DISP expected.  We need to count because of re-dispatch from itself.
+            // But we also want to ignore the case when a runnable travels among queues and thus has
+            // more than one dispatch log.
+            ++e.__dispatch_count;
+          }
         });
       });
       const execute = function(e) {
         this.thread._event_stack.push(
           this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
             e.__ts = this.timestamp;
+            e.__running = true;
           })
         );
       };
@@ -1602,12 +1608,14 @@ logan.schema("MOZ_LOG",
       module.rule("INTERRUPTED %p", function(e) {
         this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).capture().call(e => {
           e.__ts = this.timestamp;
+          e.__running = false;
         });
         this.thread._event_stack.pop();
       });
       module.rule("DONE %p", function(e) {
         this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).call(e => {
           (e.__dispatch_count && --e.__dispatch_count) ? e.capture() : e.destroy();
+          e.__running = false;
         });
         this.thread._event_stack.pop();
       });
