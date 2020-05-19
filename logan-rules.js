@@ -1590,20 +1590,15 @@ logan.schema("MOZ_LOG",
           ++e.__dispatch_count;
         });
       });
-      module.rule("EXEC %p", function(e) {
+      const execute = function(e) {
         this.thread._event_stack.push(
           this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
             e.__ts = this.timestamp;
           })
         );
-      });
-      module.rule("EXEC %p [%*]", function(e) {
-        this.thread._event_stack.push(
-          this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
-            e.__ts = this.timestamp;
-          })
-        );
-      });
+      };
+      module.rule("EXEC %p", execute);
+      module.rule("EXEC %p [%*]", execute);
       module.rule("INTERRUPTED %p", function(e) {
         this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).capture().call(e => {
           e.__ts = this.timestamp;
