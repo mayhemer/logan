@@ -398,7 +398,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   }
 
-  Obj.prototype.createOrReuse = function(className, onCreate = null, capture = true) {
+  Obj.prototype.createOnce = function(className, onCreate = null, capture = true) {
     if (this.props.className || this.captures.length) {
       if (capture) {
         this.capture();

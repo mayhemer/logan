@@ -1581,8 +1581,8 @@ logan.schema("MOZ_LOG",
 
     schema.module("events", module => {
       module.rule("DISP %p", function(e) {
-        // createOrReuse: an event can be re-dispatched from within itself or multiple times.
-        this.obj(e).createOrReuse("Event", e => {
+        // createOnce: an event can be re-dispatched from within itself or multiple times.
+        this.obj(e).createOnce("Event", e => {
           e.__dispatch_count = 0;
           e.__running = false;
         }).call(e => {
