@@ -1597,7 +1597,7 @@ logan.schema("MOZ_LOG",
       });
       const execute = function(e) {
         this.thread._event_stack.push(
-          this.obj(e).class("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
+          this.obj(e).createOnce("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
             e.__ts = this.timestamp;
             e.__running = true;
           })
