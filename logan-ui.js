@@ -5,6 +5,7 @@
   const ON_SCROLL_LINES_COUNT = 20;
   const AUTO_FETCH_INITIAL_DELAY = 250;
   const AUTO_FETCH_DELAY_DECAY = 32;
+  const ALWAYS_SHOW_HIDDEN_LINES_ARROWS = true;
   // -----------------------
 
   function ensure(array, itemName, def = {}) {
@@ -853,6 +854,9 @@
       }
 
       let showArrow = (capture, increment) => {
+        if (ALWAYS_SHOW_HIDDEN_LINES_ARROWS) {
+          return true;
+        }
         const next = nextOnThread(capture.id, increment);
         return next && capture.obj !== next.obj && !(next.id in this.display);
       }
