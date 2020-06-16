@@ -10,6 +10,7 @@ logan.schema("MOZ_LOG",
         text: text,
         timestamp: new Date(date + "T" + time + "Z"),
         threadname: thread,
+        pid: (match => match ? match[1] : 0)(thread.match(/(\d+):/)),
         module: module,
       };
     }
@@ -21,6 +22,7 @@ logan.schema("MOZ_LOG",
       return {
         text: text,
         threadname: thread,
+        pid: (match => match ? match[1] : 0)(thread.match(/(\d+):/)),
         module: module,
       };
     }
@@ -1595,6 +1597,14 @@ logan.schema("MOZ_LOG",
           }
         });
       });
+      module.rule("SEND %p %d", function(m, seqn) {
+        this.obj(m).create("IPC Send").ipcid(seqn).expect("PID %d", (m, other_pid) => {
+          m.send(`IPC:${other_pid}`).destroy(undefined, false);
+        }).call(m => {
+          m.__ts = this.timestamp;
+        });
+      });
+
       const execute = function(e) {
         this.thread._event_stack.push(
           this.obj(e).createOnce("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
@@ -1612,6 +1622,19 @@ logan.schema("MOZ_LOG",
         });
         this.thread._event_stack.pop();
       });
+
+      module.rule("RECV %p %d [%s]", function(m, seqn) {
+        this.thread._event_stack.push(
+          this.obj(m).createOnce("IPC Receive").ipcid(seqn).recv(`IPC:${this.pid}`, (m, sender) => {
+            m.prop("delay", this.duration(sender.__ts));
+            sender.link(m);
+          }).call(m => {
+            m.__ts = this.timestamp;
+            m.__running = true;
+          })
+        );
+      });
+
       module.rule("DONE %p", function(e) {
         this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).call(e => {
           (e.__dispatch_count && --e.__dispatch_count) ? e.capture() : e.destroy();
