@@ -686,14 +686,15 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.capture({ dispatch: true }, origin);
       LOG(" storing send() " + logan._proc.line + " ipcid=" + this.ipc_id);
       return {
+        origin,
         sender: this,
-        origin: origin
       };
     };
 
     let id = message + "::" + this.ipc_id;
-    let sync = logan._proc._sync[id];
+    LOG(`send() with id = ${id}`);
 
+    let sync = logan._proc._sync[id];
     if (!sync) {
       logan._proc._sync[id] = create();
       return this;
@@ -723,27 +724,38 @@ const EPOCH_1970 = new Date("1970-01-01");
     if (!logan._proc._ipc) {
       return this;
     }
-
     if (this.ipc_id === undefined) {
       return this;
     }
 
+    const create = () => {
+      LOG(" blocking and storing recv() " + logan._proc.line + " ipcid=" + this.ipc_id + " file=" + logan._proc.file.name);
+      return {
+        func,
+        receiver: this,
+        proc: logan._proc.save(),
+      };
+    }
+
     let id = message + "::" + this.ipc_id;
+    LOG(`recv() with id = ${id}`);
 
     let sync = logan._proc._sync[id];
     if (!sync) {
       // There was no send() call for this ipcid and message, hence
       // we have to wait.  Store the recv() info and proccessing state
       // and stop parsing this file.
-      logan._proc._sync[id] = {
-        func: func,
-        receiver: this,
-        proc: logan._proc.save(),
-      };
-
+      logan._proc._sync[id] = create();
       logan._proc.file.__base.recv_wait = true;
 
-      LOG(" blocking and storing recv() " + logan._proc.line + " ipcid=" + this.ipc_id + " file=" + logan._proc.file.name);
+      return this;
+    }
+
+    while (!sync.sender && sync.next) {
+      sync = sync.next;
+    }
+    if (!sync.sender) {
+      sync.next = create();
       return this;
     }
 
@@ -1319,6 +1331,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     consumeLineByRules: function(schema, consume, prepared) {
       this._proc.schema = schema;
       this._proc.file = consume.file;
+      this._proc.pid = prepared.pid;
       this._proc.timestamp = prepared.timestamp;
       this._proc.line = prepared.text;
       this._proc.raw = prepared.raw;
