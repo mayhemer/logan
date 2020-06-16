@@ -109,6 +109,9 @@ div.log_line {
 div.log_line:hover:not(.expanded) {
   font-weight: bold;
 }
+div.log_line.noextra:hover {
+  opacity: 0.6;
+}
 div.log_line.focused {
   outline: solid 1px;
 }
