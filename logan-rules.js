@@ -1597,12 +1597,10 @@ logan.schema("MOZ_LOG",
           }
         });
       });
-      module.rule("SEND %p %d", function(m, seqn) {
-        this.obj(m).create("IPC Send").ipcid(seqn).expect("PID %d", (m, other_pid) => {
-          m.send(`IPC:${other_pid}`).destroy(undefined, false);
-        }).call(m => {
+      module.rule("SEND %p %d %d", function(m, seqn, other_pid) {
+        this.obj(m).create("IPC Send").ipcid(seqn).send(`IPC:${other_pid}`).call(m => {
           m.__ts = this.timestamp;
-        });
+        }).destroy(undefined, false);
       });
 
       const execute = function(e) {
