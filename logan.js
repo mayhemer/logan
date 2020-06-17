@@ -125,7 +125,7 @@ const EPOCH_1970 = new Date("1970-01-01");
   const FILE_SLICE = 1 * 1024 * 1024;
   const USE_RULES_TREE_OPTIMIZATION = true;
   const ALLOW_NON_POINTER_ALIAS_GREPING = true;
-  const DONT_BLOCK_READING_ON_RECV_WAIT = true;
+  const BLOCK_READING_ON_RECV_WAIT = true;
   // ------------------------------
 
   let IF_RULE_INDEXER = 0;
@@ -1257,7 +1257,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         });
 
         let consume = files.find(file => !file.file.__base.recv_wait);
-        if (!consume || DONT_BLOCK_READING_ON_RECV_WAIT) {
+        if (!consume || !BLOCK_READING_ON_RECV_WAIT) {
           // All files are blocked probably because of large timestamp shift
           // Let's just unblock parsing, in most cases we will satisfy recv()
           // soon after.
