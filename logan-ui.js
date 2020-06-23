@@ -870,7 +870,12 @@
           // To loop
           UI.lastIncrement = increment;
 
-          let fromTop = $(element).parents(".log_line").offset().top - $(window).scrollTop();
+          let fromTop = $(element).parents(".log_line");
+          if (!fromTop) {
+            console.error("from top missing", element);
+            return;
+          }
+          fromTop.offset().top - $(window).scrollTop();
           fromTop |= 1; // to fix the jumping effect in Firefox
 
           let id = capture.id;
