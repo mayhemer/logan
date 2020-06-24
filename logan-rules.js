@@ -1581,7 +1581,7 @@ logan.schema("MOZ_LOG",
       });
     }); // ScriptLoader
 
-    schema.module("events", module => {
+    schema.module("events", module => {      
       module.rule("DISP %p", function(e) {
         // createOnce: an event can be re-dispatched from within itself or multiple times.
         this.obj(e).createOnce("Event", e => {
@@ -1603,25 +1603,23 @@ logan.schema("MOZ_LOG",
         }).destroy(undefined, false);
       });
 
-      const execute = function(e) {
+      const execute = function(e, raii) {
         this.thread._event_stack.push(
           this.obj(e).createOnce("Dispatchless-event").prop("delay", (_, e) => this.duration(e.__ts)).capture().call(e => {
             e.__ts = this.timestamp;
             e.__running = true;
+            if (raii) {
+              e.alias(raii);
+            }
           })
         );
       };
       module.rule("EXEC %p", execute);
-      module.rule("EXEC %p [%*]", execute);
-      module.rule("INTERRUPTED %p", function(e) {
-        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).capture().call(e => {
-          e.__ts = this.timestamp;
-          e.__running = false;
-        });
-        this.thread._event_stack.pop();
-      });
+      module.rule("EXEC %p [%*]", function(e, _) { execute(e); });
+      module.rule("EXEC %p %p", execute);
+      module.rule("EXEC %p %p [%*]", execute);
 
-      module.rule("RECV %p %d [%s]", function(m, seqn) {
+      const receive = function(m, raii, seqn) {
         this.thread._event_stack.push(
           this.obj(m).createOnce("IPC Receive").ipcid(seqn).recv(`IPC:${this.pid}`, (m, sender) => {
             m.prop("delay", this.duration(sender.__ts));
@@ -1629,12 +1627,27 @@ logan.schema("MOZ_LOG",
           }).call(m => {
             m.__ts = this.timestamp;
             m.__running = true;
+            if (raii) {
+              m.alias(raii);
+            }
           })
         );
+      };
+      module.rule("RECV %p %d [%*]", function(m, seqn) { receive(m, null, seqn); });
+      module.rule("RECV %p %p %d [%*]", receive);
+
+      module.rule("INTERRUPTED %p", function(raii) {
+        // unaliasing because the raii is only transient.
+        this.obj(raii).unalias().prop("self-time", (time, e) => time + this.duration(e.__ts)).capture().call(e => {
+          e.__ts = this.timestamp;
+          e.__running = false;
+        });
+        this.thread._event_stack.pop();
       });
 
-      module.rule("DONE %p", function(e) {
-        this.obj(e).prop("self-time", (time, e) => time + this.duration(e.__ts)).call(e => {
+      module.rule("DONE %p", function(raii) {
+        // unaliasing because the raii is only transient.
+        this.obj(raii).unalias().prop("self-time", (time, e) => time + this.duration(e.__ts)).call(e => {
           (e.__dispatch_count && --e.__dispatch_count) ? e.capture() : e.destroy();
           e.__running = false;
         });

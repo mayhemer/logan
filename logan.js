@@ -335,6 +335,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.props = new Bag({ pointer: ptr, className: null, ordernum: this.id + 1000000 });
     this.captures = [];
     this.aliases = {};
+    this.destroyed = false;
     this._grep = false;
 
     // This is used for placing the summary of the object (to generate
@@ -433,8 +434,8 @@ const EPOCH_1970 = new Date("1970-01-01");
     return this;
   };
 
-  Obj.prototype.unalias = function() {
-    alias = this.__most_recent_accessor;
+  Obj.prototype.unalias = function(alias) {
+    alias = alias || this.__most_recent_accessor;
     if (!this.aliases[alias]) {
       return this;
     }
@@ -471,7 +472,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     delete logan._proc.objs[this.props.pointer];
     let updateAliasRegExp = false;
     for (let alias in this.aliases) {
-      if (!alias.match(POINTER_REGEXP)) {
+      if (!updateAliasRegExp && alias.match(POINTER_REGEXP)) {
         updateAliasRegExp = true;
       }
       delete logan._proc.objs[alias];
@@ -488,6 +489,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     }
 
     this.capture({ destroyed: true });
+    this.destroyed = true;
   };
 
   function Capture(what, obj = null) {
@@ -497,6 +499,10 @@ const EPOCH_1970 = new Date("1970-01-01");
       line: logan._proc.linenumber,
       offset: logan._proc.filebinaryoffset,
     };
+
+    if (obj && obj.destroyed) {
+      what.destroyed = true;
+    }
 
     this.id = logan.captures.length;
     if (netdiag.enabled) {
@@ -1620,8 +1626,19 @@ const EPOCH_1970 = new Date("1970-01-01");
         if (obj.captures[0].id > seekId) {
           continue;
         }
-        let last = obj.captures.last();
-        if (last.id < seekId && last.what.destroyed) {
+
+        if ((_ => {
+          for (let i = obj.captures.length; i > 0;) {
+            let capture = obj.captures[--i];
+            if (!capture.what.destroyed) {
+              return false;
+            }
+            if (capture.id < seekId) {
+              return true;
+            }
+          }
+          return false;
+        })()) {
           continue;
         }
         // The object lives around the seek point or has not been destroyed
