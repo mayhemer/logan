@@ -500,10 +500,6 @@ const EPOCH_1970 = new Date("1970-01-01");
       offset: logan._proc.filebinaryoffset,
     };
 
-    if (obj && obj.destroyed) {
-      what.destroyed = true;
-    }
-
     this.id = logan.captures.length;
     if (netdiag.enabled) {
       // This property takes surprisingly a lot of memory...
@@ -1628,13 +1624,14 @@ const EPOCH_1970 = new Date("1970-01-01");
         }
 
         if ((_ => {
+          if (!obj.destroyed) {
+            return false;
+          }
           for (let i = obj.captures.length; i > 0;) {
             let capture = obj.captures[--i];
-            if (!capture.what.destroyed) {
-              return false;
-            }
-            if (capture.id < seekId) {
-              return true;
+            const older = capture.id < seekId;
+            if (capture.what.destroyed || older) {
+              return older;
             }
           }
           return false;
