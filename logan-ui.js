@@ -1093,6 +1093,11 @@
                   $(window).scroll();
                 }.bind(this))
               )
+              .append($("<input>").attr("type", "button").addClass("button").val("debug").css("margin-bottom", "1em")
+                .click(function() {
+                  console.log(obj);
+                }.bind(this))
+              )
             this.summary(obj, Object.keys, (obj, props) => {
               element.append($("<div>")
                 .html(this.quick(obj) + " created " + this.ISOTime(obj.placement.time) + " (" + obj.placement.file.name + ")"));
