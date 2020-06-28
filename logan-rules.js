@@ -1581,7 +1581,7 @@ logan.schema("MOZ_LOG",
       });
     }); // ScriptLoader
 
-    schema.module("events", module => {      
+    schema.module("events", module => {
       module.rule("DISP %p", function(e) {
         // createOnce: an event can be re-dispatched from within itself or multiple times.
         this.obj(e).createOnce("Event", e => {
@@ -1595,7 +1595,7 @@ logan.schema("MOZ_LOG",
             // more than one dispatch log.
             ++e.__dispatch_count;
           }
-        });
+        }).follow("TIMEOUT %u", e => { e.capture() });
       });
       module.rule("SEND %p %d %d", function(m, seqn, other_pid) {
         this.obj(m).create("IPC Send").ipcid(seqn).send(`IPC:${other_pid}`).call(m => {
