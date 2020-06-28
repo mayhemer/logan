@@ -62,7 +62,11 @@
 
   const CLOSE_CROSS = "\u274C"; // "\u2A2F" = VECTOR OR CROSS PRODUCT (too small?);
 
-  let HIGHLIGHTSET = ['#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f', '#8dd3c7'];
+  let HIGHLIGHTSET = [
+    '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f', '#8dd3c7',
+    "#d7653b", "#a391a9", "#bdf324", "#16bce1", "#aa766a", "#e51e8c", "#7063fd", "#e3d4f4", "#f73a31", "#e4fcc0", "#e7c272", "#07d4fe",
+    "#acc423", "#8d97ea", "#80f592", "#b39d2f", "#ffc1af", "#87ba35", "#eb5d32", "#60bdf0", "#85d3c4", "#0ab233", "#65feeb", "#e61a08",
+    "#d738ae", "#42fc09", "#cd939c", "#e60be8", "#b3d5e2", "#9291fa", "#ec5294", "#f19f7f", "#9bd264", "#d5fbaa", "#b36704", "#c7f23b"];
   function nextHighlightColor() {
     let result = HIGHLIGHTSET[0];
     HIGHLIGHTSET.push(HIGHLIGHTSET.shift());
