@@ -119,6 +119,21 @@ const NULLPTR_REGEXP = /^(?:(?:0x)?0+|\(null\)|\(nil\))$/;
 const CAPTURED_LINE_LABEL = "a log line";
 const EPOCH_1970 = new Date("1970-01-01");
 
+// Windows sometimes writes %p as upper-case-padded and sometimes as lower-case-unpadded
+// 000001500B043028 -> 1500b043000
+function pointerTrim(ptr) {
+  if (!ptr) {
+    return "0";
+  }
+
+  let pointer = ptr.match(POINTER_REGEXP);
+  if (pointer) {
+    return pointer[1].toLowerCase();
+  }
+
+  return ptr;
+}
+
 (function() {
 
   // Configuration of the internals
@@ -191,21 +206,6 @@ const EPOCH_1970 = new Date("1970-01-01");
 
     LOG("input '" + input + "' \nregexp '" + printf + "'");
     return new RegExp(printf);
-  }
-
-  // Windows sometimes writes %p as upper-case-padded and sometimes as lower-case-unpadded
-  // 000001500B043028 -> 1500b043000
-  function pointerTrim(ptr) {
-    if (!ptr) {
-      return "0";
-    }
-
-    let pointer = ptr.match(POINTER_REGEXP);
-    if (pointer) {
-      return pointer[1].toLowerCase();
-    }
-
-    return ptr;
   }
 
   function ruleMappingGrade1(input) {
@@ -335,7 +335,7 @@ const EPOCH_1970 = new Date("1970-01-01");
     this.props = new Bag({ pointer: ptr, className: null, ordernum: this.id + 1000000 });
     this.captures = [];
     this.aliases = {};
-    this.destroyed = false;
+    this.destroyed = null;
     this._grep = false;
 
     // This is used for placing the summary of the object (to generate
@@ -488,8 +488,9 @@ const EPOCH_1970 = new Date("1970-01-01");
       this.capture();
     }
 
-    this.capture({ destroyed: true });
-    this.destroyed = true;
+    let info = {};
+    this.capture({ destroyed: true }, info);
+    this.destroyed = info.capture;
   };
 
   function Capture(what, obj = null) {
@@ -1622,20 +1623,7 @@ const EPOCH_1970 = new Date("1970-01-01");
         if (obj.captures[0].id > seekId) {
           continue;
         }
-
-        if ((_ => {
-          if (!obj.destroyed) {
-            return false;
-          }
-          for (let i = obj.captures.length; i > 0;) {
-            let capture = obj.captures[--i];
-            const older = capture.id < seekId;
-            if (capture.what.destroyed || older) {
-              return older;
-            }
-          }
-          return false;
-        })()) {
+        if (obj.destroyed && obj.destroyed.id < seekId) {
           continue;
         }
         // The object lives around the seek point or has not been destroyed

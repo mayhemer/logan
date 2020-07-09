@@ -504,6 +504,10 @@
       }
 
       return input.replace(GREP_REGEXP, function(ptr) {
+        const ptr_trim = pointerTrim(ptr);
+        if (ignore.props.pointer == ptr_trim || Object.keys(ignore.aliases).includes(ptr_trim)) {
+          return ptr;
+        }
         let obj = logan.find(ptr, at);
         if (obj && obj !== ignore) {
           return `<span class='obj-${obj.id} inline-revealer' onclick='window.logan_inlineExpand(this, ${obj.id}, ${at});'>${ptr}</span>`;
