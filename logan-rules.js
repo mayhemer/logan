@@ -1615,7 +1615,7 @@ logan.schema("MOZ_LOG",
         );
       };
       module.rule("EXEC %p", execute);
-      module.rule("EXEC %p [%*]", function(e, _) { execute(e); });
+      module.rule("EXEC %p [%*]", function(e, _) { execute.call(this, e, null); });
       module.rule("EXEC %p %p", execute);
       module.rule("EXEC %p %p [%*]", execute);
 
@@ -1633,7 +1633,7 @@ logan.schema("MOZ_LOG",
           })
         );
       };
-      module.rule("RECV %p %d [%*]", function(m, seqn) { receive(m, null, seqn); });
+      module.rule("RECV %p %d [%*]", function(m, seqn) { receive.call(this, m, null, seqn); });
       module.rule("RECV %p %p %d [%*]", receive);
 
       module.rule("INTERRUPTED %p", function(raii) {
