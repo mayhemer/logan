@@ -879,12 +879,10 @@
           UI.lastIncrement = increment;
 
           let fromTop = $(element).parents(".log_line");
-          if (!fromTop) {
-            console.error("from top missing", element);
-            return;
+          if (fromTop) {
+            fromTop = fromTop.offset().top - $(window).scrollTop();
+            fromTop |= 1; // to fix the jumping effect in Firefox
           }
-          fromTop.offset().top - $(window).scrollTop();
-          fromTop |= 1; // to fix the jumping effect in Firefox
 
           let id = capture.id;
           let next = nextOnThread(id, increment);
@@ -907,7 +905,7 @@
           } 
 
           element = this.addCapture(obj, next, true);
-          if (increment > 0) {
+          if (increment > 0 && fromTop) {
             $(window).scrollTop(element.offset().top - fromTop);
           }
 
