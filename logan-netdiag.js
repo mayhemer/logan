@@ -1,7 +1,7 @@
 var netdiag = null;
 var netdiagUI = null;
 
-const NET_DIAG_ENABLED = false;
+const NET_DIAG_ENABLED = true;
 
 (function() {
 
@@ -74,10 +74,10 @@ const NET_DIAG_ENABLED = false;
         this.capture(docshell, { FirstPaint: true });
       }
     },
-    EndPageLoad: function(lg) {
-      let topload = Array.from(this.toploads).reverse().find(load => load.rcid == lg.props["rc-id"]);
+    EndPageLoad: function(docshell) {
+      const topload = Array.from(this.toploads).reverse().find(load => load.capture.capture.obj == docshell);
       if (topload) {
-        topload.EndPageLoad_capture = this.capture(lg, { EndPageLoad: true });
+        topload.EndPageLoad_capture = this.capture(docshell, { EndPageLoad: true });
       }
     },
 
@@ -315,9 +315,10 @@ const NET_DIAG_ENABLED = false;
             assert(obj === net.trans_active.httpchannel);
             if (!net.trans_active.httpconnection.networksocket) {
               console.log(net.trans_active.httpconnection);
+              continue;
             }
             assert(net.trans_active.httpconnection);
-            assert(net.trans_active.httpconnection.networksocket);
+            // MOOT, assert(net.trans_active.httpconnection.networksocket);
             if (obj === channel) {
               state = STATE.AFTER_ACTIVATE;
             }

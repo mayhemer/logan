@@ -195,6 +195,10 @@ logan.schema("MOZ_LOG",
       module.rule("DOCSHELL %p SetCurrentURI %s\n", function(docshell, url) {
         this.thread.docshell = this.obj(docshell).capture();
       });
+      module.rule("DOCSHELL %p EndPageLoad status: %x\n", function(docshell, status) {
+        const ds = this.obj(docshell).capture();
+        netcap(n => { n.EndPageLoad(ds) });
+      });
       logan.summaryProps("nsDocShell", ["url"]);
 
     }); // nsDocShellLeak
