@@ -1465,6 +1465,9 @@ function pointerTrim(ptr) {
       UI.fillSearchBy();
       UI.searchingEnabled(true);
       UI.loaded();
+
+      console.log("Found threads:");
+      console.log(Object.keys(this._proc.threads).sort());
     },
 
     search: async function(UI, className, queries, seekId, coloring) {
