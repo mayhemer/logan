@@ -9,7 +9,7 @@ logan.schema("MOZ_LOG",
       return {
         text: text,
         timestamp: new Date(date + "T" + time + "Z"),
-        threadname: thread,
+        threadname: (match => match ? match[1] : thread)(thread.match(/\d+: (.*$)/)),
         pid: (match => match ? match[1] : 0)(thread.match(/(\d+):/)),
         module: module,
       };
@@ -1614,6 +1614,7 @@ logan.schema("MOZ_LOG",
         pool = this.obj(pool);
         this.obj(this.thread.name)
           .create("nsThreadPool::thread")
+          .prop("name", this.thread.name)
           .link(pool)
           .call(t => {
             ++pool.__threads_total;
@@ -1625,7 +1626,7 @@ logan.schema("MOZ_LOG",
         const thread = this.obj(this.thread.name)
           .call(t => {
             if (!t.__running) {
-              t.__running = true;
+              t.__running = this.timestamp;
               ++pool.__threads_running_event;
             }
             --pool.__pending_events;
@@ -1637,10 +1638,11 @@ logan.schema("MOZ_LOG",
       module.rule("THRD-P(%p) %s waiting [%f]\n", function(pool, timeout) {
         pool = this.obj(pool);
         this.obj(this.thread.name)
-          .prop("run-time", (run_time, p) => this.duration(p.__start_time))
+          .prop("alive-time", (total_time, p) => this.duration(p.__start_time))
           .capture()
           .call(t => {
             if (t.__running) {
+              t.prop("run-time", run_time => this.duration(t.__running) + run_time);
               t.__running = false;
               --pool.__threads_running_event;
             }
@@ -1656,9 +1658,10 @@ logan.schema("MOZ_LOG",
       module.rule("THRD-P(%p) leave\n", function(pool) {
         pool = this.obj(pool);
         const thread = this.obj(this.thread.name)
-          .prop("run-time", (run_time, p) => this.duration(p.__start_time))
+          .prop("alive-time", (total_time, p) => this.duration(p.__start_time))
           .call(t => {
             if (t.__running) {
+              t.prop("run-time", run_time => this.duration(t.__running) + run_time);
               t.__running = false;
               --pool.__threads_running_event;
             }
@@ -1667,7 +1670,7 @@ logan.schema("MOZ_LOG",
         thread.destroy();
         pool.capture(`  threads: executing=${pool.__threads_running_event}, total=${pool.__threads_total}, pending-tasks=${pool.__pending_events}`).mention(thread);
       });
-      logan.summaryProps("nsThreadPool::thread", ["run-time", "idle-time", "tasks-ran"]);
+      logan.summaryProps("nsThreadPool::thread", ["alive-time", "run-time", "idle-time", "tasks-ran"]);
     }); // nsThreadPool
 
     schema.module("events", module => {
