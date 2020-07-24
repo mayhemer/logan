@@ -1585,6 +1585,91 @@ logan.schema("MOZ_LOG",
       });
     }); // ScriptLoader
 
+    schema.module("nsThreadPool", module => {
+      module.rule("THRD-P(%p) constructor!!!\n", function(pool) {
+        this.obj(pool).create("nsThreadPool").grep().call(p => {
+          p.__threads_running_event = 0;
+          p.__threads_total = 0;
+          p.__pending_events = 0;
+        });
+      });
+      module.rule("THRD-P(%p) put [%d %d %d]\n", function(pool, idle_count, thread_count, thread_limit) {
+        this.obj(pool)
+          .createOnce("nsThreadPool", p => {
+            p.__threads_running_event = 0;
+            p.__threads_total = 0;
+            p.__pending_events = 0;
+          })
+          .grep()
+          .prop("idle-count", idle_count)
+          .prop("thread-count", thread_count)
+          .capture()
+          .call(p => {
+            ++p.__pending_events;
+            p.capture(`  pending-tasks=${p.__pending_events}`);
+          });
+      });
+
+      module.rule("THRD-P(%p) enter %s\n", function(pool, threadname) {
+        pool = this.obj(pool);
+        this.obj(this.thread.name)
+          .create("nsThreadPool::thread")
+          .link(pool)
+          .call(t => {
+            ++pool.__threads_total;
+            t.__start_time = this.timestamp;
+          });
+      });
+      module.rule("THRD-P(%p) %s running [%p]\n", function(pool, event) {
+        pool = this.obj(pool);
+        const thread = this.obj(this.thread.name)
+          .call(t => {
+            if (!t.__running) {
+              t.__running = true;
+              ++pool.__threads_running_event;
+            }
+            --pool.__pending_events;
+          })
+          .prop("tasks-ran", count => ++count)
+          .capture();
+        pool.capture(`  threads: executing=${pool.__threads_running_event}, total=${pool.__threads_total}, pending-tasks=${pool.__pending_events}`).mention(thread);
+      });
+      module.rule("THRD-P(%p) %s waiting [%f]\n", function(pool, timeout) {
+        pool = this.obj(pool);
+        this.obj(this.thread.name)
+          .prop("run-time", (run_time, p) => this.duration(p.__start_time))
+          .capture()
+          .call(t => {
+            if (t.__running) {
+              t.__running = false;
+              --pool.__threads_running_event;
+            }
+            t.__idle_start = this.timestamp;
+          });
+        pool.capture(`  threads: executing=${pool.__threads_running_event}, total=${pool.__threads_total}, pending-tasks=${pool.__pending_events}`);
+      });
+      module.rule("THRD-P(%p) done waiting\n", function(pool) {
+        this.obj(this.thread.name)
+          .prop("idle-time", (idle_time, p) => this.duration(p.__idle_start) + idle_time)
+          .capture();
+      });
+      module.rule("THRD-P(%p) leave\n", function(pool) {
+        pool = this.obj(pool);
+        const thread = this.obj(this.thread.name)
+          .prop("run-time", (run_time, p) => this.duration(p.__start_time))
+          .call(t => {
+            if (t.__running) {
+              t.__running = false;
+              --pool.__threads_running_event;
+            }
+            --pool.__threads_total;
+          })
+        thread.destroy();
+        pool.capture(`  threads: executing=${pool.__threads_running_event}, total=${pool.__threads_total}, pending-tasks=${pool.__pending_events}`).mention(thread);
+      });
+      logan.summaryProps("nsThreadPool::thread", ["run-time", "idle-time", "tasks-ran"]);
+    }); // nsThreadPool
+
     schema.module("events", module => {
       module.rule("DISP %p", function(e) {
         // createOnce: an event can be re-dispatched from within itself or multiple times.
