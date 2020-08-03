@@ -879,7 +879,7 @@
           UI.lastIncrement = increment;
 
           let fromTop = $(element).parents(".log_line");
-          if (fromTop) {
+          if (fromTop && fromTop.offset()) {
             fromTop = fromTop.offset().top - $(window).scrollTop();
             fromTop |= 1; // to fix the jumping effect in Firefox
           }
