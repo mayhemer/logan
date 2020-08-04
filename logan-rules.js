@@ -121,13 +121,21 @@ logan.schema("MOZ_LOG",
         doc = this.obj(doc).capture();
         netcap(n => { n.DOMContentLoaded(doc.docshell) });
       });
+      module.rule("DOCUMENT %p ResetToURI %*$", function(doc, uri) {
+        this.obj(doc).prop("uri", uri, true).capture().call(doc => {
+          doc.__reset_time = this.timestamp;
+        });
+      });
       module.rule("DOCUMENT %p with PressShell %p and DocShell %p", function(doc, presshell, docshell) {
         this.thread.on("docshell", ds => {
           docshell = ds.alias(docshell);
         }, () => {
           docshell = this.obj(docshell);
         });
-        this.obj(presshell).link(docshell).docshell = docshell;
+        this.obj(presshell).link(docshell).call(presshell => {
+          presshell.docshell = docshell;
+          presshell.document = this.obj(doc);
+        });
         this.obj(doc).link(docshell).docshell = docshell;
       });
 
@@ -149,7 +157,10 @@ logan.schema("MOZ_LOG",
         this.obj(ps).__init_time = this.timestamp;
       });
       module.rule("PresShell::ScheduleBeforeFirstPaint this=%p", function(ps) {
-        ps = this.obj(ps).prop("first-paint-time-ms", (_, ps) => this.duration(ps.__init_time)).capture();
+        ps = this.obj(ps)
+          .prop("first-paint-time-ms", (_, ps) => this.duration(ps.__init_time))
+          .prop("schedule-before-first-paint-since-reset", (_, ps) => this.duration(ps.document.__reset_time))
+          .capture();
         netcap(n => { n.FirstPaint(ps.docshell) });
       });
     }); // PresShell
