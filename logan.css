@@ -159,7 +159,7 @@ span.checker:before {
   content: '\2610';
   /* content: '\26AA'; */
   margin: 0;
-  padding: 0 1em;
+  padding: 0 1.5em;
 
   position: absolute;
   cursor: pointer;
@@ -167,6 +167,20 @@ span.checker:before {
 span.checker.expanded:before {
   content: '\2611';
   /* content: '\26AB'; */
+}
+
+div.log_line > span.relative_ts:empty {
+  display: none;
+}
+div.log_line > span.relative_ts::after {
+  content: 'ms';
+}
+div.log_line > span.relative_ts {
+  min-width: 5em;
+  display: inline-block;
+  margin-left: 4em;
+  margin-right: -2.6em;
+  text-align: right;
 }
 
 div.log_line > span.line_controller {
@@ -185,7 +199,7 @@ div.log_line:hover > span.line_controller {
 }
 
 div.log_line > span.pre {
-  margin-left: 3em;
+  margin-left: 4em;
 }
 span.branch > span:not(.checker) {
   margin-left: .5em;

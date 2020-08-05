@@ -121,6 +121,7 @@
     mousedown: false,
     lastIncrement: 0,
     autoFetchDelay: AUTO_FETCH_INITIAL_DELAY,
+    relativeTS: null,
 
     escapeHtml: function(string) {
       return String(string).replace(/[&<>"'`=\/]/g, function(s) {
@@ -247,6 +248,7 @@
       this.expanders = {};
       this.loadWhole = new Set();
       this.display = {};
+      this.relativeTS = null;
     },
 
     clearResultsView: function() {
@@ -943,6 +945,35 @@
               alert(`ALREADY OPEN: event ${event.props.pointer.toUpperCase()}`);
             }
           });
+
+        const relative_ts_text = (this_capture, source_capture) => {
+          let relative_ts = this_capture.time.getTime() - source_capture.time.getTime();
+          relative_ts = `${relative_ts > 0 ? '+' : ''}${relative_ts}`;
+          return relative_ts;
+        };      
+        
+        const relativeTS = $("<span>")
+          .addClass("relative_ts");
+        if (UI.relativeTS) {
+          const relative_ts = relative_ts_text(capture, UI.relativeTS);
+          relativeTS.text(relative_ts);
+        }
+
+        let zeroTS = $("<span>")
+          .attr('title', 'Sets this line as 0-time for relative timestamp display')
+          .text('\u23F2')
+          .click(function() {
+            UI.relativeTS = capture;
+            for (const disp of Object.values(UI.display)) {
+              const that = disp.data("capture");
+              const relative_ts = relative_ts_text(that, UI.relativeTS);
+              let target = $(disp).children(".relative_ts");
+              if (!target.length) {
+                continue;
+              }
+              target.text(relative_ts);
+            }
+          });
         
         if (UI.mousedown) {
           setTimeout(() => {
@@ -958,15 +989,18 @@
           }, UI.autoFetchDelay);
         }
 
-        return $("<span>")
-          .addClass("line_controller")
-          .append(eventspan)
-          .append(up)
-          .append(down)
-          .mousedown((e) => {
-            e.preventDefault();
-          })
-        ;
+        return [
+          $("<span>")
+            .addClass("line_controller")
+            .append(eventspan)
+            .append(up)
+            .append(down)
+            .append(zeroTS)
+            .mousedown((e) => {
+              e.preventDefault();
+            }),
+          relativeTS
+        ];
       };
 
       let classification = () => !extra ? ("noextra obj-" + obj.id) : "extra";

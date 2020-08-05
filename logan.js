@@ -502,10 +502,8 @@ function pointerTrim(ptr) {
     };
 
     this.id = logan.captures.length;
-    if (netdiag.enabled) {
-      // This property takes surprisingly a lot of memory...
-      this.time = logan._proc.timestamp;
-    }
+    // This property takes surprisingly a lot of memory...
+    this.time = logan._proc.timestamp;
     this.thread = logan._proc.thread;
     this.obj = obj;
     this.what = what;
