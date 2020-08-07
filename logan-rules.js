@@ -1756,10 +1756,6 @@ logan.schema("MOZ_LOG",
         });
         this.thread._event_stack.pop();
       });
-
-      module.rule("CHECKPOINT %s %*$", function(name, data) {
-        this.obj(name).create("CheckPoint").prop("name", name).prop("data", data).destroy();
-      });
     }); // events
 
   }
