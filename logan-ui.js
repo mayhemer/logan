@@ -1121,12 +1121,16 @@
                     this.bc_details.remove();
                   }
                 }.bind(this))
-              )
-              .append($("<input>").attr("type", "button").addClass("button").val("diagnose").css("margin-bottom", "1em")
-                .click(function() {
-                  netdiagUI.diagnose(this, obj);
-                }.bind(this))
-              )
+            );
+            if (NET_DIAG_ENABLED) {
+              element
+                .append($("<input>").attr("type", "button").addClass("button").val("diagnose").css("margin-bottom", "1em")
+                  .click(function() {
+                    netdiagUI.diagnose(this, obj);
+                  }.bind(this))
+                )
+            }
+            element
               .append($("<input>").attr("type", "button").addClass("button").val("load all lines").css("margin-bottom", "1em")
                 .click(function() {
                   this.loadWhole.add(obj.id);

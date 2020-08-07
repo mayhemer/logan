@@ -1,7 +1,7 @@
 var netdiag = null;
 var netdiagUI = null;
 
-const NET_DIAG_ENABLED = true;
+const NET_DIAG_ENABLED = false;
 
 (function() {
 
@@ -50,6 +50,7 @@ const NET_DIAG_ENABLED = true;
       let capture = {};
       obj.capture({ net: what }, capture);
       this.captures.push(capture);
+      // console.log('netdiag capture', capture);
       return capture;
     },
 
@@ -181,6 +182,8 @@ const NET_DIAG_ENABLED = true;
         return;
       }
 
+      console.log("topload", topload);
+
       $("#netdiag_section").empty().append($("<input type='button'>")
         .val("\uD83E\uDC70")
         .addClass("button icon red")
@@ -235,9 +238,12 @@ const NET_DIAG_ENABLED = true;
 
       let state = STATE.BEFORE_OPEN;
 
+      console.log('netdiag iterates captures');
       try {
 
         for (capture of captures) {
+
+          console.log(capture);
 
           let cid = capture.capture.id;
           let net = capture.capture.what.net;
@@ -315,10 +321,9 @@ const NET_DIAG_ENABLED = true;
             assert(obj === net.trans_active.httpchannel);
             if (!net.trans_active.httpconnection.networksocket) {
               console.log(net.trans_active.httpconnection);
-              continue;
             }
             assert(net.trans_active.httpconnection);
-            // MOOT, assert(net.trans_active.httpconnection.networksocket);
+            assert(net.trans_active.httpconnection.networksocket);
             if (obj === channel) {
               state = STATE.AFTER_ACTIVATE;
             }
@@ -453,7 +458,7 @@ const NET_DIAG_ENABLED = true;
             continue;
           }
 
-          // console.warn("unprocessed");
+          console.warn("unprocessed");
         }
 
         console.log("data collected");
@@ -489,6 +494,8 @@ const NET_DIAG_ENABLED = true;
           if (!result.obj || result.obj.props.className !== "nsHttpChannel") {
             return;
           }
+
+          console.log(result);
 
           if (result.recv_done_cid < channel.open_cid)
           {
