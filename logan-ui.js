@@ -522,7 +522,7 @@
       source = source || obj;
 
       let color = this.objColor(source);
-      let style = ".obj-" + obj.id + " { background-color: " + color + " !important}";
+      let style = ".obj-" + obj.id + " { background-color: " + color + " !important; color: black }";
 
       return function(event) {
         if (set === true) {
