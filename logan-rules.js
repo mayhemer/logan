@@ -1685,7 +1685,7 @@ logan.schema("MOZ_LOG",
     }); // nsThreadPool
 
     schema.module("events", module => {
-      module.rule("DISP %p", function(e) {
+      const dispatch = function(e) {
         // createOnce: an event can be re-dispatched from within itself or multiple times.
         this.obj(e).createOnce("Event", e => {
           e.__dispatch_count = 0;
@@ -1699,7 +1699,10 @@ logan.schema("MOZ_LOG",
             ++e.__dispatch_count;
           }
         }).follow("TIMEOUT %u", e => { e.capture() });
-      });
+      };
+      module.rule("DISP %p", dispatch);
+      module.rule("DISP %p (%p)", function(e, c) { dispatch.call(this, e + ':' + c); });
+      
       module.rule("SEND %p %d %d", function(m, seqn, other_pid) {
         this.obj(m).create("IPC Send").ipcid(seqn).send(`IPC:${other_pid}`).call(m => {
           m.__ts = this.timestamp;
@@ -1720,6 +1723,7 @@ logan.schema("MOZ_LOG",
       module.rule("EXEC %p", execute);
       module.rule("EXEC %p [%*]", function(e, _) { execute.call(this, e, null); });
       module.rule("EXEC %p %p", execute);
+      module.rule("EXEC %p (%p) %p", function(e, c, raii) { execute.call(this, e + ':' + c, raii); });
       module.rule("EXEC %p %p [%*]", execute);
 
       const receive = function(m, raii, seqn) {
